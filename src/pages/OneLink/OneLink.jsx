@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
+import { NAV_GROUPS } from '../../lib/navGroups'
 import './OneLink.css'
 
 const slugify = (value) =>
@@ -9,106 +10,6 @@ const slugify = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-+|-+$)/g, '')
-
-const NAV_GROUPS = [
-  {
-    heading: 'OVERVIEW',
-    items: [
-      {
-        key: 'dashboard',
-        label: 'Dashboard',
-        icon: '/images/dashboard.svg',
-        route: '/dashboard',
-      },
-      {
-        key: 'restaurant-profile',
-        label: 'Restaurant Profile',
-        icon: '/images/rest.svg',
-        route: '/restaurant-profile',
-      },
-      {
-        key: 'branding',
-        label: 'Branding',
-        icon: '/images/black.branding.svg',
-      },
-    ],
-  },
-  {
-    heading: 'OPERATIONS',
-    items: [
-      { key: 'menu', label: 'Menu', icon: '/images/blackmenu.svg' },
-      {
-        key: 'incoming-orders',
-        label: 'Incoming Orders',
-        icon: '/images/incoming.svg',
-        notification: '12',
-      },
-      {
-        key: 'reservations',
-        label: 'Reservations',
-        icon: '/images/breserve.svg',
-      },
-      { key: 'tables', label: 'Tables', icon: '/images/tabs.svg' },
-      { key: 'staff', label: 'Staff', icon: '/images/stafb.svg' },
-      { key: 'customers', label: 'Customers', icon: '/images/cust.svg' },
-      {
-        key: 'role-permissions',
-        label: 'Role Permissions',
-        icon: '/images/role key.svg',
-      },
-    ],
-  },
-  {
-    heading: 'GROWTH',
-    items: [
-      { key: 'analytics', label: 'Analytics', icon: '/images/analy.png' },
-      { key: 'payments', label: 'Payments', icon: '/images/payments.svg' },
-      { key: 'marketing', label: 'Marketing', icon: '/images/market.svg' },
-      { key: 'reviews', label: 'Reviews', icon: '/images/breview.svg' },
-      {
-        key: 'one-link',
-        label: 'One Link',
-        icon: '/images/one link.svg',
-        route: '/one-link',
-      },
-      {
-        key: 'directory-listings',
-        label: 'Directory Listings',
-        icon: '/images/directory.svg',
-        route: '/directory-listings',
-      },
-      {
-        key: 'digital-business-card',
-        label: 'Digital Business Card',
-        icon: '/images/digicard.svg',
-        route: '/digital-business-card',
-      },
-    ],
-  },
-  {
-    heading: 'SYSTEM',
-    items: [
-      { key: 'pos', label: 'POS Integration', icon: '/images/pos.svg' },
-      {
-        key: 'notifications',
-        label: 'Notifications',
-        icon: '/images/noti.svg',
-      },
-      { key: 'settings', label: 'Settings', icon: '/images/settings.svg' },
-    ],
-  },
-  {
-    heading: 'PLATFORM',
-    items: [
-      {
-        key: 'platform-admin',
-        label: 'Platform Admin',
-        icon: '/images/platad.svg',
-        route: '/platform-admin',
-      },
-    ],
-  },
-]
 
 const INITIAL_DESTINATIONS = [
   {
@@ -313,10 +214,10 @@ function OneLink() {
             </span>
           </div>
 
-          <nav>
+          <nav className="nav-scroll">
             {NAV_GROUPS.map((group) => (
-              <div key={group.heading}>
-                <div className="nav-heading">{group.heading}</div>
+              <div key={group.label}>
+                <div className="nav-heading">{group.label}</div>
 
                 {group.items.map((item) => (
                   <div
@@ -328,8 +229,8 @@ function OneLink() {
                       <img src={item.icon} alt="icon" />
                     </span>
                     <span>{item.label}</span>
-                    {item.notification && (
-                      <b className="notification">{item.notification}</b>
+                    {item.badge && (
+                      <b className="notification">{item.badge}</b>
                     )}
                   </div>
                 ))}

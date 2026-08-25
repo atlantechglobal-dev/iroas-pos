@@ -257,6 +257,7 @@ function PlatformAdmin() {
             </div>
           </div>
 
+          <nav className="nav-scroll">
           {NAV_GROUPS.map((group) => (
             <div key={group.label}>
               <div className="section-title">{group.label}</div>
@@ -276,6 +277,7 @@ function PlatformAdmin() {
               ))}
             </div>
           ))}
+          </nav>
         </aside>
 
         {/* MAIN CONTENT */}

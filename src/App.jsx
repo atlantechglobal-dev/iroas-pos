@@ -19,6 +19,18 @@ import DirectoryListings from './pages/DirectoryListings/DirectoryListings'
 import DigitalBusinessCard from './pages/DigitalBusinessCard/DigitalBusinessCard'
 import OneLink from './pages/OneLink/OneLink'
 import PlatformAdmin from './pages/PlatformAdmin/PlatformAdmin'
+import Menu from './pages/Menu/Menu'
+import Orders from './pages/Orders/Orders'
+import Reservations from './pages/Reservations/Reservations'
+import Tables from './pages/Tables/Tables'
+import Staff from './pages/Staff/Staff'
+import Analytics from './pages/Analytics/Analytics'
+import Payments from './pages/Payments/Payments'
+import Marketing from './pages/Marketing/Marketing'
+import Reviews from './pages/Reviews/Reviews'
+import PosIntegration from './pages/PosIntegration/PosIntegration'
+import Notifications from './pages/Notifications/Notifications'
+import Settings from './pages/Settings/Settings'
 
 function App() {
   return (
@@ -112,6 +124,102 @@ function App() {
           element={
             <ProtectedRoute>
               <OneLink />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/menu"
+          element={
+            <ProtectedRoute>
+              <Menu />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders"
+          element={
+            <ProtectedRoute>
+              <Orders />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reservations"
+          element={
+            <ProtectedRoute>
+              <Reservations />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tables"
+          element={
+            <ProtectedRoute>
+              <Tables />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff"
+          element={
+            <ProtectedRoute>
+              <Staff />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments"
+          element={
+            <ProtectedRoute>
+              <Payments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/marketing"
+          element={
+            <ProtectedRoute>
+              <Marketing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reviews"
+          element={
+            <ProtectedRoute>
+              <Reviews />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pos-integration"
+          element={
+            <ProtectedRoute>
+              <PosIntegration />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <Notifications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           }
         />

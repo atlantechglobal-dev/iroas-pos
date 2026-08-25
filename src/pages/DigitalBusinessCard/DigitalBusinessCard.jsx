@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
+import { NAV_GROUPS } from '../../lib/navGroups'
 import './DigitalBusinessCard.css'
 
 const slugify = (value) =>
@@ -9,146 +10,6 @@ const slugify = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-+|-+$)/g, '')
-
-const NAV_GROUPS = [
-  {
-    label: 'Overview',
-    items: [
-      {
-        key: 'dashboard',
-        label: 'Dashboard',
-        icon: '<rect x="2.5" y="2.5" width="6.5" height="6.5" rx="1.2"/><rect x="11" y="2.5" width="6.5" height="6.5" rx="1.2"/><rect x="2.5" y="11" width="6.5" height="6.5" rx="1.2"/><rect x="11" y="11" width="6.5" height="6.5" rx="1.2"/>',
-        route: '/dashboard',
-      },
-      {
-        key: 'restaurant-profile',
-        label: 'Restaurant Profile',
-        icon: '<path d="M3 8 L4 3 H16 L17 8"/><path d="M3 8 V17 H17 V8"/><path d="M3 8 H17"/><rect x="8" y="12" width="4" height="5"/>',
-        route: '/restaurant-profile',
-      },
-      {
-        key: 'branding',
-        label: 'Branding',
-        icon: '<path d="M10 2.5c-4.1 0-7.5 3.2-7.5 7.2 0 2.9 2 4.3 3.8 4.3.9 0 1.2-.5 1.2-1 0-.4-.3-.8-.3-1.4 0-1.5 1.4-2.6 3.2-2.6 2.7 0 4.6-1.7 4.6-4 0-2.5-2.3-4.5-5-4.5Z"/><circle cx="6.3" cy="8.7" r=".9" fill="currentColor" stroke="none"/><circle cx="9.3" cy="6.2" r=".9" fill="currentColor" stroke="none"/><circle cx="13" cy="7.4" r=".9" fill="currentColor" stroke="none"/>',
-      },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      {
-        key: 'menu',
-        label: 'Menu',
-        icon: '<path d="M3 3 L17 17"/><path d="M17 3 L3 17"/><circle cx="5" cy="5" r="2"/><circle cx="5" cy="15" r="2"/>',
-      },
-      {
-        key: 'incoming-orders',
-        label: 'Incoming Orders',
-        badge: '12',
-        icon: '<rect x="4" y="3" width="12" height="15" rx="1.4"/><rect x="7.5" y="1.5" width="5" height="3" rx="1"/><path d="M7 8 H13 M7 11 H13 M7 14 H10.5"/>',
-      },
-      {
-        key: 'reservations',
-        label: 'Reservations',
-        icon: '<rect x="2.5" y="3.5" width="15" height="14" rx="1.4"/><path d="M2.5 7.5 H17.5"/><path d="M6 2 V5 M14 2 V5"/>',
-      },
-      {
-        key: 'tables',
-        label: 'Tables',
-        icon: '<rect x="2.5" y="4.5" width="15" height="11" rx="1.4"/><path d="M2.5 9 H17.5 M10 4.5 V15.5"/>',
-      },
-      {
-        key: 'staff',
-        label: 'Staff',
-        icon: '<circle cx="10" cy="6.5" r="3.2"/><path d="M3.5 17c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6"/>',
-      },
-      {
-        key: 'customers',
-        label: 'Customers',
-        icon: '<circle cx="7.2" cy="6.5" r="2.6"/><circle cx="13.6" cy="7.3" r="2.1"/><path d="M2.3 17c0-2.9 2.2-5.2 4.9-5.2s4.9 2.3 4.9 5.2"/><path d="M12.7 12.3c2 .3 3.6 2.2 3.6 4.5"/>',
-      },
-      {
-        key: 'role-permissions',
-        label: 'Role Permissions',
-        icon: '<circle cx="6.5" cy="13.5" r="3.3"/><path d="M8.8 11.2 15.5 4.5 M13 7 14.6 8.6 M15.2 4.8 17 6.6"/>',
-      },
-    ],
-  },
-  {
-    label: 'Growth',
-    items: [
-      {
-        key: 'analytics',
-        label: 'Analytics',
-        icon: '<path d="M3 17 V11 M8 17 V6 M13 17 V9 M17.5 17 V3"/>',
-      },
-      {
-        key: 'payments',
-        label: 'Payments',
-        icon: '<rect x="2.5" y="4.5" width="15" height="11" rx="1.6"/><path d="M2.5 8 H17.5"/>',
-      },
-      {
-        key: 'marketing',
-        label: 'Marketing',
-        icon: '<path d="M3 8 V12 L6 12.6 V7.4 Z"/><path d="M6 7.4 13 3.5 V16.5 L6 12.6"/><path d="M5.5 12.8 6.8 16.5 H4.7 Z"/>',
-      },
-      {
-        key: 'reviews',
-        label: 'Reviews',
-        icon: '<path d="M10 2.5 12.2 7.4 17.5 8.1 13.6 11.7 14.6 17 10 14.3 5.4 17 6.4 11.7 2.5 8.1 7.8 7.4 Z"/>',
-      },
-      {
-        key: 'one-link',
-        label: 'One Link',
-        route: '/one-link',
-        icon: '<path d="M8.5 11.5 11.5 8.5"/><path d="M9.3 5.8 11 4.1a3 3 0 0 1 4.2 4.2l-1.7 1.7"/><path d="M10.7 14.2 9 15.9a3 3 0 0 1-4.2-4.2l1.7-1.7"/>',
-      },
-      {
-        key: 'directory-listings',
-        label: 'Directory Listings',
-        route: '/directory-listings',
-        icon: '<path d="M4 5 H16 M4 10 H16 M4 15 H16"/><circle cx="4" cy="5" r=".2"/>',
-      },
-      {
-        key: 'digital-business-card',
-        label: 'Digital Business Card',
-        route: '/digital-business-card',
-        icon: '<rect x="2.5" y="4" width="15" height="12" rx="1.6"/><circle cx="7" cy="9.2" r="1.7"/><path d="M4.5 13.6c.5-1.5 1.5-2.2 2.5-2.2s2 .7 2.5 2.2"/><path d="M12 8 H15 M12 10.5 H15"/>',
-      },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      {
-        key: 'pos',
-        label: 'POS Integration',
-        icon: '<path d="M7 2.5 V7 M13 2.5 V7"/><rect x="5.5" y="7" width="9" height="5" rx="1.2"/><path d="M10 12 V15.5"/><path d="M7 15.5 H13"/>',
-      },
-      {
-        key: 'notifications',
-        label: 'Notifications',
-        icon: '<path d="M5 14c0-1 .8-1.2.8-3.2V9a4.2 4.2 0 0 1 8.4 0v1.8c0 2 .8 2.2.8 3.2Z"/><path d="M8.3 16.5a1.8 1.8 0 0 0 3.4 0"/>',
-      },
-      {
-        key: 'settings',
-        label: 'Settings',
-        icon: '<circle cx="10" cy="10" r="2.6"/><path d="M10 3v2M10 15v2M17 10h-2M5 10H3M14.9 5.1l-1.4 1.4M6.5 13.5l-1.4 1.4M14.9 14.9l-1.4-1.4M6.5 6.5 5.1 5.1"/>',
-      },
-    ],
-  },
-  {
-    label: 'Platform',
-    items: [
-      {
-        key: 'platform-admin',
-        label: 'Platform Admin',
-        route: '/platform-admin',
-        icon: '<path d="M10 2.3 16.5 4.7 V9.5c0 4.2-2.7 6.9-6.5 8.2-3.8-1.3-6.5-4-6.5-8.2V4.7Z"/><path d="M7.3 10 9.2 11.9 12.9 8.2"/>',
-      },
-    ],
-  },
-]
 
 const THEME_COLORS = {
   lime: { accent: '#8dc63f', dark: '#7ab52f' },
@@ -255,6 +116,7 @@ function DigitalBusinessCard() {
             <div className="chev">▾</div>
           </div>
 
+          <nav className="nav-scroll">
           {NAV_GROUPS.map((group) => (
             <div key={group.label}>
               <div className="nav-group-label">{group.label}</div>
@@ -265,18 +127,16 @@ function DigitalBusinessCard() {
                   key={item.key}
                   onClick={() => handleNavClick(item)}
                 >
-                  <span
-                    className="ico"
-                    dangerouslySetInnerHTML={{
-                      __html: `<svg viewBox="0 0 20 20">${item.icon}</svg>`,
-                    }}
-                  />
+                  <span className="ico">
+                    <img src={item.icon} alt="" />
+                  </span>
                   {item.label}
                   {item.badge && <span className="badge">{item.badge}</span>}
                 </div>
               ))}
             </div>
           ))}
+          </nav>
         </aside>
 
         {/* MAIN */}
