@@ -18,16 +18,22 @@
     var(--bg-cream) 45%,
     var(--bg-peach) 100%
   );
+  width: 100%;
   min-height: 100vh;
   color: var(--ink);
 
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 90px 24px 60px;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+  justify-content: center;
+
+  .go-live-content {
+    width: 100%;
+    max-width: 640px;
+    padding: 90px 24px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
 
   .icon-badge {
     width: 88px;
@@ -180,7 +186,9 @@
   }
 
   @media (max-width: 480px) {
-    padding: 60px 16px 40px;
+    .go-live-content {
+      padding: 60px 16px 40px;
+    }
 
     .title {
       font-size: 26px;
