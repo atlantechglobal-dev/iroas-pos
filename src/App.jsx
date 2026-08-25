@@ -13,6 +13,8 @@ import Domain from './pages/Domain/Domain'
 import Brand from './pages/Brand/Brand'
 import Launch from './pages/Launch/Launch'
 import GoLive from './pages/GoLive/GoLive'
+import Dashboard from './pages/Dashboard/Dashboard'
+import RestaurantProfile from './pages/RestaurantProfile/RestaurantProfile'
 import DirectoryListings from './pages/DirectoryListings/DirectoryListings'
 import DigitalBusinessCard from './pages/DigitalBusinessCard/DigitalBusinessCard'
 import OneLink from './pages/OneLink/OneLink'
@@ -70,6 +72,22 @@ function App() {
           element={
             <ProtectedRoute>
               <GoLive />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/restaurant-profile"
+          element={
+            <ProtectedRoute>
+              <RestaurantProfile />
             </ProtectedRoute>
           }
         />

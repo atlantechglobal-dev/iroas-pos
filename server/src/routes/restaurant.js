@@ -10,10 +10,19 @@ function getOwnRestaurant(ownerId) {
 
 router.use(requireAuth)
 
+function parseSettings(restaurant) {
+  if (!restaurant.settings_json) return {}
+  try {
+    return JSON.parse(restaurant.settings_json)
+  } catch {
+    return {}
+  }
+}
+
 router.get('/', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
-  res.json({ restaurant })
+  res.json({ restaurant: { ...restaurant, settings: parseSettings(restaurant) } })
 })
 
 router.put('/profile', (req, res) => {
@@ -104,6 +113,20 @@ router.put('/brand', (req, res) => {
   )
 
   res.json({ ok: true })
+})
+
+router.put('/settings', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+
+  const patch = req.body || {}
+  const merged = { ...parseSettings(restaurant), ...patch }
+
+  db.prepare(
+    `UPDATE restaurants SET settings_json = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(JSON.stringify(merged), restaurant.id)
+
+  res.json({ ok: true, settings: merged })
 })
 
 router.post('/launch', (req, res) => {

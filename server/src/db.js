@@ -51,6 +51,7 @@ db.exec(`
     theme TEXT DEFAULT 'modern',
     status TEXT NOT NULL DEFAULT 'onboarding' CHECK (status IN ('onboarding', 'live')),
     plan TEXT NOT NULL DEFAULT 'Starter',
+    settings_json TEXT,
     launched_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -65,5 +66,11 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `)
+
+// Migration: older databases created before settings_json existed.
+const restaurantColumns = db.prepare('PRAGMA table_info(restaurants)').all()
+if (!restaurantColumns.some((col) => col.name === 'settings_json')) {
+  db.exec('ALTER TABLE restaurants ADD COLUMN settings_json TEXT')
+}
 
 export default db

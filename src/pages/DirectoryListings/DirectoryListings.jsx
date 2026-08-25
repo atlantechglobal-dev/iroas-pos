@@ -7,11 +7,17 @@ const NAV_GROUPS = [
   {
     label: 'Overview',
     items: [
-      { key: 'dashboard', label: 'Dashboard', icon: '/images/dashboard.svg' },
+      {
+        key: 'dashboard',
+        label: 'Dashboard',
+        icon: '/images/dashboard.svg',
+        route: '/dashboard',
+      },
       {
         key: 'restaurant-profile',
         label: 'Restaurant Profile',
         icon: '/images/rest.svg',
+        route: '/restaurant-profile',
       },
       {
         key: 'branding',

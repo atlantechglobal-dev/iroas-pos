@@ -56,6 +56,7 @@ export const api = {
   updateProfile: (payload) => request('/restaurant/profile', { method: 'PUT', body: payload }),
   updateDomain: (payload) => request('/restaurant/domain', { method: 'PUT', body: payload }),
   updateBrand: (payload) => request('/restaurant/brand', { method: 'PUT', body: payload }),
+  updateSettings: (payload) => request('/restaurant/settings', { method: 'PUT', body: payload }),
   launch: () => request('/restaurant/launch', { method: 'POST' }),
 
   adminStats: () => request('/admin/stats'),

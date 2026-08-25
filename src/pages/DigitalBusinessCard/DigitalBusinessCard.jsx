@@ -18,11 +18,13 @@ const NAV_GROUPS = [
         key: 'dashboard',
         label: 'Dashboard',
         icon: '<rect x="2.5" y="2.5" width="6.5" height="6.5" rx="1.2"/><rect x="11" y="2.5" width="6.5" height="6.5" rx="1.2"/><rect x="2.5" y="11" width="6.5" height="6.5" rx="1.2"/><rect x="11" y="11" width="6.5" height="6.5" rx="1.2"/>',
+        route: '/dashboard',
       },
       {
         key: 'restaurant-profile',
         label: 'Restaurant Profile',
         icon: '<path d="M3 8 L4 3 H16 L17 8"/><path d="M3 8 V17 H17 V8"/><path d="M3 8 H17"/><rect x="8" y="12" width="4" height="5"/>',
+        route: '/restaurant-profile',
       },
       {
         key: 'branding',
