@@ -1,7 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getStoredUser, clearSession } from '../../lib/api'
+import { api, getStoredUser, clearSession } from '../../lib/api'
 import './OneLink.css'
+
+const slugify = (value) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-+|-+$)/g, '')
 
 const NAV_GROUPS = [
   {
@@ -178,11 +185,33 @@ function OneLink() {
   const [activeNav, setActiveNav] = useState('one-link')
   const [destinations, setDestinations] = useState(INITIAL_DESTINATIONS)
   const [theme, setTheme] = useState(THEMES[0])
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [restaurantName, setRestaurantName] = useState('')
+  const [restaurantStatus, setRestaurantStatus] = useState('')
   const [publishLabel, setPublishLabel] = useState('✓  Publish changes')
+
+  useEffect(() => {
+    api
+      .getRestaurant()
+      .then(({ restaurant }) => {
+        if (restaurant.name) setRestaurantName(restaurant.name)
+        setRestaurantStatus(restaurant.status)
+      })
+      .catch(() => {})
+  }, [])
+
+  const displayRestaurant = restaurantName.trim() || 'Your restaurant'
+  const linkSlug = slugify(restaurantName || currentUser?.name || 'your-link')
+  const oneLink = `iroas.link/${linkSlug}`
 
   const handleNavClick = (item) => {
     setActiveNav(item.key)
-    if (item.route) navigate(item.route)
+    setProfileOpen(false)
+    if (item.route) {
+      navigate(item.route)
+    } else {
+      alert(`${item.label} — coming soon in this demo.`)
+    }
   }
 
   const toggleDestination = (key) => {
@@ -197,7 +226,7 @@ function OneLink() {
 
   const handleCopyLink = () => {
     navigator.clipboard
-      .writeText('https://iroas.link/saffron-and-fig')
+      .writeText(`https://${oneLink}`)
       .then(() => alert('Link copied!'))
       .catch(() => alert('Unable to copy link.'))
   }
@@ -207,8 +236,26 @@ function OneLink() {
     setTimeout(() => setPublishLabel('✓  Publish changes'), 2000)
   }
 
-  const handleDownloadQR = () => {
-    console.log('Downloading QR...')
+  const handleDownloadQR = async () => {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(
+      `https://${oneLink}`,
+    )}`
+
+    try {
+      const response = await fetch(qrUrl)
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = `${linkSlug}-QR.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      window.open(qrUrl, '_blank')
+    }
   }
 
   const handleAddCustomLink = () => {
@@ -242,14 +289,17 @@ function OneLink() {
             <img src="/images/Logo9-1 1.svg" alt="IROAS Logo" />
           </div>
 
-          <div className="restaurant-box">
+          <div
+            className="restaurant-box"
+            onClick={() => alert('Switch restaurant — coming soon in this demo.')}
+          >
             <div className="restaurant-symbol">
-              <img src="/images/s&f.svg" alt="icon" />
+              {displayRestaurant.charAt(0).toUpperCase()}
             </div>
 
             <div className="restaurant-details">
-              <strong>Saffron & Fig</strong>
-              <span>Downtown · Open</span>
+              <strong>{displayRestaurant}</strong>
+              <span>{restaurantStatus === 'live' ? 'Live' : 'Onboarding'}</span>
             </div>
 
             <span className="restaurant-arrow">
@@ -297,21 +347,46 @@ function OneLink() {
                 + Quick action
               </button>
 
-              <button className="notification-button">
+              <button
+                className="notification-button"
+                onClick={() => alert('No new notifications.')}
+              >
                 <img src="/images/bell.svg" alt="Notifications" />
               </button>
 
-              <div className="profile" onClick={handleLogout} title="Click to log out">
-                <div className="profile-image">
-                  {(currentUser?.name || 'A').charAt(0).toUpperCase()}
+              <div className="profile-wrapper">
+                <div className="profile" onClick={() => setProfileOpen((prev) => !prev)}>
+                  <div className="profile-image">
+                    {(currentUser?.name || 'A').charAt(0).toUpperCase()}
+                  </div>
+
+                  <div className="profile-details">
+                    <strong>{currentUser?.name || 'Owner'}</strong>
+                    <small>Owner</small>
+                  </div>
+
+                  <span className="profile-arrow">⌄</span>
                 </div>
 
-                <div className="profile-details">
-                  <strong>{currentUser?.name || 'Owner'}</strong>
-                  <small>Owner</small>
-                </div>
-
-                <span className="profile-arrow">⌄</span>
+                {profileOpen && (
+                  <>
+                    <div className="menu-overlay" onClick={() => setProfileOpen(false)} />
+                    <div className="profile-menu">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false)
+                          alert('Account settings — coming soon in this demo.')
+                        }}
+                      >
+                        Settings
+                      </button>
+                      <button type="button" className="danger" onClick={handleLogout}>
+                        Log out
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </header>
@@ -356,7 +431,7 @@ function OneLink() {
 
                   <div className="link-row">
                     <div className="link-field">
-                      iroas.link/<strong>saffron-and-fig</strong>
+                      iroas.link/<strong>{linkSlug}</strong>
                     </div>
 
                     <button className="small-button" onClick={handleCopyLink}>
@@ -480,9 +555,11 @@ function OneLink() {
                 <div className="phone">
                   <div className="phone-screen">
                     <div className="preview-logo">
-                      <div className="preview-circle">S</div>
-                      <strong>Saffron & Fig</strong>
-                      <span>iroas.link/saffron-and-fig</span>
+                      <div className="preview-circle">
+                        {displayRestaurant.charAt(0).toUpperCase()}
+                      </div>
+                      <strong>{displayRestaurant}</strong>
+                      <span>{oneLink}</span>
                     </div>
 
                     <div className="preview-links">

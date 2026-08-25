@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getStoredUser, clearSession } from '../../lib/api'
+import { api, getStoredUser, clearSession } from '../../lib/api'
 import './DirectoryListings.css'
 
 const NAV_GROUPS = [
@@ -176,6 +176,29 @@ function DirectoryListings() {
 
   const [activeNav, setActiveNav] = useState('directory-listings')
   const [directoryQuery, setDirectoryQuery] = useState('')
+  const [restaurantName, setRestaurantName] = useState('')
+  const [restaurantCity, setRestaurantCity] = useState('')
+  const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [profileOpen, setProfileOpen] = useState(false)
+
+  useEffect(() => {
+    api
+      .getRestaurant()
+      .then(({ restaurant }) => {
+        if (restaurant.name) setRestaurantName(restaurant.name)
+        if (restaurant.city) setRestaurantCity(restaurant.city)
+        setRestaurantStatus(restaurant.status)
+      })
+      .catch(() => {})
+  }, [])
+
+  const displayRestaurant = restaurantName.trim() || 'Your restaurant'
+  const restaurantSubtitle = [
+    restaurantCity.trim(),
+    restaurantStatus === 'live' ? 'Live' : 'Onboarding',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   const handleLogout = () => {
     clearSession()
@@ -184,15 +207,20 @@ function DirectoryListings() {
 
   const handleNavClick = (item) => {
     setActiveNav(item.key)
-    if (item.route) navigate(item.route)
+    setProfileOpen(false)
+    if (item.route) {
+      navigate(item.route)
+    } else {
+      alert(`${item.label} — coming soon in this demo.`)
+    }
   }
 
   const handleSync = () => {
-    console.log('Syncing all directories...')
+    alert('Syncing all directories… this demo is not connected to a real listings provider yet.')
   }
 
   const handleAction = (name) => {
-    console.log(`Action clicked for: ${name}`)
+    alert(`${name} — coming soon in this demo.`)
   }
 
   const filteredDirectories = DIRECTORIES.filter((directory) =>
@@ -208,13 +236,17 @@ function DirectoryListings() {
             <img src="/images/Logo9-1 1.svg" alt="logo" />
           </div>
 
-          <button className="restaurant-switch" type="button">
+          <button
+            className="restaurant-switch"
+            type="button"
+            onClick={() => alert('Switch restaurant — coming soon in this demo.')}
+          >
             <span className="avatar-badge">
-              <img src="/images/s&f.svg" alt="" />
+              {displayRestaurant.charAt(0).toUpperCase()}
             </span>
             <span className="restaurant-info">
-              <strong>Saffron & Fig</strong>
-              <small>Downtown · Open</small>
+              <strong>{displayRestaurant}</strong>
+              <small>{restaurantSubtitle || 'Onboarding'}</small>
             </span>
             <svg className="chev" width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -260,14 +292,23 @@ function DirectoryListings() {
             </div>
 
             <div className="topbar-actions">
-              <button className="btn btn-primary btn-sm" type="button">
+              <button
+                className="btn btn-primary btn-sm"
+                type="button"
+                onClick={() => alert('Quick actions — coming soon in this demo.')}
+              >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
                 </svg>
                 Quick action
               </button>
 
-              <button className="icon-btn" type="button" aria-label="Notifications">
+              <button
+                className="icon-btn"
+                type="button"
+                aria-label="Notifications"
+                onClick={() => alert('No new notifications.')}
+              >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <path d="M6 8C6 5.79086 7.79086 4 10 4H14C16.2091 4 18 5.79086 18 8V13L20 17H4L6 13V8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
                   <path d="M10 20C10 21.1046 10.8954 22 12 22C13.1046 22 14 21.1046 14 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -275,18 +316,44 @@ function DirectoryListings() {
                 <span className="dot"></span>
               </button>
 
-              <button className="user-chip" type="button" onClick={handleLogout} title="Click to log out">
-                <span className="avatar-dark">
-                  {(currentUser?.name || 'A').charAt(0).toUpperCase()}
-                </span>
-                <span className="user-info">
-                  <strong>{currentUser?.name || 'Owner'}</strong>
-                  <small>Owner</small>
-                </span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
+              <div className="user-chip-wrapper">
+                <button
+                  className="user-chip"
+                  type="button"
+                  onClick={() => setProfileOpen((prev) => !prev)}
+                >
+                  <span className="avatar-dark">
+                    {(currentUser?.name || 'A').charAt(0).toUpperCase()}
+                  </span>
+                  <span className="user-info">
+                    <strong>{currentUser?.name || 'Owner'}</strong>
+                    <small>Owner</small>
+                  </span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+
+                {profileOpen && (
+                  <>
+                    <div className="menu-overlay" onClick={() => setProfileOpen(false)} />
+                    <div className="profile-menu">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false)
+                          alert('Account settings — coming soon in this demo.')
+                        }}
+                      >
+                        Settings
+                      </button>
+                      <button type="button" className="danger" onClick={handleLogout}>
+                        Log out
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </header>
 

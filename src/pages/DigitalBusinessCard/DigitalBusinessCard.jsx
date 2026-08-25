@@ -1,7 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getStoredUser, clearSession } from '../../lib/api'
+import { api, getStoredUser, clearSession } from '../../lib/api'
 import './DigitalBusinessCard.css'
+
+const slugify = (value) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-+|-+$)/g, '')
 
 const NAV_GROUPS = [
   {
@@ -151,22 +158,42 @@ function DigitalBusinessCard() {
   const navigate = useNavigate()
   const currentUser = getStoredUser()
 
-  const handleLogout = () => {
-    clearSession()
-    navigate('/login')
-  }
-
   const [activeNav, setActiveNav] = useState('digital-business-card')
   const [theme, setTheme] = useState('lime')
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [restaurantName, setRestaurantName] = useState('')
+  const [restaurantStatus, setRestaurantStatus] = useState('')
   const [card, setCard] = useState({
-    name: 'Ananya Rao',
-    role: 'Owner · Saffron & Fig',
-    phone: '+91 98200 11223',
-    email: 'ananya@saffronandfig.in',
-    website: 'saffronandfig.in',
-    insta: '@saffronandfig',
-    address: '12 Linking Road, Bandra West, Mumbai',
+    name: currentUser?.name || '',
+    role: '',
+    phone: '',
+    email: currentUser?.email || '',
+    website: '',
+    insta: '',
+    address: '',
   })
+
+  useEffect(() => {
+    api
+      .getRestaurant()
+      .then(({ restaurant }) => {
+        if (restaurant.name) setRestaurantName(restaurant.name)
+        setRestaurantStatus(restaurant.status)
+
+        setCard((prev) => ({
+          ...prev,
+          role: `Owner · ${restaurant.name || 'Your restaurant'}`,
+          phone: restaurant.phone || prev.phone,
+          website: restaurant.website || prev.website,
+          address: restaurant.address || prev.address,
+        }))
+      })
+      .catch(() => {})
+  }, [])
+
+  const displayRestaurant = restaurantName.trim() || 'Your restaurant'
+  const cardSlug = slugify(restaurantName || currentUser?.name || 'your-card')
+  const cardLink = `iroas.link/${cardSlug}`
 
   const updateField = (field) => (event) => {
     setCard((prev) => ({ ...prev, [field]: event.target.value }))
@@ -174,15 +201,28 @@ function DigitalBusinessCard() {
 
   const handleNavClick = (item) => {
     setActiveNav(item.key)
-    if (item.route) navigate(item.route)
+    setProfileOpen(false)
+    if (item.route) {
+      navigate(item.route)
+    } else {
+      alert(`${item.label} — coming soon in this demo.`)
+    }
   }
 
   const handleDownload = () => {
-    alert('Downloading card as PNG…')
+    alert('Downloading card as PNG… (demo — export isn\'t wired up to a real image renderer yet.)')
   }
 
   const handleShare = () => {
-    alert('Share link copied: iroas.link/saffron-fig')
+    navigator.clipboard
+      .writeText(`https://${cardLink}`)
+      .then(() => alert(`Share link copied: ${cardLink}`))
+      .catch(() => alert(`Share link: ${cardLink}`))
+  }
+
+  const handleLogout = () => {
+    clearSession()
+    navigate('/login')
   }
 
   const colors = THEME_COLORS[theme]
@@ -199,11 +239,16 @@ function DigitalBusinessCard() {
             <img src="/images/Logo9-1 1.svg" alt="Logo" style={{ height: 24 }} />
           </div>
 
-          <div className="store-switcher">
-            <div className="avatar">SF</div>
+          <div
+            className="store-switcher"
+            onClick={() => alert('Switch restaurant — coming soon in this demo.')}
+          >
+            <div className="avatar">{displayRestaurant.charAt(0).toUpperCase()}</div>
             <div className="meta">
-              <div className="name">Saffron & Fig</div>
-              <div className="sub">Downtown · Open</div>
+              <div className="name">{displayRestaurant}</div>
+              <div className="sub">
+                {restaurantStatus === 'live' ? 'Live' : 'Onboarding'}
+              </div>
             </div>
             <div className="chev">▾</div>
           </div>
@@ -238,18 +283,48 @@ function DigitalBusinessCard() {
             <div className="search">
               🔍 Search orders, menu items, customers... <kbd>⌘ K</kbd>
             </div>
-            <button className="btn btn-primary">+ Quick action</button>
-            <div className="icon-btn">
+            <button
+              className="btn btn-primary"
+              onClick={() => alert('Quick actions — coming soon in this demo.')}
+            >
+              + Quick action
+            </button>
+            <div
+              className="icon-btn"
+              onClick={() => alert('No new notifications.')}
+            >
               🔔<span className="dot"></span>
             </div>
-            <div className="profile" onClick={handleLogout} title="Click to log out">
-              <div className="avatar">
-                {(currentUser?.name || 'A').charAt(0).toUpperCase()}
+            <div className="profile-wrapper">
+              <div className="profile" onClick={() => setProfileOpen((prev) => !prev)}>
+                <div className="avatar">
+                  {(currentUser?.name || 'A').charAt(0).toUpperCase()}
+                </div>
+                <div className="meta">
+                  <div className="name">{currentUser?.name || 'Owner'}</div>
+                  <div className="role">Owner</div>
+                </div>
               </div>
-              <div className="meta">
-                <div className="name">{currentUser?.name || 'Owner'}</div>
-                <div className="role">Owner</div>
-              </div>
+
+              {profileOpen && (
+                <>
+                  <div className="menu-overlay" onClick={() => setProfileOpen(false)} />
+                  <div className="profile-menu">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileOpen(false)
+                        alert('Account settings — coming soon in this demo.')
+                      }}
+                    >
+                      Settings
+                    </button>
+                    <button type="button" className="danger" onClick={handleLogout}>
+                      Log out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -372,10 +447,9 @@ function DigitalBusinessCard() {
               <div className="info-note">
                 <span className="ico">🪪</span>
                 <span>
-                  Your card lives at{' '}
-                  <code>iroas.link/saffron-fig</code>. Anyone who scans the
-                  QR can save you to contacts, call, or open your menu in one
-                  tap.
+                  Your card lives at <code>{cardLink}</code>. Anyone who
+                  scans the QR can save you to contacts, call, or open your
+                  menu in one tap.
                 </span>
               </div>
             </section>
@@ -386,7 +460,7 @@ function DigitalBusinessCard() {
 
               <div className="preview-card">
                 <div className="preview-header">
-                  <div className="store">SAFFRON & FIG</div>
+                  <div className="store">{displayRestaurant.toUpperCase()}</div>
                   <div className="pname">{card.name}</div>
                   <div className="prole">{card.role}</div>
                 </div>
@@ -475,7 +549,7 @@ function DigitalBusinessCard() {
 
                   <div className="qtext">
                     Scan to save contact, view the menu and book a table.
-                    <span className="link">iroas.link/saffron-fig</span>
+                    <span className="link">{cardLink}</span>
                   </div>
                 </div>
               </div>

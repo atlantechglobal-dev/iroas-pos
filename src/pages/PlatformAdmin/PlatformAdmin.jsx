@@ -174,6 +174,7 @@ function PlatformAdmin() {
   const [flags, setFlags] = useState(INITIAL_FLAGS)
   const [tenants, setTenants] = useState([])
   const [stats, setStats] = useState(null)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const loadTenants = (search = '') => {
     api
@@ -197,7 +198,12 @@ function PlatformAdmin() {
 
   const handleNavClick = (item) => {
     setActiveNav(item.key)
-    if (item.route) navigate(item.route)
+    setProfileOpen(false)
+    if (item.route) {
+      navigate(item.route)
+    } else {
+      alert(`${item.label} — coming soon in this demo.`)
+    }
   }
 
   const toggleFlag = (key) => {
@@ -240,17 +246,15 @@ function PlatformAdmin() {
 
           <div className="restaurant-box">
             <div className="restaurant-avatar">
-              <img src="/images/s&f.svg" alt="icon" />
+              <img src="/images/Logo9-1 1.svg" alt="icon" />
             </div>
 
             <div className="restaurant-info">
-              <div className="restaurant-name">Saffron & Fig</div>
-              <div className="restaurant-status">Downtown · Open</div>
+              <div className="restaurant-name">IROAS Platform</div>
+              <div className="restaurant-status">
+                {stats ? `${stats.totalTenants} tenants` : 'All tenants'}
+              </div>
             </div>
-
-            <span className="restaurant-arrow">
-              <img src="/images/upd.svg" alt="Logo" />
-            </span>
           </div>
 
           {NAV_GROUPS.map((group) => (
@@ -291,21 +295,46 @@ function PlatformAdmin() {
                 + Quick action
               </button>
 
-              <button className="notification">
+              <button
+                className="notification"
+                onClick={() => alert('No new notifications.')}
+              >
                 <img src="/images/bell.svg" alt="icon" />
               </button>
 
-              <div className="profile" onClick={handleLogout} title="Click to log out">
-                <div className="profile-circle">
-                  {(admin?.name || 'A').charAt(0).toUpperCase()}
+              <div className="profile-wrapper">
+                <div className="profile" onClick={() => setProfileOpen((prev) => !prev)}>
+                  <div className="profile-circle">
+                    {(admin?.name || 'A').charAt(0).toUpperCase()}
+                  </div>
+
+                  <div className="profile-text">
+                    <strong>{admin?.name || 'Admin'}</strong>
+                    <small>Platform Admin</small>
+                  </div>
+
+                  <span>⌄</span>
                 </div>
 
-                <div className="profile-text">
-                  <strong>{admin?.name || 'Admin'}</strong>
-                  <small>Platform Admin</small>
-                </div>
-
-                <span>⌄</span>
+                {profileOpen && (
+                  <>
+                    <div className="menu-overlay" onClick={() => setProfileOpen(false)} />
+                    <div className="profile-menu">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false)
+                          alert('Account settings — coming soon in this demo.')
+                        }}
+                      >
+                        Settings
+                      </button>
+                      <button type="button" className="danger" onClick={handleLogout}>
+                        Log out
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -280,6 +280,10 @@
     height: 17px;
   }
 
+  .profile-wrapper {
+    position: relative;
+  }
+
   .profile {
     height: 52px;
     display: flex;
@@ -290,6 +294,53 @@
     padding: 6px 14px 6px 6px;
     background: var(--panel);
     cursor: pointer;
+  }
+
+  .menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+  }
+
+  .profile-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 170px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 12px 28px rgba(20, 20, 20, 0.14);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 61;
+  }
+
+  .profile-menu button {
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 9px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: inherit;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .profile-menu button:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .profile-menu button.danger {
+    color: #d3453b;
+  }
+
+  .profile-menu button.danger:hover {
+    background: rgba(211, 69, 59, 0.1);
   }
 
   .profile-circle {

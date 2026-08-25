@@ -26,7 +26,18 @@ function Login() {
     try {
       const { token, user } = await api.login({ email: email.trim(), password })
       setSession(token, user)
-      navigate(user.role === 'admin' ? '/platform-admin' : '/restaurant-setup')
+
+      if (user.role === 'admin') {
+        navigate('/platform-admin')
+        return
+      }
+
+      try {
+        const { restaurant } = await api.getRestaurant()
+        navigate(restaurant.status === 'live' ? '/directory-listings' : '/restaurant-setup')
+      } catch {
+        navigate('/restaurant-setup')
+      }
     } catch (err) {
       setError(err.message)
     } finally {
