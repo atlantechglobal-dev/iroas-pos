@@ -100,6 +100,7 @@ function Brand() {
   const [accentColor, setAccentColor] = useState('#BDB8A4')
   const [selectedFont, setSelectedFont] = useState('Plus Jakarta Sans')
   const [selectedTheme, setSelectedTheme] = useState('modern')
+  const [previewMode, setPreviewMode] = useState('light')
 
   useEffect(() => {
     api
@@ -153,6 +154,10 @@ function Brand() {
 
   const activeTheme =
     THEMES.find((theme) => theme.key === selectedTheme) ?? THEMES[0]
+
+  const previewBackground =
+    previewMode === 'dark' ? '#10182a' : activeTheme.background
+  const previewColor = previewMode === 'dark' ? '#ffffff' : activeTheme.color
 
   return (
     <div className="brand-page">
@@ -421,14 +426,36 @@ function Brand() {
 
           {/* RIGHT PREVIEW */}
           <aside className="preview-area">
-            <div className="preview-label">BRAND PREVIEW</div>
+            <div className="preview-label-row">
+              <div className="preview-label">BRAND PREVIEW</div>
+
+              <div className="mode-toggle">
+                <button
+                  type="button"
+                  className={`mode-btn ${previewMode === 'light' ? 'active' : ''}`}
+                  onClick={() => setPreviewMode('light')}
+                  aria-label="Light preview"
+                >
+                  ☀
+                </button>
+
+                <button
+                  type="button"
+                  className={`mode-btn ${previewMode === 'dark' ? 'active' : ''}`}
+                  onClick={() => setPreviewMode('dark')}
+                  aria-label="Dark preview"
+                >
+                  ☾
+                </button>
+              </div>
+            </div>
 
             <div
               className="brand-preview"
               style={{
                 fontFamily: selectedFont,
-                background: activeTheme.background,
-                color: activeTheme.color,
+                background: previewBackground,
+                color: previewColor,
               }}
             >
               <div className="preview-top">

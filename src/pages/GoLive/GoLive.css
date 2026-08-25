@@ -10,8 +10,8 @@
   --status-green: #6fae2e;
   --btn-border: #e8e5de;
 
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Inter",
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: linear-gradient(
     160deg,
     var(--bg-cream) 0%,
