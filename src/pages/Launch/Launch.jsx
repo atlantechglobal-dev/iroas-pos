@@ -81,25 +81,109 @@ function Launch() {
     }
   }
 
+  const escapeHtml = (value) =>
+    value.replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[char])
+
   const handlePrintQR = () => {
-    window.print()
+    const printWindow = window.open('', '_blank', 'width=420,height=640')
+
+    if (!printWindow) {
+      // popup blocked — fall back to printing the current page
+      window.print()
+      return
+    }
+
+    const safeName = escapeHtml(displayName)
+    const safeHost = escapeHtml(hostname)
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>${safeName} — QR Code</title>
+          <style>
+            body {
+              font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont,
+                "Segoe UI", Arial, sans-serif;
+              text-align: center;
+              padding: 56px 24px;
+              color: #17171a;
+            }
+            img { width: 260px; height: 260px; }
+            h1 { font-size: 22px; font-weight: 800; margin: 24px 0 4px; }
+            p { color: #8b8b8f; font-size: 14px; margin: 0; }
+          </style>
+        </head>
+        <body>
+          <img src="${qrImageUrl}" alt="${safeName} QR code" />
+          <h1>${safeName}</h1>
+          <p>${safeHost}</p>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+
+    const triggerPrint = () => {
+      printWindow.focus()
+      printWindow.print()
+    }
+
+    const img = printWindow.document.querySelector('img')
+    if (img && !img.complete) {
+      img.onload = triggerPrint
+      img.onerror = triggerPrint
+    } else {
+      triggerPrint()
+    }
+
+    printWindow.onafterprint = () => printWindow.close()
   }
 
   const handleShareQR = async () => {
-    if (navigator.share) {
-      try {
+    const canNativeShare = typeof navigator.share === 'function'
+
+    try {
+      if (canNativeShare && navigator.canShare) {
+        const response = await fetch(qrImageUrl)
+        const blob = await response.blob()
+        const file = new File([blob], `${hostname.split('.')[0]}-QR.png`, {
+          type: 'image/png',
+        })
+
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: displayName,
+            text: `Scan to visit ${displayName}`,
+            files: [file],
+          })
+          return
+        }
+      }
+
+      if (canNativeShare) {
         await navigator.share({
           title: displayName,
           text: `Visit ${displayName}`,
           url: LIVE_LINK,
         })
-      } catch {
-        // share cancelled
+        return
       }
-    } else {
-      copyRestaurantLink()
-      showMessage('Link copied — sharing is not supported here.')
+    } catch (err) {
+      if (err && err.name === 'AbortError') return
     }
+
+    copyRestaurantLink()
+    showMessage('Link copied — sharing is not supported here.')
+  }
+
+  const handleSaveLater = () => {
+    showMessage('Your progress has been saved.')
   }
 
   const handleLaunch = async () => {
@@ -132,7 +216,9 @@ function Launch() {
             Auto-saved
           </span>
 
-          <button className="save-btn">Save & continue later</button>
+          <button className="save-btn" onClick={handleSaveLater}>
+            Save & continue later
+          </button>
         </div>
       </header>
 
