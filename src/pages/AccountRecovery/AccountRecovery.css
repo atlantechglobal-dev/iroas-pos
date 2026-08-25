@@ -1,7 +1,7 @@
 .account-recovery-page {
   min-height: 100vh;
   display: flex;
-  font-family: "Inter", sans-serif;
+  font-family: "Plus Jakarta Sans", "Inter", sans-serif;
   background: white;
   color: #171b1f;
 
@@ -33,10 +33,15 @@
     align-items: center;
     gap: 8px;
     width: fit-content;
+
+    padding: 10px 18px;
+
+    background: #05070a;
+    border-radius: 16px;
   }
 
   .logo img {
-    height: 34px;
+    height: 28px;
     width: auto;
     display: block;
   }
