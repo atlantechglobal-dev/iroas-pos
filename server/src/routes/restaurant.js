@@ -24,22 +24,33 @@ router.put('/profile', (req, res) => {
     restaurantName,
     cuisine,
     description,
+    phone,
+    website,
+    email,
+    city,
     country,
     timezone,
+    address,
     hours,
   } = req.body || {}
 
   db.prepare(
     `UPDATE restaurants
-     SET name = ?, cuisine = ?, description = ?, country = ?, timezone = ?,
+     SET name = ?, cuisine = ?, description = ?, phone = ?, website = ?, email = ?,
+         city = ?, country = ?, timezone = ?, address = ?,
          operating_hours = ?, updated_at = datetime('now')
      WHERE id = ?`,
   ).run(
     restaurantName ?? restaurant.name,
     cuisine ?? restaurant.cuisine,
     description ?? restaurant.description,
+    phone ?? restaurant.phone,
+    website ?? restaurant.website,
+    email ?? restaurant.email,
+    city ?? restaurant.city,
     country ?? restaurant.country,
     timezone ?? restaurant.timezone,
+    address ?? restaurant.address,
     hours ? JSON.stringify(hours) : restaurant.operating_hours,
     restaurant.id,
   )
@@ -101,6 +112,10 @@ router.post('/launch', (req, res) => {
 
   if (!restaurant.name) {
     return res.status(400).json({ error: 'Complete the restaurant profile before launching.' })
+  }
+
+  if (!restaurant.subdomain && !restaurant.custom_domain) {
+    return res.status(400).json({ error: 'Choose a web address before launching.' })
   }
 
   db.prepare(

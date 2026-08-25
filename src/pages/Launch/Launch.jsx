@@ -1,15 +1,51 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import './Launch.css'
-
-const LIVE_LINK = 'https://trident--kitchen.iroas.com'
 
 function Launch() {
   const navigate = useNavigate()
 
   const [toast, setToast] = useState('')
   const [launched, setLaunched] = useState(false)
+  const [restaurantName, setRestaurantName] = useState('')
+  const [cuisine, setCuisine] = useState('')
+  const [city, setCity] = useState('')
+  const [domain, setDomain] = useState('')
+
+  useEffect(() => {
+    api
+      .getRestaurant()
+      .then(({ restaurant }) => {
+        if (restaurant.name) setRestaurantName(restaurant.name)
+        if (restaurant.cuisine) setCuisine(restaurant.cuisine)
+        if (restaurant.city) setCity(restaurant.city)
+
+        if (restaurant.custom_domain) {
+          setDomain(restaurant.custom_domain)
+        } else if (restaurant.subdomain) {
+          setDomain(`${restaurant.subdomain}.iroas.com`)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const displayName = restaurantName.trim() || 'Your restaurant'
+  const previewInitial = restaurantName.trim()
+    ? restaurantName.trim().charAt(0).toUpperCase()
+    : 'R'
+  const locationLine = [cuisine.trim(), city.trim()].filter(Boolean).join(' · ')
+
+  const hostname = domain || 'yourrestaurant.iroas.com'
+  const LIVE_LINK = `https://${hostname}`
+
+  const qrImageUrl = useMemo(
+    () =>
+      `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(
+        LIVE_LINK,
+      )}`,
+    [LIVE_LINK],
+  )
 
   const showMessage = (message) => {
     setToast(message)
@@ -27,13 +63,22 @@ function Launch() {
     window.open(LIVE_LINK, '_blank')
   }
 
-  const handleDownloadQR = () => {
-    const link = document.createElement('a')
-    link.href = '/images/trident qr.svg'
-    link.download = 'trident-restaurant-QR.png'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  const handleDownloadQR = async () => {
+    try {
+      const response = await fetch(qrImageUrl)
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = `${hostname.split('.')[0]}-QR.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      window.open(qrImageUrl, '_blank')
+    }
   }
 
   const handlePrintQR = () => {
@@ -44,8 +89,8 @@ function Launch() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Trident Restaurant',
-          text: 'Visit our restaurant',
+          title: displayName,
+          text: `Visit ${displayName}`,
           url: LIVE_LINK,
         })
       } catch {
@@ -192,8 +237,8 @@ function Launch() {
           <div className="real-life-grid">
             <div className="real-card">
               <div className="real-image">
-                <img src="/images/trident qr.svg" alt="Restaurant Code" />
-                <span>trident</span>
+                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <span>{displayName}</span>
               </div>
 
               <div className="real-label">Table tent</div>
@@ -201,8 +246,8 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image">
-                <img src="/images/trident qr.svg" alt="Restaurant Code" />
-                <span>trident</span>
+                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <span>{displayName}</span>
               </div>
 
               <div className="real-label">Sticker</div>
@@ -210,8 +255,8 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image">
-                <img src="/images/trident qr.svg" alt="Restaurant Code" />
-                <span>trident</span>
+                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <span>{displayName}</span>
               </div>
 
               <div className="real-label">Business card</div>
@@ -219,8 +264,8 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image poster">
-                <img src="/images/trident qr.svg" alt="Restaurant QR code" />
-                <span>trident</span>
+                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <span>{displayName}</span>
               </div>
 
               <div className="real-label">Poster</div>
@@ -238,18 +283,20 @@ function Launch() {
                 <span>▯</span>
               </div>
 
-              <div className="restaurant-logo">T</div>
+              <div className="restaurant-logo">{previewInitial}</div>
 
-              <h2>trident</h2>
+              <h2>{displayName}</h2>
 
-              <p className="restaurant-location">Indian · Mumbai</p>
+              <p className="restaurant-location">
+                {locationLine || 'Cuisine · City'}
+              </p>
 
               <div className="phone-qr">
-                <img src="/images/trident qr.svg" alt="Restaurant QR" />
+                <img src={qrImageUrl} alt={`${displayName} QR code`} />
               </div>
 
               <div className="qr-bottom-content">
-                <div className="qr-link">trident-kitchen.iroas.com</div>
+                <div className="qr-link">{hostname}</div>
 
                 <div className="qr-actions">
                   <button

@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { api } from '../../lib/api'
 import './GoLive.css'
 
 const CHECKLIST = [
@@ -10,17 +12,58 @@ const CHECKLIST = [
 
 function GoLive() {
   const navigate = useNavigate()
+  const [restaurantName, setRestaurantName] = useState('')
+  const [liveLink, setLiveLink] = useState('')
+
+  useEffect(() => {
+    api
+      .getRestaurant()
+      .then(({ restaurant }) => {
+        if (restaurant.name) setRestaurantName(restaurant.name)
+
+        if (restaurant.custom_domain) {
+          setLiveLink(`https://${restaurant.custom_domain}`)
+        } else if (restaurant.subdomain) {
+          setLiveLink(`https://${restaurant.subdomain}.iroas.com`)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const displayName = restaurantName.trim() || 'Your restaurant'
 
   const handleDashboard = () => {
     navigate('/directory-listings')
   }
 
   const handlePreview = () => {
-    console.log('Opening website preview...')
+    if (liveLink) {
+      window.open(liveLink, '_blank')
+    }
   }
 
-  const handleDownloadQR = () => {
-    console.log('Downloading QR kit...')
+  const handleDownloadQR = async () => {
+    if (!liveLink) return
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(
+      liveLink,
+    )}`
+
+    try {
+      const response = await fetch(qrUrl)
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = `${displayName.replace(/\s+/g, '-').toLowerCase()}-QR.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      window.open(qrUrl, '_blank')
+    }
   }
 
   return (
@@ -29,7 +72,7 @@ function GoLive() {
         <img src="/images/cracker.svg" alt="Success icon" />
       </div>
 
-      <h1 className="title">trident is now live!</h1>
+      <h1 className="title">{displayName} is now live!</h1>
 
       <p className="subtitle">
         Your digital identity is set up and ready to greet guests. Welcome to

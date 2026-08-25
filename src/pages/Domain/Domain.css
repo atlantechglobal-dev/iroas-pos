@@ -298,6 +298,7 @@
     border: none;
     outline: none;
     padding: 0 6px;
+    font-family: inherit;
     font-size: 15px;
     font-weight: 700;
     color: var(--text);
@@ -390,6 +391,12 @@
     border-color: var(--green);
     background: var(--green-soft);
     color: var(--green-text);
+  }
+
+  .suggestions-empty {
+    font-size: 13px;
+    color: var(--muted-2);
+    margin: 0;
   }
 
   /* CUSTOM DOMAIN */

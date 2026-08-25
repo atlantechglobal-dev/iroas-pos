@@ -18,8 +18,13 @@ function RestaurantSetup() {
   const [restaurantName, setRestaurantName] = useState('')
   const [cuisine, setCuisine] = useState('')
   const [description, setDescription] = useState('')
+  const [phone, setPhone] = useState('')
+  const [website, setWebsite] = useState('')
+  const [email, setEmail] = useState('')
+  const [city, setCity] = useState('')
   const [country, setCountry] = useState('')
   const [timezone, setTimezone] = useState('')
+  const [address, setAddress] = useState('')
   const [hours, setHours] = useState(defaultHours)
   const [saveLabel, setSaveLabel] = useState('Save & continue later')
 
@@ -31,8 +36,13 @@ function RestaurantSetup() {
         if (restaurant.name) setRestaurantName(restaurant.name)
         if (restaurant.cuisine) setCuisine(restaurant.cuisine)
         if (restaurant.description) setDescription(restaurant.description)
+        if (restaurant.phone) setPhone(restaurant.phone)
+        if (restaurant.website) setWebsite(restaurant.website)
+        if (restaurant.email) setEmail(restaurant.email)
+        if (restaurant.city) setCity(restaurant.city)
         if (restaurant.country) setCountry(restaurant.country)
         if (restaurant.timezone) setTimezone(restaurant.timezone)
+        if (restaurant.address) setAddress(restaurant.address)
         if (restaurant.operating_hours) {
           try {
             setHours(JSON.parse(restaurant.operating_hours))
@@ -56,8 +66,13 @@ function RestaurantSetup() {
     restaurantName,
     cuisine,
     description,
+    phone,
+    website,
+    email,
+    city,
     country,
     timezone,
+    address,
     hours,
   })
 
@@ -230,7 +245,12 @@ function RestaurantSetup() {
                   <img src="/images/blackcall.svg" alt="" />
                 </span>
 
-                <input type="text" defaultValue="+91 98••• •••••" />
+                <input
+                  type="text"
+                  placeholder="+91 98765 43210"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                />
               </div>
             </div>
 
@@ -245,7 +265,12 @@ function RestaurantSetup() {
                   <img src="/images/blackweb.svg" alt="" />
                 </span>
 
-                <input type="text" placeholder="www.yourrestaurant.com" />
+                <input
+                  type="text"
+                  placeholder="www.yourrestaurant.com"
+                  value={website}
+                  onChange={(event) => setWebsite(event.target.value)}
+                />
               </div>
             </div>
 
@@ -257,7 +282,12 @@ function RestaurantSetup() {
                   <img src="/images/msg.svg" alt="" />
                 </span>
 
-                <input type="email" placeholder="hello@yourrestaurant.com" />
+                <input
+                  type="email"
+                  placeholder="hello@yourrestaurant.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
               </div>
             </div>
 
@@ -269,7 +299,12 @@ function RestaurantSetup() {
                   <img src="/images/blacklocation.svg" alt="" />
                 </span>
 
-                <input type="text" defaultValue="Mumbai" />
+                <input
+                  type="text"
+                  placeholder="Mumbai"
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                />
               </div>
             </div>
 

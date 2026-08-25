@@ -101,11 +101,15 @@ function Brand() {
   const [selectedFont, setSelectedFont] = useState('Plus Jakarta Sans')
   const [selectedTheme, setSelectedTheme] = useState('modern')
   const [previewMode, setPreviewMode] = useState('light')
+  const [restaurantName, setRestaurantName] = useState('')
+  const [cuisine, setCuisine] = useState('')
 
   useEffect(() => {
     api
       .getRestaurant()
       .then(({ restaurant }) => {
+        if (restaurant.name) setRestaurantName(restaurant.name)
+        if (restaurant.cuisine) setCuisine(restaurant.cuisine)
         if (restaurant.primary_color) setPrimaryColor(restaurant.primary_color)
         if (restaurant.secondary_color) setSecondaryColor(restaurant.secondary_color)
         if (restaurant.accent_color) setAccentColor(restaurant.accent_color)
@@ -158,6 +162,11 @@ function Brand() {
   const previewBackground =
     previewMode === 'dark' ? '#10182a' : activeTheme.background
   const previewColor = previewMode === 'dark' ? '#ffffff' : activeTheme.color
+
+  const displayName = restaurantName.trim() || 'Your restaurant'
+  const previewInitial = restaurantName.trim()
+    ? restaurantName.trim().charAt(0).toUpperCase()
+    : 'R'
 
   return (
     <div className="brand-page">
@@ -475,11 +484,11 @@ function Brand() {
                         }}
                       />
                     ) : (
-                      'T'
+                      previewInitial
                     )}
                   </span>
 
-                  <strong>trident</strong>
+                  <strong>{displayName}</strong>
                 </div>
 
                 <button
@@ -493,9 +502,13 @@ function Brand() {
               <div className="preview-content">
                 <span className="welcome">WELCOME</span>
 
-                <h2>Taste what makes trident special.</h2>
+                <h2>Taste what makes {displayName} special.</h2>
 
-                <p>Fresh flavors, crafted with care.</p>
+                <p>
+                  {cuisine.trim()
+                    ? `${cuisine.trim()} flavors, crafted with care.`
+                    : 'Fresh flavors, crafted with care.'}
+                </p>
 
                 <div className="preview-buttons">
                   <button

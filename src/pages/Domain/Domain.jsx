@@ -3,18 +3,51 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import './Domain.css'
 
-const SUGGESTIONS = [
-  'trident',
-  'trident-mumbai',
-  'the-trident',
-  'trident-kitchen',
-  'eat-trident',
-]
+const slugify = (value) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-+|-+$)/g, '')
+
+function shuffle(list) {
+  const arr = [...list]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+function buildSuggestions(name, city) {
+  const base = slugify(name || '')
+  if (!base) return []
+
+  const citySlug = slugify(city || '')
+
+  const extras = [
+    citySlug ? `${base}-${citySlug}` : null,
+    `the-${base}`,
+    `${base}-kitchen`,
+    `eat-${base}`,
+    `${base}-dine`,
+    `${base}-eats`,
+    `${base}-table`,
+  ].filter(Boolean)
+
+  // base name-slug always leads; the rest are shuffled for variety on every visit
+  const unique = [...new Set(extras)]
+
+  return [base, ...shuffle(unique)].slice(0, 5)
+}
 
 function Domain() {
   const navigate = useNavigate()
 
-  const [subdomain, setSubdomain] = useState('s')
+  const [restaurantName, setRestaurantName] = useState('')
+  const [cuisine, setCuisine] = useState('')
+  const [city, setCity] = useState('')
+  const [subdomain, setSubdomain] = useState('')
   const [customDomain, setCustomDomain] = useState('')
   const [saveLabel, setSaveLabel] = useState('Save & continue later')
 
@@ -22,11 +55,19 @@ function Domain() {
     api
       .getRestaurant()
       .then(({ restaurant }) => {
+        if (restaurant.name) setRestaurantName(restaurant.name)
+        if (restaurant.cuisine) setCuisine(restaurant.cuisine)
+        if (restaurant.city) setCity(restaurant.city)
         if (restaurant.subdomain) setSubdomain(restaurant.subdomain)
         if (restaurant.custom_domain) setCustomDomain(restaurant.custom_domain)
       })
       .catch(() => {})
   }, [])
+
+  const suggestions = useMemo(
+    () => buildSuggestions(restaurantName, city),
+    [restaurantName, city],
+  )
 
   const cleanSubdomain = (value) =>
     value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
@@ -39,13 +80,19 @@ function Domain() {
     setSubdomain(domain)
   }
 
+  const suggestedPlaceholder = slugify(restaurantName || '') || 'yourrestaurant'
+
   const availableMessage = subdomain
     ? `✓ ${subdomain}.iroas.com is available`
     : 'Enter a subdomain'
 
   const browserAddress = subdomain
     ? `◉  https://${subdomain}.iroas.com`
-    : '◉  https://s.iroas.com'
+    : `◉  https://${suggestedPlaceholder}.iroas.com`
+
+  const previewLetter = restaurantName.trim()
+    ? restaurantName.trim().charAt(0).toUpperCase()
+    : 'R'
 
   const isEnabled = useMemo(
     () => subdomain.trim().length > 0 || customDomain.trim().length > 0,
@@ -181,6 +228,7 @@ function Domain() {
                   <input
                     type="text"
                     autoComplete="off"
+                    placeholder={suggestedPlaceholder}
                     value={subdomain}
                     onChange={handleSubdomainChange}
                   />
@@ -203,17 +251,23 @@ function Domain() {
                 </div>
 
                 <div className="suggestions">
-                  {SUGGESTIONS.map((domain) => (
-                    <button
-                      key={domain}
-                      className={`suggestion ${
-                        subdomain === domain ? 'selected' : ''
-                      }`}
-                      onClick={() => handleSuggestionClick(domain)}
-                    >
-                      {domain}.iroas.com
-                    </button>
-                  ))}
+                  {suggestions.length > 0 ? (
+                    suggestions.map((domain) => (
+                      <button
+                        key={domain}
+                        className={`suggestion ${
+                          subdomain === domain ? 'selected' : ''
+                        }`}
+                        onClick={() => handleSuggestionClick(domain)}
+                      >
+                        {domain}.iroas.com
+                      </button>
+                    ))
+                  ) : (
+                    <p className="suggestions-empty">
+                      Add your restaurant name in Step 1 to see suggestions.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -260,11 +314,14 @@ function Domain() {
               </div>
 
               <div className="website-preview">
-                <div className="restaurant-avatar">T</div>
+                <div className="restaurant-avatar">{previewLetter}</div>
 
-                <h2>trident</h2>
+                <h2>{restaurantName.trim() || 'Your restaurant'}</h2>
 
-                <p>Indian · Mumbai</p>
+                <p>
+                  {[cuisine.trim(), city.trim()].filter(Boolean).join(' · ') ||
+                    'Cuisine · City'}
+                </p>
 
                 <button className="reserve-button">Reserve a table</button>
               </div>
