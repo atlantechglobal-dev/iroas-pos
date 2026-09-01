@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './Orders.css'
 
 const INITIAL_COLUMNS = [
@@ -46,14 +47,17 @@ function Orders() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
   const [columns, setColumns] = useState(INITIAL_COLUMNS)
 
   useEffect(() => {
     api.getRestaurant().then(({ restaurant }) => {
       if (restaurant.name) setRestaurantName(restaurant.name)
       setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
     }).catch(() => {})
   }, [])
+const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
 
@@ -77,7 +81,7 @@ function Orders() {
   }
 
   return (
-    <div className="orders-page">
+    <div className="orders-page" style={accentStyle}>
       <div className="app">
         <aside className="sidebar">
           <div className="brand"><img src="/images/Logo9-1 1.svg" alt="logo" /></div>

@@ -24,7 +24,7 @@ function GoLive() {
         if (restaurant.custom_domain) {
           setLiveLink(`https://${restaurant.custom_domain}`)
         } else if (restaurant.subdomain) {
-          setLiveLink(`https://${restaurant.subdomain}.iroas.com`)
+          setLiveLink(`https://${restaurant.subdomain}${restaurant.domain_suffix || '.iroas.com'}`)
         }
       })
       .catch(() => {})

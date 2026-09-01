@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './Tables.css'
 
 const INITIAL_TABLES = [
@@ -31,6 +32,7 @@ function Tables() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
   const [tables, setTables] = useState(INITIAL_TABLES)
   const [selected, setSelected] = useState([])
 
@@ -38,8 +40,10 @@ function Tables() {
     api.getRestaurant().then(({ restaurant }) => {
       if (restaurant.name) setRestaurantName(restaurant.name)
       setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
     }).catch(() => {})
   }, [])
+const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
 
@@ -78,7 +82,7 @@ function Tables() {
   }
 
   return (
-    <div className="tables-page">
+    <div className="tables-page" style={accentStyle}>
       <div className="app">
         <aside className="sidebar">
           <div className="brand"><img src="/images/Logo9-1 1.svg" alt="logo" /></div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './DirectoryListings.css'
 
 const DIRECTORIES = [
@@ -87,6 +88,7 @@ function DirectoryListings() {
   const [restaurantCity, setRestaurantCity] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
 
   useEffect(() => {
     api
@@ -95,9 +97,12 @@ function DirectoryListings() {
         if (restaurant.name) setRestaurantName(restaurant.name)
         if (restaurant.city) setRestaurantCity(restaurant.city)
         setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
       })
       .catch(() => {})
   }, [])
+
+  const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
   const restaurantSubtitle = [
@@ -135,7 +140,7 @@ function DirectoryListings() {
   )
 
   return (
-    <div className="directory-page">
+    <div className="directory-page" style={accentStyle}>
       <div className="app">
         {/* SIDEBAR */}
         <aside className="sidebar">

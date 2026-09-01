@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { COUNTRIES } from '../../lib/countries'
+import { TIMEZONES } from '../../lib/timezones'
 import './RestaurantSetup.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -315,10 +317,10 @@ function RestaurantSetup() {
                 value={country}
                 onChange={(event) => setCountry(event.target.value)}
               >
-                <option value=""></option>
-                <option value="India">India</option>
-                <option value="United States">United States</option>
-                <option value="United Kingdom">United Kingdom</option>
+                <option value="">Select country</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
             </div>
 
@@ -329,10 +331,10 @@ function RestaurantSetup() {
                 value={timezone}
                 onChange={(event) => setTimezone(event.target.value)}
               >
-                <option value=""></option>
-                <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                <option value="Asia/Dubai">Asia/Dubai</option>
-                <option value="Europe/London">Europe/London</option>
+                <option value="">Select timezone</option>
+                {TIMEZONES.map((tz) => (
+                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                ))}
               </select>
             </div>
 

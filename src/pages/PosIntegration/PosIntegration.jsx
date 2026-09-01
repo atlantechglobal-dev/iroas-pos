@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './PosIntegration.css'
 
 const PROVIDERS = [
@@ -43,14 +44,17 @@ function PosIntegration() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
   const [rules, setRules] = useState(RULES)
 
   useEffect(() => {
     api.getRestaurant().then(({ restaurant }) => {
       if (restaurant.name) setRestaurantName(restaurant.name)
       setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
     }).catch(() => {})
   }, [])
+const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
 
@@ -66,7 +70,7 @@ function PosIntegration() {
   }
 
   return (
-    <div className="pos-page">
+    <div className="pos-page" style={accentStyle}>
       <div className="app">
         <aside className="sidebar">
           <div className="brand"><img src="/images/Logo9-1 1.svg" alt="logo" /></div>

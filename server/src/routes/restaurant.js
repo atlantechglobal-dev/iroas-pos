@@ -67,25 +67,32 @@ router.put('/profile', (req, res) => {
   res.json({ ok: true })
 })
 
+const VALID_DOMAIN_SUFFIXES = ['.iroas.com', '.iroas.co.za']
+
 router.put('/domain', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
 
-  const { subdomain, customDomain } = req.body || {}
+  const { subdomain, customDomain, domainSuffix } = req.body || {}
+  const suffix = VALID_DOMAIN_SUFFIXES.includes(domainSuffix)
+    ? domainSuffix
+    : restaurant.domain_suffix || '.iroas.com'
 
   if (subdomain) {
     const taken = db
-      .prepare('SELECT id FROM restaurants WHERE subdomain = ? AND id != ?')
-      .get(subdomain, restaurant.id)
+      .prepare(
+        'SELECT id FROM restaurants WHERE subdomain = ? AND domain_suffix = ? AND id != ?',
+      )
+      .get(subdomain, suffix, restaurant.id)
     if (taken) {
       return res.status(409).json({ error: 'That subdomain is already taken.' })
     }
   }
 
   db.prepare(
-    `UPDATE restaurants SET subdomain = ?, custom_domain = ?, updated_at = datetime('now')
+    `UPDATE restaurants SET subdomain = ?, domain_suffix = ?, custom_domain = ?, updated_at = datetime('now')
      WHERE id = ?`,
-  ).run(subdomain ?? null, customDomain ?? null, restaurant.id)
+  ).run(subdomain ?? null, suffix, customDomain ?? null, restaurant.id)
 
   res.json({ ok: true })
 })

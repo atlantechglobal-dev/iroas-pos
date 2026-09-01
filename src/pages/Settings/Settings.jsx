@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './Settings.css'
+
+const ACCENT_PRESETS = ['#8bc53f', '#2e6fb5', '#d3453b', '#a9821a', '#7c4aa8', '#e2703a', '#1e9e8c']
 
 const SECTIONS = [
   {
@@ -39,15 +42,33 @@ function Settings() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
+  const [savingAccent, setSavingAccent] = useState(false)
 
   useEffect(() => {
     api.getRestaurant().then(({ restaurant }) => {
       if (restaurant.name) setRestaurantName(restaurant.name)
       setRestaurantStatus(restaurant.status)
+      if (restaurant.settings?.adminAccentColor) {
+        setAccentColor(restaurant.settings.adminAccentColor)
+      }
     }).catch(() => {})
   }, [])
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
+  const accentStyle = deriveAccentShades(accentColor)
+
+  const saveAccentColor = async (color) => {
+    setAccentColor(color)
+    setSavingAccent(true)
+    try {
+      await api.updateSettings({ adminAccentColor: color })
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSavingAccent(false)
+    }
+  }
 
   const handleLogout = () => { clearSession(); navigate('/login') }
   const handleNavClick = (item) => {
@@ -61,7 +82,7 @@ function Settings() {
   }
 
   return (
-    <div className="settings-page">
+    <div className="settings-page" style={accentStyle}>
       <div className="app">
         <aside className="sidebar">
           <div className="brand"><img src="/images/Logo9-1 1.svg" alt="logo" /></div>
@@ -131,6 +152,40 @@ function Settings() {
                 <p className="eyebrow">System</p>
                 <h1>Settings</h1>
                 <p className="page-desc">Configure every corner of IROAS for your operation. Everything here is workspace-wide.</p>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <p className="section-label">Appearance</p>
+              <div className="accent-card">
+                <div className="accent-info">
+                  <strong>Dashboard accent color</strong>
+                  <p>Pick a color to match your brand — it updates every page in this dashboard instantly.</p>
+                </div>
+
+                <div className="accent-controls">
+                  <div className="accent-presets">
+                    {ACCENT_PRESETS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`accent-swatch ${accentColor.toLowerCase() === c ? 'selected' : ''}`}
+                        style={{ background: c }}
+                        onClick={() => saveAccentColor(c)}
+                        aria-label={`Use ${c}`}
+                      />
+                    ))}
+                  </div>
+
+                  <label className="accent-custom">
+                    <input
+                      type="color"
+                      value={accentColor}
+                      onChange={(e) => saveAccentColor(e.target.value)}
+                    />
+                    <span>{savingAccent ? 'Saving…' : accentColor.toUpperCase()}</span>
+                  </label>
+                </div>
               </div>
             </div>
 

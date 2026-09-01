@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './Reservations.css'
 
 const TIMELINE_HOURS = ['6:00', '6:30', '7:00', '7:30', '8:00', '8:30', '9:00', '9:30', '10:00']
@@ -30,6 +31,7 @@ function Reservations() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
   const [view, setView] = useState('Timeline')
   const [reservations, setReservations] = useState(UPCOMING)
 
@@ -37,8 +39,10 @@ function Reservations() {
     api.getRestaurant().then(({ restaurant }) => {
       if (restaurant.name) setRestaurantName(restaurant.name)
       setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
     }).catch(() => {})
   }, [])
+const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
   const arrivingSoon = reservations.filter((r) => r.status === 'Confirmed').length
@@ -55,7 +59,7 @@ function Reservations() {
   }
 
   return (
-    <div className="reservations-page">
+    <div className="reservations-page" style={accentStyle}>
       <div className="app">
         <aside className="sidebar">
           <div className="brand"><img src="/images/Logo9-1 1.svg" alt="logo" /></div>

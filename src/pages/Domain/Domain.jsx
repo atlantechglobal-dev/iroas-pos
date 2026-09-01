@@ -41,6 +41,8 @@ function buildSuggestions(name, city) {
   return [base, ...shuffle(unique)].slice(0, 5)
 }
 
+const DOMAIN_SUFFIXES = ['.iroas.com', '.iroas.co.za']
+
 function Domain() {
   const navigate = useNavigate()
 
@@ -48,7 +50,9 @@ function Domain() {
   const [cuisine, setCuisine] = useState('')
   const [city, setCity] = useState('')
   const [subdomain, setSubdomain] = useState('')
+  const [domainSuffix, setDomainSuffix] = useState('.iroas.com')
   const [customDomain, setCustomDomain] = useState('')
+  const [mode, setMode] = useState('subdomain')
   const [saveLabel, setSaveLabel] = useState('Save & continue later')
 
   useEffect(() => {
@@ -59,7 +63,11 @@ function Domain() {
         if (restaurant.cuisine) setCuisine(restaurant.cuisine)
         if (restaurant.city) setCity(restaurant.city)
         if (restaurant.subdomain) setSubdomain(restaurant.subdomain)
-        if (restaurant.custom_domain) setCustomDomain(restaurant.custom_domain)
+        if (restaurant.domain_suffix) setDomainSuffix(restaurant.domain_suffix)
+        if (restaurant.custom_domain) {
+          setCustomDomain(restaurant.custom_domain)
+          setMode('custom')
+        }
       })
       .catch(() => {})
   }, [])
@@ -83,25 +91,37 @@ function Domain() {
   const suggestedPlaceholder = slugify(restaurantName || '') || 'yourrestaurant'
 
   const availableMessage = subdomain
-    ? `✓ ${subdomain}.iroas.com is available`
+    ? `✓ ${subdomain}${domainSuffix} is available`
     : 'Enter a subdomain'
 
-  const browserAddress = subdomain
-    ? `◉  https://${subdomain}.iroas.com`
-    : `◉  https://${suggestedPlaceholder}.iroas.com`
+  const browserAddress =
+    mode === 'custom' && customDomain
+      ? `◉  https://${customDomain}`
+      : subdomain
+        ? `◉  https://${subdomain}${domainSuffix}`
+        : `◉  https://${suggestedPlaceholder}${domainSuffix}`
 
   const previewLetter = restaurantName.trim()
     ? restaurantName.trim().charAt(0).toUpperCase()
     : 'R'
 
   const isEnabled = useMemo(
-    () => subdomain.trim().length > 0 || customDomain.trim().length > 0,
-    [subdomain, customDomain],
+    () =>
+      mode === 'custom'
+        ? customDomain.trim().length > 0
+        : subdomain.trim().length > 0,
+    [mode, subdomain, customDomain],
   )
+
+  const buildPayload = () => ({
+    subdomain: mode === 'subdomain' ? subdomain : null,
+    domainSuffix,
+    customDomain: mode === 'custom' ? customDomain : null,
+  })
 
   const handleSave = async () => {
     try {
-      await api.updateDomain({ subdomain, customDomain })
+      await api.updateDomain(buildPayload())
       alert('Your progress has been saved.')
     } catch (err) {
       alert(err.message)
@@ -109,13 +129,17 @@ function Domain() {
   }
 
   const handleContinue = async () => {
-    if (subdomain.trim().length === 0 && customDomain.trim().length === 0) {
-      alert('Please choose a web address first.')
+    if (isEnabled === false) {
+      alert(
+        mode === 'custom'
+          ? 'Please enter your domain first.'
+          : 'Please choose a subdomain first.',
+      )
       return
     }
 
     try {
-      await api.updateDomain({ subdomain, customDomain })
+      await api.updateDomain(buildPayload())
       navigate('/brand')
     } catch (err) {
       alert(err.message)
@@ -218,85 +242,119 @@ function Domain() {
             </div>
 
             <div className="card-body">
-              {/* FREE SUBDOMAIN */}
-              <div className="field-section">
-                <label className="field-label">FREE IROAS SUBDOMAIN</label>
+              {/* MODE TOGGLE */}
+              <div className="mode-toggle">
+                <button
+                  type="button"
+                  className={`mode-option ${mode === 'subdomain' ? 'active' : ''}`}
+                  onClick={() => setMode('subdomain')}
+                >
+                  <strong>Free IROAS subdomain</strong>
+                  <span>Get an address with an IROAS handle attached</span>
+                </button>
 
-                <div className="subdomain-box">
-                  <span className="protocol">https://</span>
-
-                  <input
-                    type="text"
-                    autoComplete="off"
-                    placeholder={suggestedPlaceholder}
-                    value={subdomain}
-                    onChange={handleSubdomainChange}
-                  />
-
-                  <span className="domain-ending">.iroas.com</span>
-
-                  <div className="availability">✓</div>
-                </div>
-
-                <div className="available-message">{availableMessage}</div>
+                <button
+                  type="button"
+                  className={`mode-option ${mode === 'custom' ? 'active' : ''}`}
+                  onClick={() => setMode('custom')}
+                >
+                  <strong>Connect my own domain</strong>
+                  <span>Use a domain you already own — no IROAS handle</span>
+                </button>
               </div>
 
-              {/* AI SUGGESTIONS */}
-              <div className="suggestions-section">
-                <div className="suggestions-title">
-                  <span>
-                    <img src="/images/security.svg" alt="" />
-                  </span>
-                  AI-GENERATED SUGGESTIONS
-                </div>
+              {mode === 'subdomain' ? (
+                <>
+                  {/* FREE SUBDOMAIN */}
+                  <div className="field-section">
+                    <label className="field-label">FREE IROAS SUBDOMAIN</label>
 
-                <div className="suggestions">
-                  {suggestions.length > 0 ? (
-                    suggestions.map((domain) => (
-                      <button
-                        key={domain}
-                        className={`suggestion ${
-                          subdomain === domain ? 'selected' : ''
-                        }`}
-                        onClick={() => handleSuggestionClick(domain)}
+                    <div className="subdomain-box">
+                      <span className="protocol">https://</span>
+
+                      <input
+                        type="text"
+                        autoComplete="off"
+                        placeholder={suggestedPlaceholder}
+                        value={subdomain}
+                        onChange={handleSubdomainChange}
+                      />
+
+                      <select
+                        className="domain-ending-select"
+                        value={domainSuffix}
+                        onChange={(event) => setDomainSuffix(event.target.value)}
                       >
-                        {domain}.iroas.com
-                      </button>
-                    ))
-                  ) : (
-                    <p className="suggestions-empty">
-                      Add your restaurant name in Step 1 to see suggestions.
-                    </p>
-                  )}
-                </div>
-              </div>
+                        {DOMAIN_SUFFIXES.map((suffix) => (
+                          <option key={suffix} value={suffix}>{suffix}</option>
+                        ))}
+                      </select>
 
-              {/* CUSTOM DOMAIN */}
-              <div className="custom-domain-card">
-                <div className="custom-icon">◉</div>
+                      <div className="availability">✓</div>
+                    </div>
 
-                <div className="custom-content">
-                  <div className="custom-title">Already own a domain?</div>
-
-                  <div className="custom-description">
-                    Connect your custom domain anytime — we'll handle SSL and
-                    DNS automatically.
+                    <div className="available-message">{availableMessage}</div>
                   </div>
 
-                  <div className="custom-input">
-                    <span className="custom-protocol">https://</span>
+                  {/* AI SUGGESTIONS */}
+                  <div className="suggestions-section">
+                    <div className="suggestions-title">
+                      <span>
+                        <img src="/images/security.svg" alt="" />
+                      </span>
+                      AI-GENERATED SUGGESTIONS
+                    </div>
 
-                    <input
-                      type="text"
-                      placeholder="yourrestaurant.com"
-                      value={customDomain}
-                      onChange={(event) =>
-                        setCustomDomain(event.target.value)
-                      }
-                    />
+                    <div className="suggestions">
+                      {suggestions.length > 0 ? (
+                        suggestions.map((domain) => (
+                          <button
+                            key={domain}
+                            className={`suggestion ${
+                              subdomain === domain ? 'selected' : ''
+                            }`}
+                            onClick={() => handleSuggestionClick(domain)}
+                          >
+                            {domain}{domainSuffix}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="suggestions-empty">
+                          Add your restaurant name in Step 1 to see suggestions.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* CUSTOM DOMAIN */
+                <div className="custom-domain-card standalone">
+                  <div className="custom-icon">◉</div>
+
+                  <div className="custom-content">
+                    <div className="custom-title">Connect your own domain</div>
+
+                    <div className="custom-description">
+                      Enter a domain you already own — we'll handle SSL and
+                      DNS automatically. Works with .com, .co.za, or any
+                      extension.
+                    </div>
+
+                    <div className="custom-input">
+                      <span className="custom-protocol">https://</span>
+
+                      <input
+                        type="text"
+                        placeholder="yourrestaurant.com"
+                        value={customDomain}
+                        onChange={(event) =>
+                          setCustomDomain(event.target.value)
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </section>
 

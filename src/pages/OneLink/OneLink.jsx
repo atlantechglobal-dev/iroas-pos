@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './OneLink.css'
 
 const slugify = (value) =>
@@ -95,6 +96,7 @@ function OneLink() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
   const [publishLabel, setPublishLabel] = useState('✓  Publish changes')
 
   useEffect(() => {
@@ -103,9 +105,11 @@ function OneLink() {
       .then(({ restaurant }) => {
         if (restaurant.name) setRestaurantName(restaurant.name)
         setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
       })
       .catch(() => {})
   }, [])
+const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
   const linkSlug = slugify(restaurantName || currentUser?.name || 'your-link')
@@ -188,7 +192,7 @@ function OneLink() {
   const liveDestinations = destinations.filter((d) => d.live)
 
   return (
-    <div className="one-link-page">
+    <div className="one-link-page" style={accentStyle}>
       <div className="app">
         {/* LEFT SIDEBAR */}
         <aside className="sidebar">

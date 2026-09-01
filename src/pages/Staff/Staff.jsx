@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './Staff.css'
 
 const ROLES = ['Owner', 'Manager', 'Chef', 'Cashier', 'Waiter', 'Kitchen Staff']
@@ -22,6 +23,7 @@ function Staff() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
   const [activeRole, setActiveRole] = useState('Owner')
   const [query, setQuery] = useState('')
 
@@ -29,8 +31,10 @@ function Staff() {
     api.getRestaurant().then(({ restaurant }) => {
       if (restaurant.name) setRestaurantName(restaurant.name)
       setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
     }).catch(() => {})
   }, [])
+const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
   const filtered = DIRECTORY.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
@@ -43,7 +47,7 @@ function Staff() {
   }
 
   return (
-    <div className="staff-page">
+    <div className="staff-page" style={accentStyle}>
       <div className="app">
         <aside className="sidebar">
           <div className="brand"><img src="/images/Logo9-1 1.svg" alt="logo" /></div>

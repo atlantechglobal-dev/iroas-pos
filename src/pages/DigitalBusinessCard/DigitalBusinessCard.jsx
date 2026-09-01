@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './DigitalBusinessCard.css'
 
 const slugify = (value) =>
@@ -26,6 +27,7 @@ function DigitalBusinessCard() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
   const [card, setCard] = useState({
     name: currentUser?.name || '',
     role: '',
@@ -42,6 +44,7 @@ function DigitalBusinessCard() {
       .then(({ restaurant }) => {
         if (restaurant.name) setRestaurantName(restaurant.name)
         setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
 
         setCard((prev) => ({
           ...prev,
@@ -53,6 +56,7 @@ function DigitalBusinessCard() {
       })
       .catch(() => {})
   }, [])
+const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
   const cardSlug = slugify(restaurantName || currentUser?.name || 'your-card')
@@ -93,7 +97,7 @@ function DigitalBusinessCard() {
   return (
     <div
       className={`business-card-page ${theme === 'charcoal' ? 'theme-charcoal' : ''}`}
-      style={{ '--accent': colors.accent, '--accent-dark': colors.dark }}
+      style={{ '--accent': colors.accent, '--accent-dark': colors.dark, ...accentStyle }}
     >
       <div className="app">
         {/* SIDEBAR */}

@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
+import { COUNTRIES } from '../../lib/countries'
+import { TIMEZONES } from '../../lib/timezones'
 import './RestaurantProfile.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -99,6 +102,7 @@ function RestaurantProfile() {
   const [channelDunzo, setChannelDunzo] = useState(false)
   const [coverPhoto, setCoverPhoto] = useState(null)
   const [ogImage, setOgImage] = useState(null)
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
 
   useEffect(() => {
     api
@@ -128,6 +132,7 @@ function RestaurantProfile() {
         }
 
         const s = restaurant.settings || {}
+        if (s.adminAccentColor) setAccentColor(s.adminAccentColor)
         if (s.legalEntity) setLegalEntity(s.legalEntity)
         if (s.priceRange) setPriceRange(s.priceRange)
         if (s.tagline) setTagline(s.tagline)
@@ -165,6 +170,8 @@ function RestaurantProfile() {
       })
       .catch(() => {})
   }, [])
+
+  const accentStyle = deriveAccentShades(accentColor)
 
   const updateHour = (index, field, value) => {
     setHours((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)))
@@ -270,7 +277,7 @@ function RestaurantProfile() {
   }
 
   return (
-    <div className="restaurant-profile-page">
+    <div className="restaurant-profile-page" style={accentStyle}>
       <div className="app">
         {/* SIDEBAR */}
         <aside className="sidebar">
@@ -576,9 +583,9 @@ function RestaurantProfile() {
                     <label>Time zone</label>
                     <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
                       <option value="">Select timezone</option>
-                      <option value="Asia/Kolkata">Asia/Kolkata (GMT+5:30)</option>
-                      <option value="Asia/Dubai">Asia/Dubai (GMT+4:00)</option>
-                      <option value="Europe/London">Europe/London (GMT+0:00)</option>
+                      {TIMEZONES.map((tz) => (
+                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                      ))}
                     </select>
                   </div>
 

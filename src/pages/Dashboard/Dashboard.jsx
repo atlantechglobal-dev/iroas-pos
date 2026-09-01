@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
+import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
 import './Dashboard.css'
 
 function generateSeries(n, base, amplitude) {
@@ -98,6 +99,7 @@ function Dashboard() {
   const [restaurantName, setRestaurantName] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
   const [range, setRange] = useState('7d')
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
 
   useEffect(() => {
     api
@@ -105,9 +107,12 @@ function Dashboard() {
       .then(({ restaurant }) => {
         if (restaurant.name) setRestaurantName(restaurant.name)
         setRestaurantStatus(restaurant.status)
+        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
       })
       .catch(() => {})
   }, [])
+
+  const accentStyle = deriveAccentShades(accentColor)
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
   const firstName = (currentUser?.name || 'there').split(' ')[0]
@@ -138,7 +143,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page" style={accentStyle}>
       <div className="app">
         {/* SIDEBAR */}
         <aside className="sidebar">

@@ -42,6 +42,7 @@ db.exec(`
     address TEXT,
     operating_hours TEXT,
     subdomain TEXT,
+    domain_suffix TEXT DEFAULT '.iroas.com',
     custom_domain TEXT,
     logo_data_url TEXT,
     primary_color TEXT DEFAULT '#F97316',
@@ -67,10 +68,13 @@ db.exec(`
   );
 `)
 
-// Migration: older databases created before settings_json existed.
+// Migration: older databases created before these columns existed.
 const restaurantColumns = db.prepare('PRAGMA table_info(restaurants)').all()
 if (!restaurantColumns.some((col) => col.name === 'settings_json')) {
   db.exec('ALTER TABLE restaurants ADD COLUMN settings_json TEXT')
+}
+if (!restaurantColumns.some((col) => col.name === 'domain_suffix')) {
+  db.exec("ALTER TABLE restaurants ADD COLUMN domain_suffix TEXT DEFAULT '.iroas.com'")
 }
 
 export default db

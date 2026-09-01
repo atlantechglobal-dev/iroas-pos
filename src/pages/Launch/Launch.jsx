@@ -24,7 +24,7 @@ function Launch() {
         if (restaurant.custom_domain) {
           setDomain(restaurant.custom_domain)
         } else if (restaurant.subdomain) {
-          setDomain(`${restaurant.subdomain}.iroas.com`)
+          setDomain(`${restaurant.subdomain}${restaurant.domain_suffix || '.iroas.com'}`)
         }
       })
       .catch(() => {})
