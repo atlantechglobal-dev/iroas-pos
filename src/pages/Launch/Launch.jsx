@@ -60,7 +60,9 @@ function Launch() {
   }
 
   const handleOpenLink = () => {
-    window.open(LIVE_LINK, '_blank')
+    // There's no real hosted site behind this link yet — show the branded
+    // in-app preview (actual chosen colors/font/theme) instead of a dead URL.
+    navigate('/site-preview')
   }
 
   const handleDownloadQR = async () => {

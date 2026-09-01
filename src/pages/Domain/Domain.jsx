@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import Select from '../../components/Select'
 import './Domain.css'
 
 const slugify = (value) =>
@@ -280,15 +281,12 @@ function Domain() {
                         onChange={handleSubdomainChange}
                       />
 
-                      <select
+                      <Select
                         className="domain-ending-select"
                         value={domainSuffix}
-                        onChange={(event) => setDomainSuffix(event.target.value)}
-                      >
-                        {DOMAIN_SUFFIXES.map((suffix) => (
-                          <option key={suffix} value={suffix}>{suffix}</option>
-                        ))}
-                      </select>
+                        onChange={setDomainSuffix}
+                        options={DOMAIN_SUFFIXES.map((suffix) => ({ value: suffix, label: suffix }))}
+                      />
 
                       <div className="availability">✓</div>
                     </div>

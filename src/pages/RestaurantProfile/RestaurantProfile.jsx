@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getStoredUser, clearSession } from '../../lib/api'
 import { NAV_GROUPS } from '../../lib/navGroups'
 import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
-import { COUNTRIES } from '../../lib/countries'
+import { COUNTRY_OPTIONS } from '../../lib/countries'
 import { TIMEZONES } from '../../lib/timezones'
+import { getCitiesForCountry } from '../../lib/cities'
+import Select from '../../components/Select'
 import './RestaurantProfile.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -64,6 +66,10 @@ function RestaurantProfile() {
   const [country, setCountry] = useState('')
   const [timezone, setTimezone] = useState('')
   const [address, setAddress] = useState('')
+
+  const cityOptions = useMemo(() => {
+    return getCitiesForCountry(country).map((name) => ({ value: name, label: name }))
+  }, [country])
   const [hours, setHours] = useState(defaultHours)
   const [logoDataUrl, setLogoDataUrl] = useState(null)
 
@@ -521,17 +527,33 @@ function RestaurantProfile() {
                       </div>
                     </div>
                     <div className="contact-row">
-                      <span className="contact-ico">🏙</span>
-                      <div>
-                        <span className="contact-label">City</span>
-                        <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai" />
-                      </div>
-                    </div>
-                    <div className="contact-row">
                       <span className="contact-ico">🏳</span>
                       <div>
                         <span className="contact-label">Country</span>
-                        <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="India" />
+                        <Select
+                          value={country}
+                          onChange={(value) => { setCountry(value); setCity('') }}
+                          options={COUNTRY_OPTIONS}
+                          placeholder="Select country"
+                          searchable
+                        />
+                      </div>
+                    </div>
+                    <div className="contact-row">
+                      <span className="contact-ico">🏙</span>
+                      <div>
+                        <span className="contact-label">City</span>
+                        {cityOptions.length > 0 ? (
+                          <Select
+                            value={city}
+                            onChange={setCity}
+                            options={cityOptions}
+                            placeholder={country ? 'Select city' : 'Select a country first'}
+                            searchable
+                          />
+                        ) : (
+                          <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai" />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -581,12 +603,13 @@ function RestaurantProfile() {
 
                   <div className="field">
                     <label>Time zone</label>
-                    <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
-                      <option value="">Select timezone</option>
-                      {TIMEZONES.map((tz) => (
-                        <option key={tz.value} value={tz.value}>{tz.label}</option>
-                      ))}
-                    </select>
+                    <Select
+                      value={timezone}
+                      onChange={setTimezone}
+                      options={TIMEZONES.map((tz) => ({ value: tz.value, label: tz.label }))}
+                      placeholder="Select timezone"
+                      searchable
+                    />
                   </div>
 
                   <div className="field">

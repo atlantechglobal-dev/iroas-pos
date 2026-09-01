@@ -238,6 +238,8 @@
   .contact-row > div { flex: 1; min-width: 0; }
   .contact-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
   .contact-row input { height: 38px; font-size: 13px; }
+  .contact-row .custom-select { --select-height: 38px; }
+  .contact-row .select-trigger { font-size: 13px; }
 
   /* HOURS TABLE */
 

@@ -37,9 +37,9 @@ function GoLive() {
   }
 
   const handlePreview = () => {
-    if (liveLink) {
-      window.open(liveLink, '_blank')
-    }
+    // No real hosted site exists behind liveLink yet — show the branded
+    // in-app preview (actual chosen colors/font/theme) instead of a dead URL.
+    navigate('/site-preview')
   }
 
   const handleDownloadQR = async () => {

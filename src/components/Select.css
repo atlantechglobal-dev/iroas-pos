@@ -1,0 +1,153 @@
+.custom-select {
+  position: relative;
+  width: 100%;
+  font-family: inherit;
+}
+
+.select-trigger {
+  width: 100%;
+  height: var(--select-height, 44px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border, #ece8df);
+  border-radius: var(--select-radius, 12px);
+  background: var(--panel, var(--white, #ffffff));
+  padding: 0 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--ink, var(--text, #17171a));
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.select-trigger:hover {
+  border-color: var(--green, #8bc53f);
+}
+
+.select-trigger.open {
+  border-color: var(--green, #8bc53f);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green, #8bc53f) 15%, transparent);
+}
+
+.select-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.select-placeholder {
+  color: var(--muted-2, #b3b1a8);
+}
+
+.select-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.select-chevron {
+  color: var(--muted, #8b8b8f);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.select-trigger.open .select-chevron {
+  transform: rotate(180deg);
+}
+
+.select-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+
+.select-panel {
+  /* position/top/left/width are set inline by the component (portal target
+     is document.body, so this can't rely on the trigger's own box). */
+  min-width: 200px;
+  max-height: 320px;
+  background: var(--panel, var(--white, #ffffff));
+  border: 1px solid var(--border, #ece8df);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(20, 20, 20, 0.14);
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.select-search {
+  border: none;
+  border-bottom: 1px solid var(--border, #ece8df);
+  padding: 12px 14px;
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  background: var(--bg, #f7f6f2);
+  flex-shrink: 0;
+}
+
+.select-options {
+  overflow-y: auto;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #d9d5c9 transparent;
+}
+
+.select-options::-webkit-scrollbar { width: 5px; }
+.select-options::-webkit-scrollbar-track { background: transparent; }
+.select-options::-webkit-scrollbar-thumb { background: #d9d5c9; border-radius: 999px; }
+
+.select-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 9px;
+  padding: 9px 10px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--ink, var(--text, #17171a));
+  cursor: pointer;
+}
+
+.select-option:hover {
+  background: var(--bg, #f7f6f2);
+}
+
+.select-option.selected {
+  background: var(--green-soft, #eaf5db);
+  color: var(--green-text, #4c8a1a);
+  font-weight: 600;
+}
+
+.select-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.select-check {
+  color: var(--green-dark, #6fa62a);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.select-empty {
+  margin: 0;
+  padding: 16px 10px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted, #8b8b8f);
+}

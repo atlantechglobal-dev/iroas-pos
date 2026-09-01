@@ -31,6 +31,7 @@ import Reviews from './pages/Reviews/Reviews'
 import PosIntegration from './pages/PosIntegration/PosIntegration'
 import Notifications from './pages/Notifications/Notifications'
 import Settings from './pages/Settings/Settings'
+import SitePreview from './pages/SitePreview/SitePreview'
 
 function App() {
   return (
@@ -84,6 +85,14 @@ function App() {
           element={
             <ProtectedRoute>
               <GoLive />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/site-preview"
+          element={
+            <ProtectedRoute>
+              <SitePreview />
             </ProtectedRoute>
           }
         />
