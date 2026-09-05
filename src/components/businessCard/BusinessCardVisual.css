@@ -1,0 +1,539 @@
+.bcv-card {
+  --bcv-radius: 16px;
+  width: 100%;
+  aspect-ratio: 1.75 / 1;
+  border-radius: var(--bcv-radius);
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 16px 36px rgba(20, 16, 10, 0.14);
+  background: #111;
+  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+}
+
+.bcv-inner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+
+.bcv-hero {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(145deg, #3a2a1c 0%, #1a1210 45%, #4a3020 100%);
+  background-size: cover;
+  background-position: center;
+}
+
+.bcv-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.25));
+  pointer-events: none;
+}
+
+.bcv-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bcv-logo-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.92);
+  color: #17171a;
+}
+
+.bcv-empty {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+.bcv-contacts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bcv-contacts a,
+.bcv-row-static {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  font-size: 10.5px;
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.bcv-contacts.align-right a,
+.bcv-contacts.align-right .bcv-row-static {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.bcv-ico {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: #17171a;
+  color: #fff;
+}
+
+.bcv-val {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+/* ——— split-gold ——— */
+.bcv-inner.layout-split-gold {
+  grid-template-columns: 1.05fr 0.95fr;
+}
+
+.layout-split-gold .bcv-info {
+  position: relative;
+  z-index: 2;
+  background: var(--card-panel, #f0c12e);
+  color: var(--card-ink, #17171a);
+  padding: 7% 9% 7% 8%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.layout-split-gold .bcv-identity {
+  padding-bottom: 8px;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.55);
+}
+
+.layout-split-gold .bcv-name {
+  margin: 0 0 4px;
+  font-size: clamp(16px, 3.2vw, 22px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.layout-split-gold .bcv-role {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.layout-split-gold .bcv-ico {
+  background: #17171a;
+  color: #fff;
+}
+
+.layout-split-gold .bcv-photo-side {
+  position: relative;
+  overflow: hidden;
+}
+
+.layout-split-gold .bcv-diagonal {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  left: 48%;
+  width: 28px;
+  background: #111;
+  transform: skewX(-12deg);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.layout-split-gold .bcv-brand-corner {
+  position: absolute;
+  top: 10%;
+  right: 8%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 56px;
+  text-align: center;
+}
+
+.layout-split-gold .bcv-brand-corner .bcv-logo-img,
+.layout-split-gold .bcv-brand-corner .bcv-logo-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.layout-split-gold .bcv-brand-name {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #111;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 4px;
+  border-radius: 4px;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-split-gold .bcv-circle {
+  position: absolute;
+  left: 46%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(28%, 92px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px #111;
+  background:
+    linear-gradient(135deg, #d8c4a0, #8a6a4a);
+  background-size: cover;
+  background-position: center;
+  z-index: 4;
+}
+
+/* ——— photo-dark ——— */
+.bcv-inner.layout-photo-dark {
+  grid-template-columns: 1fr 1fr;
+  background: #141414;
+}
+
+.layout-photo-dark .bcv-photo-side {
+  position: relative;
+  overflow: hidden;
+}
+
+.layout-photo-dark .bcv-torn {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  width: 28px;
+  z-index: 2;
+  background: #141414;
+  clip-path: polygon(
+    40% 0%,
+    100% 0%,
+    100% 100%,
+    40% 100%,
+    70% 92%,
+    35% 84%,
+    75% 76%,
+    30% 68%,
+    80% 60%,
+    25% 52%,
+    70% 44%,
+    35% 36%,
+    75% 28%,
+    30% 20%,
+    70% 12%,
+    40% 0%
+  );
+}
+
+.layout-photo-dark .bcv-info {
+  position: relative;
+  z-index: 1;
+  background: #141414;
+  color: #f4f4f2;
+  padding: 8% 9% 8% 7%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.layout-photo-dark .bcv-brand-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.layout-photo-dark .bcv-brand-block .bcv-logo-img,
+.layout-photo-dark .bcv-brand-block .bcv-logo-fallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card-hot, #f08a2a);
+  color: #fff;
+}
+
+.layout-photo-dark .bcv-store {
+  margin: 0;
+  font-size: clamp(13px, 2.4vw, 18px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.layout-photo-dark .bcv-tagline {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.layout-photo-dark .bcv-ico {
+  background: transparent;
+  color: #fff;
+  width: 16px;
+  height: 16px;
+}
+
+.layout-photo-dark .bcv-contacts a,
+.layout-photo-dark .bcv-row-static {
+  color: #f4f4f2;
+  font-size: 10px;
+}
+
+.layout-photo-dark .bcv-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  background: var(--card-hot, #f08a2a);
+  z-index: 5;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.layout-photo-dark .bcv-corner.tl {
+  top: 0;
+  right: 0;
+  left: auto;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.layout-photo-dark .bcv-corner.br {
+  bottom: 0;
+  left: 0;
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+}
+
+/* ——— noir-orange ——— */
+.bcv-inner.layout-noir-orange {
+  grid-template-columns: 1.1fr 0.9fr;
+  background: #0c0c0c;
+}
+
+.layout-noir-orange .bcv-info {
+  position: relative;
+  z-index: 2;
+  padding: 7% 6% 7% 8%;
+  color: var(--card-hot, #f08a2a);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(240, 138, 42, 0.08), transparent 40%),
+    #0c0c0c;
+}
+
+.layout-noir-orange .bcv-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.layout-noir-orange .bcv-brand-row .bcv-logo-img,
+.layout-noir-orange .bcv-brand-row .bcv-logo-fallback {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--card-hot, #f08a2a);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.layout-noir-orange .bcv-store {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--card-hot, #f08a2a);
+}
+
+.layout-noir-orange .bcv-tagline {
+  margin: 2px 0 0;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.layout-noir-orange .bcv-service-title {
+  margin: 4px 0 2px;
+  font-size: clamp(16px, 2.8vw, 22px);
+  font-weight: 800;
+  color: var(--card-hot, #f08a2a);
+  line-height: 1.15;
+}
+
+.layout-noir-orange .bcv-ico {
+  background: transparent;
+  color: var(--card-hot, #f08a2a);
+  width: 16px;
+  height: 16px;
+}
+
+.layout-noir-orange .bcv-contacts a,
+.layout-noir-orange .bcv-row-static {
+  color: #f2f2f0;
+  font-size: 10.5px;
+}
+
+.layout-noir-orange .bcv-social {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.layout-noir-orange .bcv-social-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--card-hot, #f08a2a);
+  color: #111;
+  text-decoration: none;
+}
+
+.layout-noir-orange .bcv-social-dot.muted {
+  opacity: 0.45;
+}
+
+.layout-noir-orange .bcv-photo-side {
+  position: relative;
+  overflow: hidden;
+}
+
+.layout-noir-orange .bcv-wave {
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  z-index: 2;
+  background: #0c0c0c;
+  clip-path: polygon(
+    0 0,
+    55% 0,
+    100% 8%,
+    40% 18%,
+    90% 28%,
+    35% 40%,
+    95% 52%,
+    30% 64%,
+    85% 76%,
+    40% 88%,
+    70% 100%,
+    0 100%
+  );
+}
+
+.layout-noir-orange .bcv-circle.sm {
+  position: absolute;
+  left: 8%;
+  bottom: 10%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  background-size: cover;
+  background-position: center;
+  z-index: 3;
+}
+
+/* Theme panel tints for split-gold */
+.bcv-card.layout-split-gold.theme-lime {
+  --card-panel: #f0c12e;
+  --card-ink: #17171a;
+}
+
+.bcv-card.layout-split-gold.theme-charcoal {
+  --card-panel: #2a2c2e;
+  --card-ink: #f2f2ef;
+}
+
+.bcv-card.layout-split-gold.theme-charcoal .bcv-role {
+  color: rgba(242, 242, 239, 0.75);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.bcv-card.layout-split-gold.theme-charcoal .bcv-identity {
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+}
+
+.bcv-card.layout-split-gold.theme-olive {
+  --card-panel: #6a945f;
+  --card-ink: #f4f8f2;
+}
+
+.bcv-card.layout-split-gold.theme-olive .bcv-role {
+  color: rgba(244, 248, 242, 0.9);
+}
+
+.bcv-card.layout-split-gold.theme-olive .bcv-identity {
+  border-bottom-color: rgba(255, 255, 255, 0.35);
+}
+
+.bcv-card.theme-lime {
+  --card-hot: #8dc63f;
+}
+
+.bcv-card.theme-charcoal {
+  --card-hot: #f08a2a;
+}
+
+.bcv-card.theme-olive {
+  --card-hot: #c4e07a;
+}
+
+@media (max-width: 480px) {
+  .bcv-card {
+    aspect-ratio: 1.55 / 1;
+  }
+
+  .layout-split-gold .bcv-name {
+    font-size: 14px;
+  }
+
+  .bcv-contacts a,
+  .bcv-row-static {
+    font-size: 9.5px;
+  }
+}

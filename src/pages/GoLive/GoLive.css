@@ -1,0 +1,233 @@
+.go-live-page {
+  --bg-cream: #fdf6ec;
+  --bg-peach: #fbe9d0;
+  --green: #a8d64a;
+  --ink: #17171a;
+  --muted: #8b8b93;
+  --card-bg: #ffffff;
+  --card-border: #f0eee9;
+  --divider: #f2f0ea;
+  --status-green: #6fae2e;
+  --btn-border: #e8e5de;
+
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Inter",
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: linear-gradient(
+    160deg,
+    var(--bg-cream) 0%,
+    var(--bg-cream) 45%,
+    var(--bg-peach) 100%
+  );
+  width: 100%;
+  min-height: 100vh;
+  color: var(--ink);
+
+  display: flex;
+  justify-content: center;
+
+  .go-live-content {
+    width: 100%;
+    max-width: 640px;
+    padding: 90px 24px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .icon-badge {
+    width: 88px;
+    height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+
+  .icon-badge img {
+    width: 100%;
+    height: 100%;
+  }
+
+  .title {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 12px;
+    color: var(--ink);
+  }
+
+  .subtitle {
+    margin: 0 0 32px;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1.5;
+    max-width: 420px;
+  }
+
+  .checklist-card {
+    width: 100%;
+    max-width: 360px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 9px 20px;
+    box-shadow: 0 20px 40px rgba(30, 20, 10, 0.06);
+    margin-bottom: 24px;
+  }
+
+  .go-live-qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    padding: 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    box-shadow: 0 12px 28px rgba(30, 20, 10, 0.05);
+  }
+
+  .go-live-qr-host {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    word-break: break-all;
+  }
+
+  .checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .checklist-item:last-child {
+    border-bottom: none;
+  }
+
+  .check-icon {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 50%;
+    background: var(--status-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .item-label {
+    flex: 1;
+    text-align: left;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .item-status {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--status-green);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 13px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: inherit;
+    font-size: 16.5px;
+    font-weight: 600;
+    padding: 14px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease,
+      background 0.15s ease;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .btn:active {
+    transform: translateY(0);
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid #6fae2e;
+    outline-offset: 2px;
+  }
+
+  .btn-primary {
+    background: var(--green);
+    color: #16210a;
+    border-color: var(--green);
+    box-shadow: 0 8px 18px rgba(168, 214, 74, 0.4);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 10px 22px rgba(168, 214, 74, 0.5);
+  }
+
+  .btn-primary svg {
+    stroke: #16210a;
+  }
+
+  .btn-secondary {
+    background: #ffffff;
+    color: var(--ink);
+    border-color: var(--btn-border);
+  }
+
+  .btn-secondary:hover {
+    background: #fafafa;
+  }
+
+  .btn-secondary svg {
+    color: var(--ink);
+  }
+
+  @media (max-width: 480px) {
+    .go-live-content {
+      padding: 60px 16px 40px;
+    }
+
+    .title {
+      font-size: 26px;
+    }
+
+    .actions {
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .btn {
+      justify-content: center;
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn {
+      transition: none;
+    }
+  }
+}

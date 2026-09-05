@@ -1,0 +1,42 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --green: #a5d526;
+  --green-dark: #8fbd18;
+  --dark: #11171d;
+  --dark-card: #20272c;
+  --text-dark: #16191c;
+  --muted: #777b80;
+  --border: #e5e5e5;
+  --white: #ffffff;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", "Inter", sans-serif;
+  background: #ffffff;
+  color: var(--text-dark);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
