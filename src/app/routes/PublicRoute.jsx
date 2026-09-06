@@ -4,7 +4,7 @@ import { ROUTES } from '../../constants/routes.js'
 import { isAdmin } from '../../constants/roles.js'
 
 export function PublicRoute({ children }) {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, restaurantStatus } = useAuth()
   const location = useLocation()
 
   if (isAuthenticated) {
@@ -16,7 +16,13 @@ export function PublicRoute({ children }) {
     if (location.pathname === ROUTES.CREATE_ACCOUNT) {
       return <Navigate to={ROUTES.RESTAURANT_SETUP} replace />
     }
-    return <Navigate to={ROUTES.DASHBOARD} replace />
+    // Don't drop an unfinished onboarding into the live dashboard — resume the wizard instead.
+    return (
+      <Navigate
+        to={restaurantStatus === 'live' ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP}
+        replace
+      />
+    )
   }
 
   return children

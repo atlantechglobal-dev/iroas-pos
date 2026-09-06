@@ -70,13 +70,18 @@ function RouteFallback() {
   )
 }
 
-function withProtection(Component, { adminOnly = false } = {}) {
+function withProtection(Component, { adminOnly = false, requireLive = false } = {}) {
   return (
-    <ProtectedRoute adminOnly={adminOnly}>
+    <ProtectedRoute adminOnly={adminOnly} requireLive={requireLive}>
       <Component />
     </ProtectedRoute>
   )
 }
+
+// Pages that assume a fully launched restaurant (subdomain/brand/etc already
+// set). The onboarding wizard itself (setup/domain/brand/launch/go-live) is
+// intentionally excluded — those must stay reachable mid-onboarding.
+const LIVE_ONLY = { requireLive: true }
 
 export function AppRoutes() {
   return (
@@ -102,32 +107,32 @@ export function AppRoutes() {
         <Route path={ROUTES.BRAND} element={withProtection(Brand)} />
         <Route path={ROUTES.LAUNCH} element={withProtection(Launch)} />
         <Route path={ROUTES.GO_LIVE} element={withProtection(GoLive)} />
-        <Route path={ROUTES.DASHBOARD} element={withProtection(Dashboard)} />
-        <Route path={ROUTES.RESTAURANT_PROFILE} element={withProtection(RestaurantProfile)} />
-        <Route path={ROUTES.DIRECTORY_LISTINGS} element={withProtection(DirectoryListings)} />
-        <Route path={ROUTES.DIGITAL_BUSINESS_CARD} element={withProtection(DigitalBusinessCard)} />
-        <Route path={ROUTES.ONE_LINK} element={withProtection(OneLink)} />
-        <Route path={ROUTES.MENU} element={withProtection(Menu)} />
-        <Route path={ROUTES.ORDERS} element={withProtection(Orders)} />
-        <Route path={ROUTES.RESERVATIONS} element={withProtection(Reservations)} />
-        <Route path={ROUTES.TABLES} element={withProtection(Tables)} />
-        <Route path={ROUTES.STAFF} element={withProtection(Staff)} />
-        <Route path={ROUTES.CUSTOMERS} element={withProtection(Customers)} />
-        <Route path={ROUTES.ROLE_PERMISSIONS} element={withProtection(RolePermissions)} />
-        <Route path={ROUTES.ANALYTICS} element={withProtection(Analytics)} />
-        <Route path={ROUTES.PAYMENTS} element={withProtection(Payments)} />
-        <Route path={ROUTES.MARKETING} element={withProtection(Marketing)} />
-        <Route path={ROUTES.REVIEWS} element={withProtection(Reviews)} />
-        <Route path={ROUTES.POS_INTEGRATION} element={withProtection(PosIntegration)} />
-        <Route path={ROUTES.NOTIFICATIONS} element={withProtection(Notifications)} />
-        <Route path={ROUTES.SETTINGS} element={withProtection(Settings)} />
-        <Route path={ROUTES.SETTINGS_USERS} element={withProtection(SettingsUsers)} />
-        <Route path={ROUTES.SETTINGS_BILLING} element={withProtection(SettingsBilling)} />
-        <Route path={ROUTES.SETTINGS_SECURITY} element={withProtection(SettingsSecurity)} />
-        <Route path={ROUTES.SETTINGS_API_KEYS} element={withProtection(SettingsApiKeys)} />
-        <Route path={ROUTES.SETTINGS_BACKUP} element={withProtection(SettingsBackup)} />
-        <Route path={ROUTES.SETTINGS_AUDIT} element={withProtection(SettingsAudit)} />
-        <Route path={ROUTES.SETTINGS_PRIVACY} element={withProtection(SettingsPrivacy)} />
+        <Route path={ROUTES.DASHBOARD} element={withProtection(Dashboard, LIVE_ONLY)} />
+        <Route path={ROUTES.RESTAURANT_PROFILE} element={withProtection(RestaurantProfile, LIVE_ONLY)} />
+        <Route path={ROUTES.DIRECTORY_LISTINGS} element={withProtection(DirectoryListings, LIVE_ONLY)} />
+        <Route path={ROUTES.DIGITAL_BUSINESS_CARD} element={withProtection(DigitalBusinessCard, LIVE_ONLY)} />
+        <Route path={ROUTES.ONE_LINK} element={withProtection(OneLink, LIVE_ONLY)} />
+        <Route path={ROUTES.MENU} element={withProtection(Menu, LIVE_ONLY)} />
+        <Route path={ROUTES.ORDERS} element={withProtection(Orders, LIVE_ONLY)} />
+        <Route path={ROUTES.RESERVATIONS} element={withProtection(Reservations, LIVE_ONLY)} />
+        <Route path={ROUTES.TABLES} element={withProtection(Tables, LIVE_ONLY)} />
+        <Route path={ROUTES.STAFF} element={withProtection(Staff, LIVE_ONLY)} />
+        <Route path={ROUTES.CUSTOMERS} element={withProtection(Customers, LIVE_ONLY)} />
+        <Route path={ROUTES.ROLE_PERMISSIONS} element={withProtection(RolePermissions, LIVE_ONLY)} />
+        <Route path={ROUTES.ANALYTICS} element={withProtection(Analytics, LIVE_ONLY)} />
+        <Route path={ROUTES.PAYMENTS} element={withProtection(Payments, LIVE_ONLY)} />
+        <Route path={ROUTES.MARKETING} element={withProtection(Marketing, LIVE_ONLY)} />
+        <Route path={ROUTES.REVIEWS} element={withProtection(Reviews, LIVE_ONLY)} />
+        <Route path={ROUTES.POS_INTEGRATION} element={withProtection(PosIntegration, LIVE_ONLY)} />
+        <Route path={ROUTES.NOTIFICATIONS} element={withProtection(Notifications, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS} element={withProtection(Settings, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS_USERS} element={withProtection(SettingsUsers, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS_BILLING} element={withProtection(SettingsBilling, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS_SECURITY} element={withProtection(SettingsSecurity, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS_API_KEYS} element={withProtection(SettingsApiKeys, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS_BACKUP} element={withProtection(SettingsBackup, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS_AUDIT} element={withProtection(SettingsAudit, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS_PRIVACY} element={withProtection(SettingsPrivacy, LIVE_ONLY)} />
         <Route path={ROUTES.PLATFORM_ADMIN} element={withProtection(PlatformAdmin, { adminOnly: true })} />
 
         <Route path={ROUTES.UNAUTHORIZED} element={<Unauthorized />} />

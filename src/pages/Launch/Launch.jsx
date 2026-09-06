@@ -4,10 +4,12 @@ import { api } from '../../lib/api'
 import { QrCodePreview, downloadQrPng, qrDataUrl } from '../../components/QrCodePreview.jsx'
 import { restaurantHostname } from '../../utils/restaurantUrl.js'
 import { guestSiteUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
+import { useAuth } from '../../hooks/useAuth.js'
 import './Launch.css'
 
 function Launch() {
   const navigate = useNavigate()
+  const { setRestaurantStatus } = useAuth()
 
   const [toast, setToast] = useState('')
   const [launched, setLaunched] = useState(false)
@@ -218,6 +220,7 @@ function Launch() {
     try {
       await api.launch()
       setLaunched(true)
+      setRestaurantStatus('live')
       showMessage('Your restaurant has been launched!')
 
       setTimeout(() => {

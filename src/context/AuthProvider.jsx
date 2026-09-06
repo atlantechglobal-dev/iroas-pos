@@ -16,10 +16,13 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate()
   const [user, setUser] = useState(() => getStoredUser())
   const [initializing, setInitializing] = useState(Boolean(getToken()))
+  // null = unknown/not fetched yet (e.g. admin, or not loaded), 'onboarding' | 'live' otherwise.
+  const [restaurantStatus, setRestaurantStatus] = useState(null)
 
   const logout = useCallback(() => {
     clearSession()
     setUser(null)
+    setRestaurantStatus(null)
     navigate(ROUTES.LOGIN, { replace: true })
   }, [navigate])
 
@@ -42,10 +45,19 @@ export function AuthProvider({ children }) {
 
     authApi
       .me()
-      .then(({ user: freshUser }) => {
+      .then(async ({ user: freshUser }) => {
         if (cancelled) return
         setUser(freshUser)
         setSession(token, freshUser)
+
+        if (!isAdmin(freshUser)) {
+          try {
+            const { restaurant } = await restaurantApi.get()
+            if (!cancelled) setRestaurantStatus(restaurant?.status || 'onboarding')
+          } catch {
+            if (!cancelled) setRestaurantStatus('onboarding')
+          }
+        }
       })
       .catch(() => {
         if (cancelled) return
@@ -73,10 +85,15 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        await restaurantApi.get()
-        navigate(ROUTES.DASHBOARD, { replace: true })
+        const { restaurant } = await restaurantApi.get()
+        const status = restaurant?.status || 'onboarding'
+        setRestaurantStatus(status)
+        navigate(status === 'live' ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP, {
+          replace: true,
+        })
       } catch {
-        navigate(ROUTES.DASHBOARD, { replace: true })
+        setRestaurantStatus('onboarding')
+        navigate(ROUTES.RESTAURANT_SETUP, { replace: true })
       }
 
       return loggedInUser
@@ -89,12 +106,14 @@ export function AuthProvider({ children }) {
       user,
       isAuthenticated: Boolean(user && getToken()),
       isAdmin: isAdmin(user),
+      restaurantStatus,
       initializing,
       login,
       logout,
       setUser,
+      setRestaurantStatus,
     }),
-    [user, initializing, login, logout],
+    [user, restaurantStatus, initializing, login, logout],
   )
 
   if (initializing) {
