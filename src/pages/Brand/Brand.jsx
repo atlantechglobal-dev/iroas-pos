@@ -1,669 +1,553 @@
-import { useEffect, useMemo, useState } from 'react'
-import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
-import { useToast } from '../../components/feedback/ToastProvider.jsx'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { prepareImageDataUrl } from '../../utils/imageFile.js'
-import { QrCodePreview, downloadQrPng } from '../../components/QrCodePreview.jsx'
-import {
-  guestSiteUrl,
-  loadOneLinkPreview,
-  restaurantPublicSlug,
-  saveOneLinkPreview,
-} from '../../utils/guestLinks.js'
 import './Brand.css'
 
-const DISPLAY_FONTS = [
-  { name: 'Plus Jakarta Sans', stack: '"Plus Jakarta Sans", sans-serif', vibe: 'Modern · Clean' },
-  { name: 'Playfair Display', stack: '"Playfair Display", serif', vibe: 'Luxury · Editorial' },
-  { name: 'Space Grotesk', stack: '"Space Grotesk", sans-serif', vibe: 'Tech · Bold' },
-  { name: 'DM Serif Display', stack: '"DM Serif Display", serif', vibe: 'Classic · Refined' },
-  { name: 'Cormorant Garamond', stack: '"Cormorant Garamond", serif', vibe: 'Fine dining' },
-  { name: 'Outfit', stack: '"Outfit", sans-serif', vibe: 'Friendly · Soft' },
-  { name: 'Libre Baskerville', stack: '"Libre Baskerville", serif', vibe: 'Traditional' },
-  { name: 'Sora', stack: '"Sora", sans-serif', vibe: 'Contemporary' },
-  { name: 'Fraunces', stack: '"Fraunces", serif', vibe: 'Warm · Character' },
-  { name: 'Syne', stack: '"Syne", sans-serif', vibe: 'Expressive' },
-]
-
-const BODY_FONTS = [
-  { name: 'Inter', stack: 'Inter, sans-serif', vibe: 'UI default' },
-  { name: 'DM Sans', stack: '"DM Sans", sans-serif', vibe: 'Readable' },
-  { name: 'Plus Jakarta Sans', stack: '"Plus Jakarta Sans", sans-serif', vibe: 'Matched modern' },
-  { name: 'Source Sans 3', stack: '"Source Sans 3", sans-serif', vibe: 'Neutral' },
-  { name: 'Nunito Sans', stack: '"Nunito Sans", sans-serif', vibe: 'Rounded soft' },
-  { name: 'Lora', stack: 'Lora, serif', vibe: 'Editorial body' },
-  { name: 'Manrope', stack: 'Manrope, sans-serif', vibe: 'Geometric' },
-  { name: 'IBM Plex Sans', stack: '"IBM Plex Sans", sans-serif', vibe: 'Professional' },
-  { name: 'Karla', stack: 'Karla, sans-serif', vibe: 'Compact' },
-  { name: 'System UI', stack: 'system-ui, sans-serif', vibe: 'Native' },
-]
-
-const PALETTE_PRESETS = [
+const FONTS = [
   {
-    key: 'citrus',
-    label: 'Citrus',
-    colors: {
-      primary: '#F97316',
-      secondary: '#FDBA74',
-      ink: '#111827',
-      surface: '#FAFAFA',
-      success: '#22C55E',
-      warning: '#F59E0B',
-    },
+    key: 'Plus Jakarta Sans',
+    symbolClass: '',
+    name: 'Plus Jakarta',
+    body: 'Body · Inter',
+    tag: 'MODERN · EDITORIAL',
   },
   {
-    key: 'lime',
-    label: 'IROAS Lime',
-    colors: {
-      primary: '#8BC53F',
-      secondary: '#F0F72A',
-      ink: '#17171A',
-      surface: '#F7F6F2',
-      success: '#22C55E',
-      warning: '#F59E0B',
-    },
+    key: 'Playfair Display',
+    symbolClass: 'serif',
+    name: 'Playfair Display',
+    body: 'Body · Inter',
+    tag: 'LUXURY · REFINED',
   },
   {
-    key: 'noir',
-    label: 'Noir',
-    colors: {
-      primary: '#111827',
-      secondary: '#6B7280',
-      ink: '#F9FAFB',
-      surface: '#1F2937',
-      success: '#34D399',
-      warning: '#FBBF24',
-    },
+    key: 'Space Grotesk',
+    symbolClass: '',
+    name: 'Space Grotesk',
+    body: 'Body · Inter',
+    tag: 'TECH · CONFIDENT',
   },
   {
-    key: 'ocean',
-    label: 'Ocean',
-    colors: {
-      primary: '#0EA5E9',
-      secondary: '#7DD3FC',
-      ink: '#0C4A6E',
-      surface: '#F0F9FF',
-      success: '#10B981',
-      warning: '#F59E0B',
-    },
-  },
-  {
-    key: 'wine',
-    label: 'Wine',
-    colors: {
-      primary: '#9F1239',
-      secondary: '#FDA4AF',
-      ink: '#1C1917',
-      surface: '#FFF1F2',
-      success: '#15803D',
-      warning: '#D97706',
-    },
-  },
-  {
-    key: 'olive',
-    label: 'Olive',
-    colors: {
-      primary: '#5F8F5A',
-      secondary: '#C4A574',
-      ink: '#1C1917',
-      surface: '#FAF7F2',
-      success: '#3F6212',
-      warning: '#B45309',
-    },
-  },
-  {
-    key: 'violet',
-    label: 'Violet',
-    colors: {
-      primary: '#7C3AED',
-      secondary: '#C4B5FD',
-      ink: '#1E1B4B',
-      surface: '#F5F3FF',
-      success: '#059669',
-      warning: '#D97706',
-    },
-  },
-  {
-    key: 'espresso',
-    label: 'Espresso',
-    colors: {
-      primary: '#78350F',
-      secondary: '#FBBF24',
-      ink: '#1C1917',
-      surface: '#FFFBEB',
-      success: '#4D7C0F',
-      warning: '#EA580C',
-    },
+    key: 'DM Serif Display',
+    symbolClass: 'serif',
+    name: 'DM Serif Display',
+    body: 'Body · DM Sans',
+    tag: 'BOLD · CLASSIC',
   },
 ]
 
-const DEFAULT_PALETTE = PALETTE_PRESETS[0].colors
-
-const COLOR_FIELDS = [
-  { key: 'primary', label: 'Primary', hint: 'Buttons & accents' },
-  { key: 'secondary', label: 'Secondary', hint: 'Highlights' },
-  { key: 'ink', label: 'Ink', hint: 'Headings & text' },
-  { key: 'surface', label: 'Surface', hint: 'Backgrounds' },
-  { key: 'success', label: 'Success', hint: 'Confirmations' },
-  { key: 'warning', label: 'Warning', hint: 'Alerts' },
+const THEMES = [
+  {
+    key: 'modern',
+    imageClass: 'modern-theme',
+    name: 'Modern Minimal',
+    description: 'Lots of whitespace, imagery',
+    lines: 2,
+    background: 'white',
+    color: '#202126',
+  },
+  {
+    key: 'luxury',
+    imageClass: 'luxury-theme',
+    name: 'Luxury Dining',
+    description: 'Editorial typography, dark accents',
+    lines: 0,
+    background: '#10182a',
+    color: 'white',
+  },
+  {
+    key: 'cafe',
+    imageClass: 'cafe-theme',
+    name: 'Cafe Style',
+    description: 'Friendly, soft, sun-washed',
+    lines: 2,
+    background: '#fff1b9',
+    color: '#202126',
+  },
+  {
+    key: 'traditional',
+    imageClass: 'traditional-theme',
+    name: 'Traditional',
+    description: 'Warm hues, ornate accents',
+    lines: 1,
+    background: '#fff4eb',
+    color: '#202126',
+  },
+  {
+    key: 'dark',
+    imageClass: 'dark-theme',
+    name: 'Dark Elegant',
+    description: 'Premium, night-time dining',
+    lines: 0,
+    background: '#10182a',
+    color: 'white',
+  },
+  {
+    key: 'bistro',
+    imageClass: 'bistro-theme',
+    name: 'Casual Bistro',
+    description: 'Light, approachable, lively',
+    lines: 1,
+    background: '#f7f7f4',
+    color: '#202126',
+  },
 ]
-
-function ensureGoogleFonts() {
-  const id = 'iroas-brand-fonts'
-  if (document.getElementById(id)) return
-  const link = document.createElement('link')
-  link.id = id
-  link.rel = 'stylesheet'
-  link.href =
-    'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=DM+Sans:wght@400;600;700&family=DM+Serif+Display&family=Fraunces:wght@600;700&family=IBM+Plex+Sans:wght@400;600;700&family=Inter:wght@400;600;700&family=Karla:wght@400;600;700&family=Libre+Baskerville:wght@400;700&family=Lora:wght@400;600;700&family=Manrope:wght@400;600;700&family=Nunito+Sans:wght@400;600;700&family=Outfit:wght@500;700&family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@500;700;800&family=Sora:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=Space+Grotesk:wght@500;700&family=Syne:wght@600;700&display=swap'
-  document.head.appendChild(link)
-}
-
-function fontStack(list, name) {
-  return list.find((f) => f.name === name)?.stack || name
-}
 
 function Brand() {
-  const toast = useToast()
+  const navigate = useNavigate()
 
-  const [restaurantName, setRestaurantName] = useState('Your restaurant')
-  const [logoDataUrl, setLogoDataUrl] = useState('')
-  const [coverDataUrl, setCoverDataUrl] = useState('')
-  const [gallery, setGallery] = useState([])
-  const [palette, setPalette] = useState(DEFAULT_PALETTE)
-  const [displayFont, setDisplayFont] = useState('Plus Jakarta Sans')
-  const [bodyFont, setBodyFont] = useState('Inter')
-  const [activePreset, setActivePreset] = useState('citrus')
-  const [saving, setSaving] = useState(false)
-  const [slug, setSlug] = useState('your-restaurant')
+  const [logoDataUrl, setLogoDataUrl] = useState(null)
+  const [primaryColor, setPrimaryColor] = useState('#F97316')
+  const [secondaryColor, setSecondaryColor] = useState('#F0F72A')
+  const [accentColor, setAccentColor] = useState('#BDB8A4')
+  const [selectedFont, setSelectedFont] = useState('Plus Jakarta Sans')
+  const [selectedTheme, setSelectedTheme] = useState('modern')
+  const [previewMode, setPreviewMode] = useState('light')
+  const [restaurantName, setRestaurantName] = useState('')
   const [cuisine, setCuisine] = useState('')
-  const [description, setDescription] = useState('')
-
-  useEffect(() => {
-    ensureGoogleFonts()
-  }, [])
 
   useEffect(() => {
     api
       .getRestaurant()
       .then(({ restaurant }) => {
-        const name = restaurant.name || 'Your restaurant'
-        setRestaurantName(name)
-        setSlug(restaurantPublicSlug(restaurant, 'your-restaurant'))
-        setCuisine(restaurant.cuisine || '')
-        setDescription(restaurant.description || '')
+        if (restaurant.name) setRestaurantName(restaurant.name)
+        if (restaurant.cuisine) setCuisine(restaurant.cuisine)
+        if (restaurant.primary_color) setPrimaryColor(restaurant.primary_color)
+        if (restaurant.secondary_color) setSecondaryColor(restaurant.secondary_color)
+        if (restaurant.accent_color) setAccentColor(restaurant.accent_color)
+        if (restaurant.font) setSelectedFont(restaurant.font)
+        if (restaurant.theme) setSelectedTheme(restaurant.theme)
         if (restaurant.logo_data_url) setLogoDataUrl(restaurant.logo_data_url)
-        if (restaurant.primary_color || restaurant.secondary_color || restaurant.accent_color) {
-          setPalette((prev) => ({
-            ...prev,
-            primary: restaurant.primary_color || prev.primary,
-            secondary: restaurant.secondary_color || prev.secondary,
-            ink: restaurant.accent_color || prev.ink,
-          }))
-        }
-        if (restaurant.font) setDisplayFont(restaurant.font)
-
-        const settings = restaurant.settings || {}
-        if (settings.coverDataUrl || settings.coverPhoto) {
-          setCoverDataUrl(settings.coverDataUrl || settings.coverPhoto)
-        }
-        if (Array.isArray(settings.gallery)) setGallery(settings.gallery)
-        if (settings.bodyFont) setBodyFont(settings.bodyFont)
-        if (settings.brandPalette) {
-          setPalette((prev) => ({ ...prev, ...settings.brandPalette }))
-        }
-        if (settings.brandPreset) setActivePreset(settings.brandPreset)
       })
       .catch(() => {})
   }, [])
 
-  const menuPreviewUrl = useMemo(() => guestSiteUrl(slug, 'menu'), [slug])
-  const sitePreviewUrl = useMemo(() => guestSiteUrl(slug, 'website'), [slug])
-  const displayStack = fontStack(DISPLAY_FONTS, displayFont)
-  const bodyStack = fontStack(BODY_FONTS, bodyFont)
-
-  const brandPayload = useMemo(
-    () => ({
-      primaryColor: palette.primary,
-      secondaryColor: palette.secondary,
-      accentColor: palette.ink,
-      surfaceColor: palette.surface,
-      successColor: palette.success,
-      warningColor: palette.warning,
-      logoDataUrl,
-      coverDataUrl,
-      displayFont,
-      bodyFont,
-      cuisine,
-      description,
-      phone: '',
-      address: '',
-    }),
-    [palette, logoDataUrl, coverDataUrl, displayFont, bodyFont, cuisine, description],
-  )
-
-  // Keep guest website preview in sync as branding changes
-  useEffect(() => {
-    const existing = loadOneLinkPreview(slug) || {}
-    saveOneLinkPreview(slug, {
-      ...existing,
-      restaurantName,
-      headline: restaurantName,
-      subheadline: description || existing.subheadline || 'Order, book a table or browse our menu.',
-      brand: {
-        ...(existing.brand || {}),
-        ...brandPayload,
-      },
-    })
-  }, [slug, restaurantName, description, brandPayload])
-
-  const onLogoChange = async (event) => {
+  const handleLogoChange = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-    const result = await prepareImageDataUrl(file)
-    if (result.error) {
-      toast.error(result.error)
-      event.target.value = ''
-      return
-    }
-    setLogoDataUrl(result.dataUrl)
-    toast.success('Logo updated — preview refreshed.')
+
+    const reader = new FileReader()
+    reader.onload = (loadEvent) => setLogoDataUrl(loadEvent.target.result)
+    reader.readAsDataURL(file)
   }
 
-  const onCoverChange = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    const result = await prepareImageDataUrl(file)
-    if (result.error) {
-      toast.error(result.error)
-      event.target.value = ''
-      return
-    }
-    setCoverDataUrl(result.dataUrl)
-    toast.success('Cover photo updated — preview refreshed.')
-  }
-
-  const onGalleryAdd = async (event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-    const result = await prepareImageDataUrl(file, { maxDimension: 960 })
-    if (result.error) {
-      toast.error(result.error)
-      return
-    }
-    setGallery((prev) => [
-      ...prev,
-      { id: `g-${Date.now()}`, dataUrl: result.dataUrl, caption: '' },
-    ])
-    toast.success('Gallery photo added.')
-  }
-
-  const removeGalleryItem = (id) => {
-    setGallery((prev) => prev.filter((g) => g.id !== id))
-  }
-
-  const updateColor = (key) => (event) => {
-    let next = event.target.value.trim()
-    if (!next.startsWith('#')) next = `#${next}`
-    setActivePreset('custom')
-    setPalette((prev) => ({ ...prev, [key]: next.slice(0, 7) }))
-  }
-
-  const applyPreset = (preset) => {
-    setActivePreset(preset.key)
-    setPalette({ ...preset.colors })
-  }
+  const buildBrandData = () => ({
+    primaryColor,
+    secondaryColor,
+    accentColor,
+    font: selectedFont,
+    theme: selectedTheme,
+    logoDataUrl,
+  })
 
   const handleSave = async () => {
-    setSaving(true)
     try {
-      await api.updateBrand({
-        primaryColor: palette.primary,
-        secondaryColor: palette.secondary,
-        accentColor: palette.ink,
-        font: displayFont,
-        theme: activePreset || 'modern',
-        logoDataUrl: logoDataUrl || null,
-      })
-      await api.updateSettings({
-        coverPhoto: coverDataUrl || null,
-        coverDataUrl: coverDataUrl || null,
-        gallery,
-        bodyFont,
-        brandPalette: palette,
-        brandPreset: activePreset,
-        displayFont,
-      })
-      toast.success('Branding saved across website, QR menu and One Link.')
+      await api.updateBrand(buildBrandData())
+      alert('Your progress has been saved.')
     } catch (err) {
-      toast.error(err.message || 'Unable to save branding.')
-    } finally {
-      setSaving(false)
+      alert(err.message)
     }
   }
 
-  const openPreview = (url) => {
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
-
-  const handleDownloadAssets = async () => {
+  const handleContinue = async () => {
     try {
-      await downloadQrPng(sitePreviewUrl, `${slug}-site-QR.png`, { width: 512 })
-      toast.success('QR asset downloaded.')
-    } catch {
-      toast.error('Unable to download brand assets.')
+      await api.updateBrand(buildBrandData())
+      navigate('/launch')
+    } catch (err) {
+      alert(err.message)
     }
   }
 
-  const handleDownloadPdf = async () => {
-    try {
-      await downloadQrPng(sitePreviewUrl, `${slug}-table-tent-QR.png`, { width: 720 })
-      toast.success('QR downloaded — print as a table tent from your device.')
-    } catch {
-      toast.error('Unable to download QR.')
-    }
-  }
+  const activeTheme =
+    THEMES.find((theme) => theme.key === selectedTheme) ?? THEMES[0]
+
+  const previewBackground =
+    previewMode === 'dark' ? '#10182a' : activeTheme.background
+  const previewColor = previewMode === 'dark' ? '#ffffff' : activeTheme.color
+
+  const displayName = restaurantName.trim() || 'Your restaurant'
+  const previewInitial = restaurantName.trim()
+    ? restaurantName.trim().charAt(0).toUpperCase()
+    : 'R'
 
   return (
-    <DashboardLayout pageClassName="branding-studio-page" activeNav="branding">
-      <div className="branding-studio">
-        <div className="branding-main">
-          <header className="branding-head">
-            <div>
-              <p className="branding-eyebrow">IDENTITY</p>
-              <h1>Branding</h1>
-              <p className="branding-desc">
-                Logo, cover, colors and type drive your guest website and QR menu. Change anything —
-                the preview updates instantly.
-              </p>
-            </div>
-            <div className="branding-head-actions">
-              <button type="button" className="btn-ghost" onClick={() => openPreview(sitePreviewUrl)}>
-                Open website
-              </button>
-              <button type="button" className="btn-ghost" onClick={handleDownloadAssets}>
-                ⬇ Brand assets
-              </button>
-              <button type="button" className="btn-save" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
-            </div>
-          </header>
+    <div className="brand-page">
+      {/* TOP HEADER */}
+      <header className="top-header">
+        <div className="header-left">
+          <img
+            src="/images/Logo9-1 1.svg"
+            alt="IROAS"
+            className="iroas-logo"
+          />
 
-          <section className="branding-section">
-            <h2>Visual identity</h2>
-            <div className="identity-grid">
-              <div className="identity-card">
-                <div className="logo-stage" style={{ background: `${palette.primary}18` }}>
-                  <div
-                    className={`logo-circle ${logoDataUrl ? 'has-image' : ''}`}
-                    style={{ background: logoDataUrl ? '#fff' : palette.primary, color: '#fff' }}
-                  >
-                    {logoDataUrl ? (
-                      <img src={logoDataUrl} alt={`${restaurantName} logo`} />
-                    ) : (
-                      <span>{restaurantName.charAt(0).toUpperCase()}</span>
-                    )}
-                  </div>
-                </div>
-                <label className="replace-btn">
-                  ↑ Replace logo
-                  <input type="file" accept="image/*" onChange={onLogoChange} hidden />
-                </label>
-              </div>
-
-              <div className="identity-card">
-                <div
-                  className="cover-stage"
-                  style={
-                    coverDataUrl
-                      ? { backgroundImage: `url(${coverDataUrl})` }
-                      : {
-                          background: `linear-gradient(135deg, ${palette.secondary}, ${palette.primary}66)`,
-                        }
-                  }
-                >
-                  {!coverDataUrl ? <span className="cover-placeholder">Cover photo</span> : null}
-                </div>
-                <label className="replace-btn cover-btn">
-                  🖼 Replace cover
-                  <input type="file" accept="image/*" onChange={onCoverChange} hidden />
-                </label>
-              </div>
-            </div>
-          </section>
-
-          <section className="branding-section">
-            <div className="section-title-row">
-              <h2>Gallery</h2>
-              <p>Photos shown on your guest website home page.</p>
-            </div>
-            <div className="gallery-admin-grid">
-              {gallery.map((g) => (
-                <div className="gallery-admin-item" key={g.id}>
-                  <img src={g.dataUrl} alt="" />
-                  <button type="button" className="gallery-remove" onClick={() => removeGalleryItem(g.id)}>
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <label className="gallery-add">
-                + Add photo
-                <input type="file" accept="image/*" hidden onChange={onGalleryAdd} />
-              </label>
-            </div>
-          </section>
-
-          <section className="branding-section">
-            <div className="section-title-row">
-              <h2>Color palette</h2>
-              <p>Presets + custom swatches for every customer touchpoint.</p>
-            </div>
-
-            <div className="preset-row">
-              {PALETTE_PRESETS.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  className={`preset-chip ${activePreset === preset.key ? 'active' : ''}`}
-                  onClick={() => applyPreset(preset)}
-                >
-                  <span className="preset-dots" aria-hidden="true">
-                    <i style={{ background: preset.colors.primary }} />
-                    <i style={{ background: preset.colors.secondary }} />
-                    <i style={{ background: preset.colors.ink }} />
-                  </span>
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="palette-grid">
-              {COLOR_FIELDS.map((field) => (
-                <label key={field.key} className="swatch-card">
-                  <span className="swatch" style={{ background: palette[field.key] }} />
-                  <span className="swatch-meta">
-                    <strong>{field.label}</strong>
-                    <em>{field.hint}</em>
-                    <input
-                      type="text"
-                      value={palette[field.key]}
-                      onChange={updateColor(field.key)}
-                      spellCheck={false}
-                    />
-                  </span>
-                  <input
-                    type="color"
-                    className="swatch-picker"
-                    value={
-                      /^#[0-9A-Fa-f]{6}$/.test(palette[field.key])
-                        ? palette[field.key]
-                        : '#000000'
-                    }
-                    onChange={(e) => {
-                      setActivePreset('custom')
-                      setPalette((prev) => ({ ...prev, [field.key]: e.target.value }))
-                    }}
-                    aria-label={`${field.label} color picker`}
-                  />
-                </label>
-              ))}
-            </div>
-          </section>
-
-          <section className="branding-section">
-            <div className="section-title-row">
-              <h2>Typography</h2>
-              <p>More display & body pairings for your guest site.</p>
-            </div>
-            <div className="type-grid">
-              <div className="type-card">
-                <span className="type-label">DISPLAY</span>
-                <select
-                  value={displayFont}
-                  onChange={(e) => setDisplayFont(e.target.value)}
-                  style={{ fontFamily: displayStack }}
-                >
-                  {DISPLAY_FONTS.map((font) => (
-                    <option key={font.name} value={font.name} style={{ fontFamily: font.stack }}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
-                <p>Headings & menus · {DISPLAY_FONTS.find((f) => f.name === displayFont)?.vibe}</p>
-                <div className="type-sample" style={{ fontFamily: displayStack, color: palette.ink }}>
-                  {restaurantName}
-                </div>
-              </div>
-              <div className="type-card">
-                <span className="type-label">BODY</span>
-                <select
-                  value={bodyFont}
-                  onChange={(e) => setBodyFont(e.target.value)}
-                  style={{ fontFamily: bodyStack }}
-                >
-                  {BODY_FONTS.map((font) => (
-                    <option key={font.name} value={font.name} style={{ fontFamily: font.stack }}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
-                <p>UI, receipts & copy · {BODY_FONTS.find((f) => f.name === bodyFont)?.vibe}</p>
-                <div className="type-sample body" style={{ fontFamily: bodyStack, color: palette.ink }}>
-                  Scan to view the menu and order online.
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="branding-section site-mock-section">
-            <div className="section-title-row">
-              <h2>Website preview</h2>
-              <p>Logo, cover, palette and fonts as guests will see them.</p>
-            </div>
-            <div
-              className="site-mock"
-              style={{
-                '--mock-primary': palette.primary,
-                '--mock-secondary': palette.secondary,
-                '--mock-ink': palette.ink,
-                '--mock-surface': palette.surface,
-                background: palette.surface,
-                color: palette.ink,
-              }}
-            >
-              <div
-                className="site-mock-cover"
-                style={
-                  coverDataUrl
-                    ? { backgroundImage: `url(${coverDataUrl})` }
-                    : {
-                        background: `linear-gradient(120deg, ${palette.primary}, ${palette.secondary})`,
-                      }
-                }
-              >
-                <div className="site-mock-brand">
-                  {logoDataUrl ? (
-                    <img src={logoDataUrl} alt="" />
-                  ) : (
-                    <span style={{ background: palette.primary }}>
-                      {restaurantName.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                  <strong style={{ fontFamily: displayStack }}>{restaurantName}</strong>
-                </div>
-              </div>
-              <div className="site-mock-body" style={{ fontFamily: bodyStack }}>
-                <p className="site-mock-eyebrow" style={{ color: palette.primary }}>
-                  {cuisine || 'Restaurant'}
-                </p>
-                <h3 style={{ fontFamily: displayStack }}>{restaurantName}</h3>
-                <p>
-                  {description ||
-                    'Your cover, logo and colors appear on the guest website opened from QR / One Link.'}
-                </p>
-                <div className="site-mock-actions">
-                  <button type="button" style={{ background: palette.primary, color: '#fff' }}>
-                    View menu
-                  </button>
-                  <button
-                    type="button"
-                    style={{ borderColor: palette.primary, color: palette.primary }}
-                  >
-                    Book a table
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
+          <div className="setup-time">
+            <span>◷</span>
+            About 2–3 minutes
+          </div>
         </div>
 
-        <aside className="branding-preview" aria-label="QR menu preview">
-          <div className="preview-head">
-            <h2>QR menu preview</h2>
-            <p>Branded for table tents & takeaway.</p>
+        <div className="header-right">
+          <div className="autosaved">
+            <span className="save-dot"></span>
+            Auto-saved
           </div>
 
-          <div
-            className="qr-preview-card"
-            style={{
-              background: palette.surface,
-              fontFamily: displayStack,
-            }}
-          >
-            {logoDataUrl ? (
-              <img className="qr-logo" src={logoDataUrl} alt="" />
-            ) : null}
-            <div className="qr-frame">
-              <QrCodePreview
-                value={sitePreviewUrl}
-                size={180}
-                alt="Menu QR code"
-                emptyMessage="Set restaurant name to generate QR"
-              />
+          <button className="save-later" onClick={handleSave}>
+            Save & continue later
+          </button>
+        </div>
+      </header>
+
+      {/* PROGRESS NAVIGATION */}
+      <nav className="progress-nav">
+        <div className="step completed">
+          <div className="step-icon">✓</div>
+
+          <div className="step-text">
+            <strong>Profile</strong>
+            <span>Tell us about your place</span>
+          </div>
+        </div>
+
+        <div className="step completed">
+          <div className="step-icon">✓</div>
+
+          <div className="step-text">
+            <strong>Domain</strong>
+            <span>Pick your web address</span>
+          </div>
+        </div>
+
+        <div className="step active">
+          <div className="step-icon">
+            <img src="/images/brand.png" alt="Brand" />
+          </div>
+
+          <div className="step-text">
+            <strong>Brand</strong>
+            <span>Logo, colors & theme</span>
+          </div>
+        </div>
+
+        <div className="step">
+          <div className="step-icon">
+            <img src="/images/qr.png" alt="Launch" />
+          </div>
+
+          <div className="step-text">
+            <strong>Launch</strong>
+            <span>QR & digital card</span>
+          </div>
+        </div>
+      </nav>
+
+      {/* MAIN */}
+      <main className="main-area">
+        <div className="content-wrapper">
+          {/* LEFT BRAND CARD */}
+          <section className="brand-card">
+            <div className="card-header">
+              <div className="step-label">
+                <span>◉</span>
+                STEP 3 OF 4
+              </div>
+
+              <h1>Make it feel like your brand</h1>
+
+              <p>
+                Upload a logo, pick your colors and typography. Everything
+                updates in the live preview instantly.
+              </p>
             </div>
-            <strong style={{ color: palette.ink, fontFamily: displayStack }}>{restaurantName}</strong>
-            <span style={{ fontFamily: bodyStack }}>Scan to view the menu</span>
-            <button
-              type="button"
-              className="download-pdf"
-              style={{ background: palette.primary }}
-              onClick={handleDownloadPdf}
-            >
-              ⬇ Download PDF
-            </button>
-          </div>
 
-          <button type="button" className="open-menu-link" onClick={() => openPreview(menuPreviewUrl)}>
-            Open live menu preview →
-          </button>
-          <button type="button" className="open-menu-link secondary" onClick={() => openPreview(sitePreviewUrl)}>
-            Open full website →
-          </button>
-        </aside>
-      </div>
-    </DashboardLayout>
+            <div className="card-body">
+              {/* LOGO */}
+              <div className="section">
+                <label className="section-label">LOGO</label>
+
+                <div className="logo-upload">
+                  <div className="logo-preview">
+                    {logoDataUrl ? (
+                      <img
+                        src={logoDataUrl}
+                        alt="Logo preview"
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          objectFit: 'contain',
+                        }}
+                      />
+                    ) : (
+                      <span>▧</span>
+                    )}
+                  </div>
+
+                  <label className="upload-box" htmlFor="logoInput">
+                    <span className="upload-main">
+                      Click to upload
+                      <span>or drag & drop</span>
+                    </span>
+
+                    <span className="upload-sub">
+                      PNG, JPG, SVG · up to 2 MB
+                    </span>
+                  </label>
+
+                  <input
+                    type="file"
+                    id="logoInput"
+                    accept=".png,.jpg,.jpeg,.svg"
+                    onChange={handleLogoChange}
+                  />
+                </div>
+              </div>
+
+              {/* BRAND COLORS */}
+              <div className="section">
+                <label className="section-label">BRAND COLORS</label>
+
+                <div className="color-row">
+                  <div className="color-box">
+                    <span className="color-title">PRIMARY</span>
+
+                    <div className="color-value">
+                      <input
+                        type="color"
+                        value={primaryColor}
+                        onChange={(event) =>
+                          setPrimaryColor(event.target.value)
+                        }
+                      />
+
+                      <span>{primaryColor.toUpperCase()}</span>
+                    </div>
+                  </div>
+
+                  <div className="color-box">
+                    <span className="color-title">SECONDARY</span>
+
+                    <div className="color-value">
+                      <input
+                        type="color"
+                        value={secondaryColor}
+                        onChange={(event) =>
+                          setSecondaryColor(event.target.value)
+                        }
+                      />
+
+                      <span>{secondaryColor.toUpperCase()}</span>
+                    </div>
+                  </div>
+
+                  <div className="color-box">
+                    <span className="color-title">ACCENT</span>
+
+                    <div className="color-value">
+                      <input
+                        type="color"
+                        value={accentColor}
+                        onChange={(event) =>
+                          setAccentColor(event.target.value)
+                        }
+                      />
+
+                      <span>{accentColor.toUpperCase()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* TYPOGRAPHY */}
+              <div className="section">
+                <label className="section-label">TYPOGRAPHY</label>
+
+                <div className="font-grid">
+                  {FONTS.map((font) => (
+                    <button
+                      key={font.key}
+                      className={`font-card ${
+                        selectedFont === font.key ? 'selected' : ''
+                      }`}
+                      onClick={() => setSelectedFont(font.key)}
+                    >
+                      <span className={`font-symbol ${font.symbolClass}`}>
+                        T
+                      </span>
+
+                      <span className="font-info">
+                        <strong>{font.name}</strong>
+                        <small>{font.body}</small>
+                        <em>{font.tag}</em>
+                      </span>
+
+                      {selectedFont === font.key && (
+                        <span className="font-check">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* THEMES */}
+              <div className="section">
+                <label className="section-label">THEME TEMPLATE</label>
+
+                <div className="theme-grid">
+                  {THEMES.map((theme) => (
+                    <button
+                      key={theme.key}
+                      className={`theme-card ${
+                        selectedTheme === theme.key ? 'selected' : ''
+                      }`}
+                      onClick={() => setSelectedTheme(theme.key)}
+                    >
+                      <div className={`theme-image ${theme.imageClass}`}>
+                        <span className="mini-menu">≡ MENU</span>
+
+                        <div className="mini-content">
+                          <strong>trident</strong>
+
+                          {theme.lines > 0 && (
+                            <div className="mini-lines">
+                              {Array.from({ length: theme.lines }).map(
+                                (_, i) => (
+                                  <i key={i}></i>
+                                ),
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="theme-info">
+                        <strong>{theme.name}</strong>
+                        <span>{theme.description}</span>
+                      </div>
+
+                      {selectedTheme === theme.key && (
+                        <span className="theme-check">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* RIGHT PREVIEW */}
+          <aside className="preview-area">
+            <div className="preview-label-row">
+              <div className="preview-label">BRAND PREVIEW</div>
+
+              <div className="mode-toggle">
+                <button
+                  type="button"
+                  className={`mode-btn ${previewMode === 'light' ? 'active' : ''}`}
+                  onClick={() => setPreviewMode('light')}
+                  aria-label="Light preview"
+                >
+                  ☀
+                </button>
+
+                <button
+                  type="button"
+                  className={`mode-btn ${previewMode === 'dark' ? 'active' : ''}`}
+                  onClick={() => setPreviewMode('dark')}
+                  aria-label="Dark preview"
+                >
+                  ☾
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="brand-preview"
+              style={{
+                fontFamily: selectedFont,
+                background: previewBackground,
+                color: previewColor,
+              }}
+            >
+              <div className="preview-top">
+                <div className="preview-name">
+                  <span
+                    className="preview-logo"
+                    style={{ background: primaryColor }}
+                  >
+                    {logoDataUrl ? (
+                      <img
+                        src={logoDataUrl}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                        }}
+                      />
+                    ) : (
+                      previewInitial
+                    )}
+                  </span>
+
+                  <strong>{displayName}</strong>
+                </div>
+
+                <button
+                  className="order-button"
+                  style={{ background: primaryColor }}
+                >
+                  Order
+                </button>
+              </div>
+
+              <div className="preview-content">
+                <span className="welcome">WELCOME</span>
+
+                <h2>Taste what makes {displayName} special.</h2>
+
+                <p>
+                  {cuisine.trim()
+                    ? `${cuisine.trim()} flavors, crafted with care.`
+                    : 'Fresh flavors, crafted with care.'}
+                </p>
+
+                <div className="preview-buttons">
+                  <button
+                    className="view-menu"
+                    style={{
+                      background: primaryColor,
+                      borderColor: primaryColor,
+                    }}
+                  >
+                    View menu
+                  </button>
+
+                  <button className="reserve">Reserve</button>
+                </div>
+
+                <div className="preview-blocks">
+                  <div className="preview-block block-one"></div>
+                  <div className="preview-block block-two"></div>
+                  <div className="preview-block block-three"></div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      {/* BOTTOM BAR */}
+      <footer className="bottom-bar">
+        <button className="back-button" onClick={() => navigate('/domain')}>
+          ← Back
+        </button>
+
+        <div className="page-indicator">Step 3 of 4 · Brand</div>
+
+        <button className="continue-button" onClick={handleContinue}>
+          Continue →
+        </button>
+      </footer>
+    </div>
   )
 }
 
