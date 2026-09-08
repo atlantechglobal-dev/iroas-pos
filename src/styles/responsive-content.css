@@ -1,0 +1,90 @@
+/* Shared responsive utilities for dashboard page content */
+
+.dashboard-shell .page-head,
+.dashboard-shell .page-header,
+.dashboard-shell .page-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.dashboard-shell .head-actions,
+.dashboard-shell .title-buttons,
+.dashboard-shell .page-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-shell .board,
+.dashboard-shell .stats-grid,
+.dashboard-shell .category-grid,
+.dashboard-shell .item-grid,
+.dashboard-shell .dashboard-grid,
+.dashboard-shell .bottom-grid,
+.dashboard-shell .three-col-row,
+.dashboard-shell .two-col-row,
+.dashboard-shell .chart-row {
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-shell .board {
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .dashboard-shell .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .dashboard-shell .bottom-grid,
+  .dashboard-shell .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-shell .page-head h1,
+  .dashboard-shell .page-header h1,
+  .dashboard-shell .page-title h1 {
+    font-size: 26px;
+  }
+
+  .dashboard-shell .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-shell .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-shell table {
+    min-width: 560px;
+  }
+
+  .dashboard-shell .head-actions,
+  .dashboard-shell .title-buttons,
+  .dashboard-shell .page-actions {
+    width: 100%;
+  }
+
+  .dashboard-shell .head-actions .btn,
+  .dashboard-shell .title-buttons button,
+  .dashboard-shell .page-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-shell .page-head h1,
+  .dashboard-shell .page-header h1,
+  .dashboard-shell .page-title h1 {
+    font-size: 22px;
+  }
+}

@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, setSession } from '../../lib/api'
+import { useAuth } from '../../hooks/useAuth.js'
+import { useToast } from '../../components/feedback/ToastProvider.jsx'
+import { isValidEmail } from '../../utils/validation.js'
+import { ROUTES } from '../../constants/routes.js'
 import './Login.css'
 
 function Login() {
   const navigate = useNavigate()
+  const { login } = useAuth()
+  const toast = useToast()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,25 +26,19 @@ function Login() {
       return
     }
 
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address.')
+      return
+    }
+
     setLoading(true)
 
     try {
-      const { token, user } = await api.login({ email: email.trim(), password })
-      setSession(token, user)
-
-      if (user.role === 'admin') {
-        navigate('/platform-admin')
-        return
-      }
-
-      try {
-        const { restaurant } = await api.getRestaurant()
-        navigate(restaurant.status === 'live' ? '/directory-listings' : '/restaurant-setup')
-      } catch {
-        navigate('/restaurant-setup')
-      }
+      await login({ email: email.trim(), password })
+      toast.success('Signed in successfully.')
     } catch (err) {
       setError(err.message)
+      toast.error(err.message)
     } finally {
       setLoading(false)
     }
@@ -47,14 +46,14 @@ function Login() {
 
   const handleForgotPassword = () => {
     if (email.trim()) {
-      navigate('/forgot-password', { state: { email } })
+      navigate(ROUTES.FORGOT_PASSWORD, { state: { email } })
     } else {
-      navigate('/forgot-password')
+      navigate(ROUTES.FORGOT_PASSWORD)
     }
   }
 
   const handleSocialLogin = (provider) => {
-    alert(`Continue with ${provider}`)
+    toast.info(`${provider} sign-in is not available yet.`)
   }
 
   return (
@@ -234,7 +233,7 @@ function Login() {
           {/* SIGN UP */}
           <p className="signup">
             Don't have an account?
-            <button onClick={() => navigate('/create-account')}>
+            <button onClick={() => navigate(ROUTES.CREATE_ACCOUNT)}>
               Create one
             </button>
           </p>

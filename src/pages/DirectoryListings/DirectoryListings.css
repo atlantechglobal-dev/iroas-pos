@@ -653,9 +653,6 @@
   }
 
   @media (max-width: 900px) {
-    .sidebar {
-      display: none;
-    }
     .topbar,
     .content {
       padding-left: 16px;

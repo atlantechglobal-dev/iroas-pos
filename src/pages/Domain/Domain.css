@@ -263,50 +263,6 @@
     padding: 28px 36px 34px;
   }
 
-  /* MODE TOGGLE */
-
-  .mode-toggle {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 26px;
-  }
-
-  .mode-option {
-    text-align: left;
-    border: 1.5px solid var(--border);
-    border-radius: 16px;
-    padding: 16px 18px;
-    background: var(--white);
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-family: inherit;
-    transition: border-color 0.15s, background 0.15s;
-  }
-
-  .mode-option:hover {
-    border-color: #cddf8e;
-  }
-
-  .mode-option.active {
-    border-color: var(--green);
-    background: #f6faea;
-  }
-
-  .mode-option strong {
-    font-size: 14.5px;
-    font-weight: 700;
-    color: var(--text);
-  }
-
-  .mode-option span {
-    font-size: 12.5px;
-    color: var(--muted);
-    line-height: 1.4;
-  }
-
   /* FIELD */
 
   .field-label {
@@ -317,6 +273,35 @@
     color: #8b8b8f;
     text-transform: uppercase;
     margin-bottom: 10px;
+  }
+
+  .handle-toggle-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .handle-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text);
+  }
+
+  .suffix-select {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 13px;
+    background: #fff;
   }
 
   .subdomain-box {
@@ -347,31 +332,6 @@
     font-weight: 700;
     color: var(--text);
     background: transparent;
-  }
-
-  .domain-ending-select {
-    width: auto;
-    flex-shrink: 0;
-    height: 100%;
-    align-self: stretch;
-  }
-
-  .domain-ending-select .select-trigger {
-    height: 100%;
-    border: none;
-    border-left: 1px solid var(--border);
-    border-radius: 0;
-    background: var(--bg);
-    padding: 0 12px;
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--muted);
-  }
-
-  .domain-ending-select .select-trigger:hover,
-  .domain-ending-select .select-trigger.open {
-    box-shadow: none;
-    background: #f1efe6;
   }
 
   .domain-ending {

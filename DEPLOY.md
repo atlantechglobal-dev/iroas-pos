@@ -55,8 +55,20 @@ cd iroas-pos
 
 ```bash
 npm install
-npm run build       # outputs to dist/
+
+# Required for QR / phone scanners after deploy — your public HTTPS origin:
+# (also create a root .env before build)
+cat > .env <<'EOF'
+VITE_API_BASE_URL=/api
+VITE_PUBLIC_BASE_URL=https://YOUR_DOMAIN_OR_DROPLET_IP
+EOF
+
+npm run build       # outputs to dist/ — embeds VITE_PUBLIC_BASE_URL into the bundle
 ```
+
+QR codes encode `{VITE_PUBLIC_BASE_URL}/s/{slug}` (guest website). Rebuild the frontend whenever you change the public domain, then regenerate/download QR codes from One Link / Launch.
+
+**Local phone testing:** run `npx vite --host`, set `VITE_PUBLIC_BASE_URL=http://YOUR_LAN_IP:5173`, restart Vite, then open One Link and download a fresh QR.
 
 **Backend:**
 

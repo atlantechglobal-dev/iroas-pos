@@ -1,4 +1,22 @@
 .dashboard-page {
+  .setup-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    border-radius: 14px;
+    border: 1px solid #f0e2c4;
+    background: #fff8ea;
+  }
+
+  .setup-banner p {
+    margin: 4px 0 0;
+    color: #8b8b8f;
+    font-size: 13px;
+  }
+
   --bg: #f7f6f2;
   --panel: #ffffff;
   --border: #ece8df;
@@ -275,7 +293,6 @@
   }
 
   @media (max-width: 900px) {
-    .sidebar { display: none; }
     .topbar, .content { padding-left: 16px; padding-right: 16px; }
     .stat-cards { grid-template-columns: 1fr 1fr; }
     .three-col-row { grid-template-columns: 1fr; }

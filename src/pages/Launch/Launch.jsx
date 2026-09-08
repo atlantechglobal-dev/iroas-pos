@@ -1,10 +1,15 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { QrCodePreview, downloadQrPng, qrDataUrl } from '../../components/QrCodePreview.jsx'
+import { restaurantHostname } from '../../utils/restaurantUrl.js'
+import { guestSiteUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
+import { useAuth } from '../../hooks/useAuth.js'
 import './Launch.css'
 
 function Launch() {
   const navigate = useNavigate()
+  const { setRestaurantStatus } = useAuth()
 
   const [toast, setToast] = useState('')
   const [launched, setLaunched] = useState(false)
@@ -12,6 +17,11 @@ function Launch() {
   const [cuisine, setCuisine] = useState('')
   const [city, setCity] = useState('')
   const [domain, setDomain] = useState('')
+  const [slug, setSlug] = useState('your-restaurant')
+  const [primaryColor, setPrimaryColor] = useState('#F97316')
+  const [secondaryColor, setSecondaryColor] = useState('#F0F72A')
+  const [accentColor, setAccentColor] = useState('#BDB8A4')
+  const qrCache = useRef('')
 
   useEffect(() => {
     api
@@ -20,12 +30,15 @@ function Launch() {
         if (restaurant.name) setRestaurantName(restaurant.name)
         if (restaurant.cuisine) setCuisine(restaurant.cuisine)
         if (restaurant.city) setCity(restaurant.city)
+        if (restaurant.primary_color) setPrimaryColor(restaurant.primary_color)
+        if (restaurant.secondary_color) setSecondaryColor(restaurant.secondary_color)
+        if (restaurant.accent_color) setAccentColor(restaurant.accent_color)
 
-        if (restaurant.custom_domain) {
-          setDomain(restaurant.custom_domain)
-        } else if (restaurant.subdomain) {
-          setDomain(`${restaurant.subdomain}${restaurant.domain_suffix || '.iroas.com'}`)
-        }
+        const host = restaurantHostname(restaurant)
+        if (host) setDomain(host)
+        setSlug(
+          restaurantPublicSlug(restaurant, 'your-restaurant'),
+        )
       })
       .catch(() => {})
   }, [])
@@ -36,16 +49,20 @@ function Launch() {
     : 'R'
   const locationLine = [cuisine.trim(), city.trim()].filter(Boolean).join(' · ')
 
+  const hasDomain = Boolean(domain)
   const hostname = domain || 'yourrestaurant.iroas.com'
-  const LIVE_LINK = `https://${hostname}`
+  const marketingLink = hasDomain ? `https://${hostname}` : ''
+  const LIVE_LINK = guestSiteUrl(slug, 'website') || marketingLink
 
-  const qrImageUrl = useMemo(
-    () =>
-      `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(
-        LIVE_LINK,
-      )}`,
-    [LIVE_LINK],
-  )
+  useEffect(() => {
+    if (!LIVE_LINK) {
+      qrCache.current = ''
+      return
+    }
+    qrDataUrl(LIVE_LINK, { width: 300 }).then((url) => {
+      qrCache.current = url
+    })
+  }, [LIVE_LINK])
 
   const showMessage = (message) => {
     setToast(message)
@@ -53,6 +70,10 @@ function Launch() {
   }
 
   const copyRestaurantLink = () => {
+    if (!LIVE_LINK) {
+      showMessage('Set your web address first')
+      return
+    }
     navigator.clipboard
       .writeText(LIVE_LINK)
       .then(() => showMessage('Link copied!'))
@@ -60,26 +81,22 @@ function Launch() {
   }
 
   const handleOpenLink = () => {
-    // There's no real hosted site behind this link yet — show the branded
-    // in-app preview (actual chosen colors/font/theme) instead of a dead URL.
-    navigate('/site-preview')
+    if (!LIVE_LINK) {
+      showMessage('Set your web address first')
+      return
+    }
+    window.open(LIVE_LINK, '_blank')
   }
 
   const handleDownloadQR = async () => {
+    if (!LIVE_LINK) {
+      showMessage('Set your web address first')
+      return
+    }
     try {
-      const response = await fetch(qrImageUrl)
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
-
-      const link = document.createElement('a')
-      link.href = objectUrl
-      link.download = `${hostname.split('.')[0]}-QR.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(objectUrl)
+      await downloadQrPng(LIVE_LINK, `${hostname.split('.')[0]}-QR.png`)
     } catch {
-      window.open(qrImageUrl, '_blank')
+      showMessage('Unable to download QR')
     }
   }
 
@@ -92,11 +109,16 @@ function Launch() {
       "'": '&#39;',
     })[char])
 
-  const handlePrintQR = () => {
+  const handlePrintQR = async () => {
+    if (!LIVE_LINK) {
+      showMessage('Set your web address first')
+      return
+    }
+
+    const qrSrc = qrCache.current || (await qrDataUrl(LIVE_LINK, { width: 300 }))
     const printWindow = window.open('', '_blank', 'width=420,height=640')
 
     if (!printWindow) {
-      // popup blocked — fall back to printing the current page
       window.print()
       return
     }
@@ -123,7 +145,7 @@ function Launch() {
           </style>
         </head>
         <body>
-          <img src="${qrImageUrl}" alt="${safeName} QR code" />
+          <img src="${qrSrc}" alt="${safeName} QR code" />
           <h1>${safeName}</h1>
           <p>${safeHost}</p>
         </body>
@@ -148,12 +170,18 @@ function Launch() {
   }
 
   const handleShareQR = async () => {
+    if (!LIVE_LINK) {
+      showMessage('Set your web address first')
+      return
+    }
+
     const canNativeShare = typeof navigator.share === 'function'
 
     try {
       if (canNativeShare && navigator.canShare) {
-        const response = await fetch(qrImageUrl)
-        const blob = await response.blob()
+        const dataUrl = qrCache.current || (await qrDataUrl(LIVE_LINK, { width: 300 }))
+        const res = await fetch(dataUrl)
+        const blob = await res.blob()
         const file = new File([blob], `${hostname.split('.')[0]}-QR.png`, {
           type: 'image/png',
         })
@@ -185,13 +213,14 @@ function Launch() {
   }
 
   const handleSaveLater = () => {
-    showMessage('Your progress has been saved.')
+    navigate('/dashboard')
   }
 
   const handleLaunch = async () => {
     try {
       await api.launch()
       setLaunched(true)
+      setRestaurantStatus('live')
       showMessage('Your restaurant has been launched!')
 
       setTimeout(() => {
@@ -325,7 +354,7 @@ function Launch() {
           <div className="real-life-grid">
             <div className="real-card">
               <div className="real-image">
-                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
                 <span>{displayName}</span>
               </div>
 
@@ -334,7 +363,7 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image">
-                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
                 <span>{displayName}</span>
               </div>
 
@@ -343,7 +372,7 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image">
-                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
                 <span>{displayName}</span>
               </div>
 
@@ -352,7 +381,7 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image poster">
-                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
                 <span>{displayName}</span>
               </div>
 
@@ -364,14 +393,19 @@ function Launch() {
         {/* PHONE PREVIEW */}
         <section className="phone-area">
           <div className="phone">
-            <div className="phone-screen">
+            <div
+              className="phone-screen"
+              style={{ background: secondaryColor, color: accentColor }}
+            >
               <div className="phone-top">
                 <span>9:41</span>
                 <div className="dynamic-island"></div>
                 <span>▯</span>
               </div>
 
-              <div className="restaurant-logo">{previewInitial}</div>
+              <div className="restaurant-logo" style={{ background: primaryColor }}>
+                {previewInitial}
+              </div>
 
               <h2>{displayName}</h2>
 
@@ -380,7 +414,7 @@ function Launch() {
               </p>
 
               <div className="phone-qr">
-                <img src={qrImageUrl} alt={`${displayName} QR code`} />
+                <QrCodePreview value={LIVE_LINK} size={180} alt={`${displayName} QR code`} />
               </div>
 
               <div className="qr-bottom-content">

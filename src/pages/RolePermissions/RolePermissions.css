@@ -1,0 +1,90 @@
+.role-permissions-page {
+  .page-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8b8b8f;
+    margin: 0 0 6px;
+  }
+
+  .page-desc {
+    color: #8b8b8f;
+    margin: 6px 0 0;
+  }
+
+  .role-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .role-card {
+    text-align: left;
+    background: #fff;
+    border: 1px solid #eceae4;
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+  }
+
+  .role-card.active {
+    border-color: #a8d64a;
+    box-shadow: 0 0 0 2px rgba(168, 214, 74, 0.25);
+  }
+
+  .role-card span {
+    display: block;
+    font-size: 12px;
+    color: #8b8b8f;
+    margin: 4px 0 8px;
+  }
+
+  .role-card p {
+    margin: 0;
+    font-size: 12px;
+    color: #555;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #eceae4;
+    border-radius: 16px;
+    padding: 16px 18px;
+  }
+
+  .perm-list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .perm-list label {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .muted-note {
+    color: #6fae2e;
+    margin: 0 0 12px;
+  }
+
+  @media (max-width: 900px) {
+    .role-grid,
+    .perm-list {
+      grid-template-columns: 1fr;
+    }
+  }
+}

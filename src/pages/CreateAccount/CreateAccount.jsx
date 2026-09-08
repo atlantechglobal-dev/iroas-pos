@@ -1,21 +1,31 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, setSession } from '../../lib/api'
+import { useAuth } from '../../hooks/useAuth.js'
+import {
+  isValidEmail,
+  isValidMobile,
+  isValidPersonName,
+  normalizeMobileDigits,
+} from '../../utils/validation.js'
 import './CreateAccount.css'
 
 const initialErrors = {
-  name: false,
-  restaurant: false,
-  email: false,
-  phone: false,
-  password: false,
+  firstName: '',
+  lastName: '',
+  restaurant: '',
+  email: '',
+  phone: '',
+  password: '',
 }
 
 function CreateAccount() {
   const navigate = useNavigate()
+  const { setUser } = useAuth()
 
   const [form, setForm] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     restaurant: '',
     email: '',
     phone: '',
@@ -28,44 +38,81 @@ function CreateAccount() {
   const [loading, setLoading] = useState(false)
 
   const updateField = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }))
+    const value = event.target.value
+    setForm((prev) => ({
+      ...prev,
+      [field]: field === 'phone' ? normalizeMobileDigits(value) : value,
+    }))
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: '' }))
+    }
+  }
+
+  const validateForm = () => {
+    const nextErrors = { ...initialErrors }
+
+    if (!form.firstName.trim()) {
+      nextErrors.firstName = 'First name is required.'
+    } else if (!isValidPersonName(form.firstName)) {
+      nextErrors.firstName = 'Enter a valid first name using letters only.'
+    }
+
+    if (!form.lastName.trim()) {
+      nextErrors.lastName = 'Last name is required.'
+    } else if (!isValidPersonName(form.lastName)) {
+      nextErrors.lastName = 'Enter a valid last name using letters only.'
+    }
+
+    if (!form.restaurant.trim()) {
+      nextErrors.restaurant = 'Restaurant name is required.'
+    }
+
+    if (!form.email.trim()) {
+      nextErrors.email = 'Email is required.'
+    } else if (!isValidEmail(form.email)) {
+      nextErrors.email = 'Enter a valid email address.'
+    }
+
+    if (!form.phone.trim()) {
+      nextErrors.phone = 'Mobile number is required.'
+    } else if (!isValidMobile(form.phone)) {
+      nextErrors.phone = 'Mobile number must be exactly 10 digits.'
+    }
+
+    if (form.password.length < 8) {
+      nextErrors.password = 'Password must be at least 8 characters.'
+    }
+
+    setErrors(nextErrors)
+    return !Object.values(nextErrors).some(Boolean)
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setServerError('')
 
-    const nextErrors = {
-      name: form.name.trim() === '',
-      restaurant: form.restaurant.trim() === '',
-      email: form.email.trim() === '' || !form.email.includes('@'),
-      phone: form.phone.trim() === '',
-      password: form.password.length < 8,
-    }
-
-    setErrors(nextErrors)
-
-    const valid = !Object.values(nextErrors).some(Boolean)
-
     if (!terms) {
       alert('Please agree to the terms and privacy policy.')
       return
     }
 
-    if (!valid) return
+    if (!validateForm()) return
 
     setLoading(true)
 
+    const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`
+
     try {
       const { token, user } = await api.signup({
-        name: form.name.trim(),
+        name: fullName,
         restaurant: form.restaurant.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
+        phone: normalizeMobileDigits(form.phone),
         password: form.password,
       })
 
       setSession(token, user)
+      setUser(user)
       navigate('/restaurant-setup')
     } catch (err) {
       setServerError(err.message)
@@ -147,46 +194,64 @@ function CreateAccount() {
 
           <p className="subtitle">Free 14-day trial · no card required.</p>
 
-          <form onSubmit={handleSubmit}>
-            {/* NAME + RESTAURANT */}
+          <form onSubmit={handleSubmit} noValidate>
+            {/* FIRST + LAST NAME */}
             <div className="two-fields">
               <div className="field-group">
-                <label htmlFor="name">YOUR NAME</label>
+                <label htmlFor="firstName">FIRST NAME</label>
 
-                <div
-                  className={`input-wrapper ${errors.name ? 'error' : ''}`}
-                >
+                <div className={`input-wrapper ${errors.firstName ? 'error' : ''}`}>
                   <i className="fa-regular fa-user"></i>
 
                   <input
                     type="text"
-                    id="name"
-                    placeholder="Ananya Rao"
-                    value={form.name}
-                    onChange={updateField('name')}
+                    id="firstName"
+                    name="firstName"
+                    placeholder="Ananya"
+                    autoComplete="given-name"
+                    value={form.firstName}
+                    onChange={updateField('firstName')}
                   />
                 </div>
+                {errors.firstName && <p className="field-error">{errors.firstName}</p>}
               </div>
 
               <div className="field-group">
-                <label htmlFor="restaurant">RESTAURANT</label>
+                <label htmlFor="lastName">LAST NAME</label>
 
-                <div
-                  className={`input-wrapper ${
-                    errors.restaurant ? 'error' : ''
-                  }`}
-                >
-                  <i className="fa-solid fa-shop"></i>
+                <div className={`input-wrapper ${errors.lastName ? 'error' : ''}`}>
+                  <i className="fa-regular fa-user"></i>
 
                   <input
                     type="text"
-                    id="restaurant"
-                    placeholder="Saffron & Fig"
-                    value={form.restaurant}
-                    onChange={updateField('restaurant')}
+                    id="lastName"
+                    name="lastName"
+                    placeholder="Rao"
+                    autoComplete="family-name"
+                    value={form.lastName}
+                    onChange={updateField('lastName')}
                   />
                 </div>
+                {errors.lastName && <p className="field-error">{errors.lastName}</p>}
               </div>
+            </div>
+
+            {/* RESTAURANT */}
+            <div className="field-group">
+              <label htmlFor="restaurant">RESTAURANT</label>
+
+              <div className={`input-wrapper ${errors.restaurant ? 'error' : ''}`}>
+                <i className="fa-solid fa-shop"></i>
+
+                <input
+                  type="text"
+                  id="restaurant"
+                  placeholder="Saffron & Fig"
+                  value={form.restaurant}
+                  onChange={updateField('restaurant')}
+                />
+              </div>
+              {errors.restaurant && <p className="field-error">{errors.restaurant}</p>}
             </div>
 
             {/* EMAIL */}
@@ -204,11 +269,12 @@ function CreateAccount() {
                   onChange={updateField('email')}
                 />
               </div>
+              {errors.email && <p className="field-error">{errors.email}</p>}
             </div>
 
             {/* PHONE */}
             <div className="field-group">
-              <label htmlFor="phone">PHONE</label>
+              <label htmlFor="phone">MOBILE</label>
 
               <div className={`input-wrapper ${errors.phone ? 'error' : ''}`}>
                 <img src="/images/call.svg" alt="" />
@@ -216,20 +282,23 @@ function CreateAccount() {
                 <input
                   type="tel"
                   id="phone"
-                  placeholder="+91 98200 00000"
+                  name="phone"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  placeholder="9876543210"
+                  maxLength={10}
                   value={form.phone}
                   onChange={updateField('phone')}
                 />
               </div>
+              {errors.phone && <p className="field-error">{errors.phone}</p>}
             </div>
 
             {/* PASSWORD */}
             <div className="field-group">
               <label htmlFor="password">PASSWORD</label>
 
-              <div
-                className={`input-wrapper ${errors.password ? 'error' : ''}`}
-              >
+              <div className={`input-wrapper ${errors.password ? 'error' : ''}`}>
                 <i className="fa-solid fa-lock"></i>
 
                 <input
@@ -252,6 +321,7 @@ function CreateAccount() {
                   ></i>
                 </button>
               </div>
+              {errors.password && <p className="field-error">{errors.password}</p>}
             </div>
 
             {/* TERMS */}
@@ -279,10 +349,13 @@ function CreateAccount() {
             {/* SIGN IN */}
             <p className="signin">
               Already have an account?{' '}
-              <a href="#login" onClick={(event) => {
-                event.preventDefault()
-                navigate('/login')
-              }}>
+              <a
+                href="#login"
+                onClick={(event) => {
+                  event.preventDefault()
+                  navigate('/login')
+                }}
+              >
                 Sign in
               </a>
             </p>

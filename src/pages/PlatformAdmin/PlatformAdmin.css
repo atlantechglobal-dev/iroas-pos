@@ -814,10 +814,6 @@
   }
 
   @media (max-width: 900px) {
-    .sidebar {
-      display: none;
-    }
-
     .main-content {
       padding: 20px 18px 40px;
     }

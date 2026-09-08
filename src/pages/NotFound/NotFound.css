@@ -1,0 +1,147 @@
+.status-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #f7f6f2;
+  font-family: "Plus Jakarta Sans", Inter, sans-serif;
+}
+
+.status-card {
+  max-width: 420px;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #ece8df;
+  border-radius: 20px;
+  padding: 32px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(30, 25, 15, 0.06);
+}
+
+.status-code {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #6fa62a;
+}
+
+.status-card h1 {
+  margin: 0 0 12px;
+  font-size: 28px;
+}
+
+.status-card p {
+  margin: 0 0 24px;
+  color: #8b8b8f;
+  line-height: 1.5;
+}
+
+.status-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #17171a;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.status-link:hover {
+  opacity: 0.92;
+}
+
+.app-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  font-family: "Plus Jakarta Sans", Inter, sans-serif;
+  color: #8b8b8f;
+}
+
+.error-boundary {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #f7f6f2;
+  font-family: "Plus Jakarta Sans", Inter, sans-serif;
+}
+
+.error-boundary-card {
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid #ece8df;
+  border-radius: 20px;
+  padding: 32px;
+  text-align: center;
+}
+
+.error-boundary-btn {
+  margin-top: 16px;
+  min-height: 42px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: #17171a;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #17171a;
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.toast-success {
+  background: #2f5310;
+}
+
+.toast-error {
+  background: #8b2e2e;
+}
+
+.toast-info {
+  background: #17171a;
+}
+
+.toast-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+@media (max-width: 768px) {
+  .toast-stack {
+    left: 16px;
+    right: 16px;
+    max-width: none;
+  }
+}

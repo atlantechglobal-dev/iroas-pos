@@ -1,83 +1,124 @@
 # IROAS POS
 
-Restaurant onboarding + operations platform for IROAS. React (Vite) frontend
-with a Node/Express + SQLite backend, covering the full customer journey:
-sign up → restaurant setup wizard (profile → domain → brand → launch) →
-go-live → operations dashboard, plus a separate Platform Admin console.
+Restaurant onboarding + operations platform for IROAS. React (Vite) frontend with a Node/Express + SQLite backend.
+
+## Tech stack
+
+| Layer | Stack |
+|-------|-------|
+| Frontend | React 19, Vite 8, React Router 7 |
+| Backend | Express 4, SQLite (`better-sqlite3`), JWT |
+| Auth | Bearer tokens in localStorage, role-based routes |
+
+## Features
+
+- Owner signup → onboarding wizard → go-live → operations dashboard
+- Platform admin console (tenants, stats)
+- Password reset flow (token returned in API for demo/testing)
+- Protected routes with admin-only access
 
 ## Project structure
 
 ```
 iroas-pos/
-├── src/                # React frontend (Vite)
-├── public/images/      # Static assets
-├── server/             # Express + SQLite backend
+├── src/
+│   ├── app/                 # App shell, providers, routes
+│   ├── components/          # Shared UI (layout, feedback)
+│   ├── config/              # Environment config
+│   ├── constants/           # Routes, roles, messages
+│   ├── context/             # Auth provider
+│   ├── hooks/               # useAuth, useRestaurant, useDebounce
+│   ├── lib/                 # Back-compat re-exports (api, navGroups)
+│   ├── pages/               # Route pages (UI preserved per screen)
+│   ├── services/            # API client + auth storage
+│   └── utils/               # Validation, helpers
+├── public/images/
+├── server/                  # Express API + SQLite
 │   ├── src/
-│   │   ├── db.js        # SQLite schema + connection
-│   │   ├── seed.js      # Creates admin + sample tenants
-│   │   ├── middleware/   # JWT auth
-│   │   └── routes/       # auth, restaurant, admin APIs
-│   └── data/iroas.db     # SQLite file (gitignored, created on first run)
-└── DEPLOY.md            # Droplet deployment runbook
+│   └── data/iroas.db
+├── .env.example             # Frontend env template
+└── DEPLOY.md
 ```
 
-## Local development
+## Installation
 
-**1. Backend**
+### Backend
 
 ```bash
 cd server
-cp .env.example .env      # edit JWT_SECRET / admin credentials if you want
+cp .env.example .env
 npm install
-npm run seed               # creates the admin account + 3 sample tenants
-npm run dev                 # http://localhost:4000
+npm run seed
+npm run dev    # http://localhost:4000
 ```
 
-**2. Frontend** (separate terminal, from the project root)
+### Frontend
 
 ```bash
+cp .env.example .env
 npm install
-npm run dev                 # http://localhost:5173, proxies /api to :4000
+npm run dev    # http://localhost:5173
 ```
 
-## Logging in
+## Environment variables
 
-**Platform Admin** (operator dashboard — tenant list, feature flags, system health):
+### Frontend (`.env`)
 
-```
-URL:      /login
-Email:    admin@iroas.com
-Password: IroasAdmin@123
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE_URL` | `/api` | API base path |
+| `VITE_APP_DOMAIN` | `iroas.com` | Brand domain suffix |
+| `VITE_DEV_API_PROXY` | `http://localhost:4000` | Vite dev proxy target |
 
-(Change these before a real deployment — see `server/.env.example`.)
+### Backend (`server/.env`)
 
-**Restaurant owner** — sign up fresh via `/create-account`, or use one of the
-seeded demo tenants (password `Demo@1234` for all three):
+See `server/.env.example` — **JWT_SECRET is required**.
 
-```
-ananya@saffronandfig.in   (Saffron & Fig — already live)
-rohit@baorepublic.in      (Bao Republic — already live)
-priya@coastandco.in       (Coast & Co. — still onboarding)
-```
+## Scripts
 
-## The journey this wires up
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | Production build → `dist/` |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Run oxlint |
 
-1. `/create-account` → `/api/auth/signup` creates the owner + a blank restaurant row, returns a session
-2. `/login` → `/api/auth/login`, routes admins to `/platform-admin` and owners to `/restaurant-setup`
-3. `/forgot-password` → `/new-password` → real token-based reset (`/api/auth/forgot-password`, `/api/auth/reset-password`). No email provider is wired up — the reset token is returned directly in the API response so the flow is fully testable without one.
-4. Onboarding wizard (`/restaurant-setup` → `/domain` → `/brand` → `/launch`) persists to the `restaurants` table via `PUT /api/restaurant/*`
-5. `/go-live` → operations dashboard (`/directory-listings`, `/digital-business-card`, `/one-link`) — these remain interactive UI demos (Phase 2/3 scope per the SOW), not backed by real integrations
-6. `/platform-admin` reads real tenant data from the database (admin-only route)
+## Authentication
 
-All wizard/dashboard/admin routes are protected — no token means a redirect to `/login`; non-admins are redirected out of `/platform-admin` and vice versa. Click the profile chip on any dashboard page to log out.
+1. Login → JWT stored in localStorage (`iroas_token`, `iroas_user`)
+2. Session validated via `GET /api/auth/me` on app load
+3. `401` responses clear session and redirect to login
+4. Admin routes require `role === 'admin'` (frontend + backend)
 
-## Building for production
+### Demo accounts
+
+**Platform Admin:** `admin@iroas.com` / `IroasAdmin@123`
+
+**Owners** (password `Demo@1234`):
+
+- `ananya@saffronandfig.in` — live
+- `rohit@baorepublic.in` — live
+- `priya@coastandco.in` — onboarding
+
+## Production build
 
 ```bash
-npm run build      # outputs to dist/
+npm run build
 ```
 
-In production (`NODE_ENV=production`), the Express server itself serves the
-built frontend from `dist/` alongside the API, so a single Node process
-handles everything. See `DEPLOY.md` for the full droplet setup.
+With `NODE_ENV=production`, Express serves `dist/` alongside the API. See `DEPLOY.md`.
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| `'vite' is not recognized` | Run `npm install` in project root |
+| API `ECONNREFUSED` on login | Start backend: `cd server && npm run dev` |
+| JWT error on server start | Set `JWT_SECRET` in `server/.env` |
+
+## Architecture notes
+
+- **DashboardLayout** — shared sidebar/topbar for dashboard pages (migration in progress)
+- **services/api** — centralized fetch client with 401 handling
+- **Lazy-loaded routes** — code-splitting per page
+- **ToastProvider** — replaces browser `alert()` for user feedback (migration in progress)

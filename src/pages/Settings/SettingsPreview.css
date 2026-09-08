@@ -1,0 +1,58 @@
+.settings-preview-page {
+  .page-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .back-link {
+    border: none;
+    background: none;
+    padding: 0;
+    color: #8b8b8f;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+
+  .page-desc {
+    color: #8b8b8f;
+    margin: 6px 0 0;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #eceae4;
+    border-radius: 16px;
+    padding: 8px 18px;
+  }
+
+  .card ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .card li {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 0;
+    border-top: 1px solid #f2f0ea;
+  }
+
+  .card li:first-child {
+    border-top: none;
+  }
+
+  .card span {
+    color: #8b8b8f;
+    font-size: 13px;
+  }
+
+  .muted-note {
+    color: #6fae2e;
+    margin: 0 0 12px;
+  }
+}

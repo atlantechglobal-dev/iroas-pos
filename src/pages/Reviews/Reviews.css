@@ -100,11 +100,72 @@
   .reply-box button { height: 40px; padding: 0 16px; border-radius: 999px; border: none; background: var(--green); color: #16210a; font-size: 12.5px; font-weight: 700; cursor: pointer; }
   .reply-box button.cancel { background: var(--bg); color: var(--muted); }
 
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .btn-add-review {
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: none;
+    background: var(--green);
+    color: #16210a;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .review-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+  }
+  .review-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(23, 23, 26, 0.45);
+  }
+  .review-modal-card {
+    position: relative;
+    z-index: 1;
+    width: min(440px, 100%);
+    background: #fff;
+    border-radius: 16px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+  }
+  .review-modal-card h3 { margin: 0; }
+  .review-modal-card label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .review-modal-card input,
+  .review-modal-card select,
+  .review-modal-card textarea {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font: inherit;
+    color: var(--ink);
+  }
+  .review-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
   @media (max-width: 1000px) {
     .review-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 900px) {
-    .sidebar { display: none; }
     .topbar, .content { padding-left: 16px; padding-right: 16px; }
   }
 }

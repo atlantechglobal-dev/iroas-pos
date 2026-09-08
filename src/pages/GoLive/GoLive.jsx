@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { QrCodePreview, downloadQrPng } from '../../components/QrCodePreview.jsx'
+import { restaurantHostname } from '../../utils/restaurantUrl.js'
+import { guestSiteUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
 import './GoLive.css'
 
 const CHECKLIST = [
@@ -14,18 +17,17 @@ function GoLive() {
   const navigate = useNavigate()
   const [restaurantName, setRestaurantName] = useState('')
   const [liveLink, setLiveLink] = useState('')
+  const [hostname, setHostname] = useState('')
 
   useEffect(() => {
     api
       .getRestaurant()
       .then(({ restaurant }) => {
         if (restaurant.name) setRestaurantName(restaurant.name)
-
-        if (restaurant.custom_domain) {
-          setLiveLink(`https://${restaurant.custom_domain}`)
-        } else if (restaurant.subdomain) {
-          setLiveLink(`https://${restaurant.subdomain}${restaurant.domain_suffix || '.iroas.com'}`)
-        }
+        const host = restaurantHostname(restaurant)
+        const slug = restaurantPublicSlug(restaurant, 'your-restaurant')
+        if (host) setHostname(host)
+        setLiveLink(guestSiteUrl(slug, 'website'))
       })
       .catch(() => {})
   }, [])
@@ -33,37 +35,19 @@ function GoLive() {
   const displayName = restaurantName.trim() || 'Your restaurant'
 
   const handleDashboard = () => {
-    navigate('/directory-listings')
+    navigate('/dashboard')
   }
 
   const handlePreview = () => {
-    // No real hosted site exists behind liveLink yet — show the branded
-    // in-app preview (actual chosen colors/font/theme) instead of a dead URL.
-    navigate('/site-preview')
+    if (liveLink) {
+      window.open(liveLink, '_blank')
+    }
   }
 
   const handleDownloadQR = async () => {
     if (!liveLink) return
-
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(
-      liveLink,
-    )}`
-
-    try {
-      const response = await fetch(qrUrl)
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
-
-      const link = document.createElement('a')
-      link.href = objectUrl
-      link.download = `${displayName.replace(/\s+/g, '-').toLowerCase()}-QR.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(objectUrl)
-    } catch {
-      window.open(qrUrl, '_blank')
-    }
+    const slug = (hostname || displayName).split('.')[0] || 'restaurant'
+    await downloadQrPng(liveLink, `${slug}-QR.png`)
   }
 
   return (
@@ -103,6 +87,16 @@ function GoLive() {
           </ul>
         </section>
 
+        <section className="go-live-qr" aria-label="QR code preview">
+          <QrCodePreview
+            value={liveLink}
+            size={200}
+            alt={`${displayName} QR code`}
+            emptyMessage="Set your web address to preview the QR code."
+          />
+          {hostname ? <p className="go-live-qr-host">{hostname}</p> : null}
+        </section>
+
         <div className="actions">
           <button
             className="btn btn-primary"
@@ -125,6 +119,7 @@ function GoLive() {
             className="btn btn-secondary"
             type="button"
             onClick={handlePreview}
+            disabled={!liveLink}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path
@@ -156,6 +151,7 @@ function GoLive() {
             className="btn btn-secondary"
             type="button"
             onClick={handleDownloadQR}
+            disabled={!liveLink}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path

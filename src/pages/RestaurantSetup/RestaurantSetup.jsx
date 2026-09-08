@@ -1,10 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { COUNTRY_OPTIONS } from '../../lib/countries'
-import { TIMEZONES } from '../../lib/timezones'
-import { getCitiesForCountry } from '../../lib/cities'
-import Select from '../../components/Select'
+import { COUNTRY_OPTIONS, TIMEZONE_OPTIONS } from '../../constants/locales.js'
 import './RestaurantSetup.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -29,11 +26,6 @@ function RestaurantSetup() {
   const [country, setCountry] = useState('')
   const [timezone, setTimezone] = useState('')
   const [address, setAddress] = useState('')
-
-  const cityOptions = useMemo(() => {
-    const cities = getCitiesForCountry(country)
-    return cities.map((name) => ({ value: name, label: name }))
-  }, [country])
   const [hours, setHours] = useState(defaultHours)
   const [saveLabel, setSaveLabel] = useState('Save & continue later')
 
@@ -89,9 +81,9 @@ function RestaurantSetup() {
     try {
       await api.updateProfile(buildProfileData())
       setSaveLabel('Saved ✓')
+      setTimeout(() => navigate('/dashboard'), 600)
     } catch {
       setSaveLabel('Save failed — try again')
-    } finally {
       setTimeout(() => setSaveLabel('Save & continue later'), 2000)
     }
   }
@@ -303,55 +295,50 @@ function RestaurantSetup() {
             <div className="field">
               <label>CITY</label>
 
-              {cityOptions.length > 0 ? (
-                <Select
-                  value={city}
-                  onChange={setCity}
-                  options={cityOptions}
-                  placeholder={country ? 'Select city' : 'Select a country first'}
-                  searchable
-                />
-              ) : (
-                <div className="input-wrapper">
-                  <span className="input-icon">
-                    <img src="/images/blacklocation.svg" alt="" />
-                  </span>
+              <div className="input-wrapper">
+                <span className="input-icon">
+                  <img src="/images/blacklocation.svg" alt="" />
+                </span>
 
-                  <input
-                    type="text"
-                    placeholder="Mumbai"
-                    value={city}
-                    onChange={(event) => setCity(event.target.value)}
-                  />
-                </div>
-              )}
+                <input
+                  type="text"
+                  placeholder="Mumbai"
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                />
+              </div>
             </div>
 
             <div className="field">
               <label>COUNTRY</label>
 
-              <Select
+              <select
                 value={country}
-                onChange={(value) => {
-                  setCountry(value)
-                  setCity('')
-                }}
-                options={COUNTRY_OPTIONS}
-                placeholder="Select country"
-                searchable
-              />
+                onChange={(event) => setCountry(event.target.value)}
+              >
+                <option value="">Select country</option>
+                {COUNTRY_OPTIONS.map((option) => (
+                  <option key={option.code} value={option.name}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="field">
               <label>TIME ZONE</label>
 
-              <Select
+              <select
                 value={timezone}
-                onChange={setTimezone}
-                options={TIMEZONES.map((tz) => ({ value: tz.value, label: tz.label }))}
-                placeholder="Select timezone"
-                searchable
-              />
+                onChange={(event) => setTimezone(event.target.value)}
+              >
+                <option value="">Select time zone</option>
+                {TIMEZONE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="field full-width">

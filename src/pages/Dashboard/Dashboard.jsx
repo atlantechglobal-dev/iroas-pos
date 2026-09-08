@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, getStoredUser, clearSession } from '../../lib/api'
-import { NAV_GROUPS } from '../../lib/navGroups'
-import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
+import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
+import { useAuth } from '../../hooks/useAuth.js'
+import { useRestaurant } from '../../hooks/useRestaurant.js'
+import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import './Dashboard.css'
 
 function generateSeries(n, base, amplitude) {
@@ -92,30 +93,13 @@ function buildAreaPath(values, width, height, padding = 6) {
 }
 
 function Dashboard() {
+  const { user } = useAuth()
+  const { displayRestaurant, restaurantStatus } = useRestaurant()
+  const toast = useToast()
   const navigate = useNavigate()
-  const currentUser = getStoredUser()
-
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [restaurantName, setRestaurantName] = useState('')
-  const [restaurantStatus, setRestaurantStatus] = useState('')
   const [range, setRange] = useState('7d')
-  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
 
-  useEffect(() => {
-    api
-      .getRestaurant()
-      .then(({ restaurant }) => {
-        if (restaurant.name) setRestaurantName(restaurant.name)
-        setRestaurantStatus(restaurant.status)
-        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
-      })
-      .catch(() => {})
-  }, [])
-
-  const accentStyle = deriveAccentShades(accentColor)
-
-  const displayRestaurant = restaurantName.trim() || 'Your restaurant'
-  const firstName = (currentUser?.name || 'there').split(' ')[0]
+  const firstName = (user?.name || 'there').split(' ')[0]
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -127,136 +111,27 @@ function Dashboard() {
   const { linePath, areaPath } = useMemo(() => buildAreaPath(series.values, 600, 180), [series])
 
   const maxOrders = Math.max(...ORDER_COUNTS)
-
-  const handleLogout = () => {
-    clearSession()
-    navigate('/login')
-  }
-
-  const handleNavClick = (item) => {
-    setProfileOpen(false)
-    if (item.route) {
-      navigate(item.route)
-    } else {
-      alert(`${item.label} — coming soon in this demo.`)
-    }
-  }
+  const previewAction = (label) =>
+    toast.info(`${label} — demo preview with sample data.`)
 
   return (
-    <div className="dashboard-page" style={accentStyle}>
-      <div className="app">
-        {/* SIDEBAR */}
-        <aside className="sidebar">
-          <div className="brand">
-            <img src="/images/Logo9-1 1.svg" alt="logo" />
-          </div>
-
-          <button
-            className="restaurant-switch"
-            type="button"
-            onClick={() => alert('Switch restaurant — coming soon in this demo.')}
-          >
-            <span className="avatar-badge">{displayRestaurant.charAt(0).toUpperCase()}</span>
-            <span className="restaurant-info">
-              <strong>{displayRestaurant}</strong>
-              <small>{restaurantStatus === 'live' ? 'Live' : 'Onboarding'}</small>
-            </span>
-            <svg className="chev" width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-
-          <nav className="nav">
-            {NAV_GROUPS.map((group) => (
-              <div className="nav-group" key={group.label}>
-                <p className="nav-label">{group.label}</p>
-                {group.items.map((item) => (
-                  <a
-                    href="#top"
-                    key={item.key}
-                    className={`nav-item ${item.key === 'dashboard' ? 'active' : ''}`}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      handleNavClick(item)
-                    }}
-                  >
-                    <img src={item.icon} alt={item.label} />
-                    {item.label}
-                    {item.badge && <span className="badge">{item.badge}</span>}
-                  </a>
-                ))}
-              </div>
-            ))}
-          </nav>
-        </aside>
-
-        {/* MAIN */}
-        <div className="main">
-          <header className="topbar">
-            <div className="search-bar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M20 20L16.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-              <input type="text" placeholder="Search orders, menu items, customers..." />
-              <span className="kbd">⌘ K</span>
-            </div>
-
-            <div className="topbar-actions">
-              <button
-                className="btn btn-primary btn-sm"
-                type="button"
-                onClick={() => alert('Quick actions — coming soon in this demo.')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                </svg>
-                Quick action
-              </button>
-
-              <button
-                className="icon-btn"
-                type="button"
-                aria-label="Notifications"
-                onClick={() => alert('No new notifications.')}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M6 8C6 5.79086 7.79086 4 10 4H14C16.2091 4 18 5.79086 18 8V13L20 17H4L6 13V8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                  <path d="M10 20C10 21.1046 10.8954 22 12 22C13.1046 22 14 21.1046 14 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-                <span className="dot"></span>
-              </button>
-
-              <div className="user-chip-wrapper">
-                <button className="user-chip" type="button" onClick={() => setProfileOpen((prev) => !prev)}>
-                  <span className="avatar-dark">{(currentUser?.name || 'A').charAt(0).toUpperCase()}</span>
-                  <span className="user-info">
-                    <strong>{currentUser?.name || 'Owner'}</strong>
-                    <small>Owner</small>
-                  </span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+    <DashboardLayout pageClassName="dashboard-page" activeNav="dashboard">
+            {restaurantStatus && restaurantStatus !== 'live' ? (
+              <div className="setup-banner">
+                <div>
+                  <strong>Finish restaurant setup</strong>
+                  <p>Complete your profile, domain and brand to go live.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => navigate('/restaurant-setup')}
+                >
+                  Continue setup
                 </button>
-
-                {profileOpen && (
-                  <>
-                    <div className="menu-overlay" onClick={() => setProfileOpen(false)} />
-                    <div className="profile-menu">
-                      <button type="button" onClick={() => { setProfileOpen(false); alert('Account settings — coming soon in this demo.') }}>
-                        Settings
-                      </button>
-                      <button type="button" className="danger" onClick={handleLogout}>
-                        Log out
-                      </button>
-                    </div>
-                  </>
-                )}
               </div>
-            </div>
-          </header>
+            ) : null}
 
-          <main className="content" id="top">
             <div className="page-head">
               <div>
                 <p className="eyebrow">TODAY · {todayLabel}</p>
@@ -267,14 +142,14 @@ function Dashboard() {
               </div>
 
               <div className="head-actions">
-                <button className="btn btn-outline" type="button" onClick={() => alert('Range picker — coming soon in this demo.')}>
+                <button className="btn btn-outline" type="button" onClick={() => previewAction('Range picker')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
                     <path d="M12 7V12L15 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                   </svg>
                   Last 7 days
                 </button>
-                <button className="btn btn-dark" type="button" onClick={() => alert('Daily report — coming soon in this demo.')}>
+                <button className="btn btn-dark" type="button" onClick={() => previewAction('Daily report')}>
                   ✦ Daily report
                 </button>
               </div>
@@ -406,7 +281,7 @@ function Dashboard() {
                     <h2>Recent orders</h2>
                     <span>Live stream from POS &amp; delivery channels</span>
                   </div>
-                  <button className="link-btn" type="button" onClick={() => alert('Orders — coming soon in this demo.')}>
+                  <button className="link-btn" type="button" onClick={() => previewAction('Orders')}>
                     View all
                   </button>
                 </div>
@@ -436,7 +311,7 @@ function Dashboard() {
                     <h2>Tonight's reservations</h2>
                     <span>4 of {RESERVATIONS.length + 5} arriving next hour</span>
                   </div>
-                  <button className="link-btn" type="button" onClick={() => alert('Reservations — coming soon in this demo.')}>
+                  <button className="link-btn" type="button" onClick={() => previewAction('Reservations')}>
                     Calendar
                   </button>
                 </div>
@@ -568,7 +443,7 @@ function Dashboard() {
                       key={i}
                       className={`floor-cell floor-${status}`}
                       title={status}
-                      onClick={() => alert(`Table ${i + 1} — ${status}`)}
+                      onClick={() => previewAction(`Table ${i + 1}`)}
                     >
                       {i + 1}
                     </div>
@@ -583,10 +458,7 @@ function Dashboard() {
                 </div>
               </section>
             </div>
-          </main>
-        </div>
-      </div>
-    </div>
+    </DashboardLayout>
   )
 }
 

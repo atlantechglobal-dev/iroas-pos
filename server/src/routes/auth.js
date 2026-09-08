@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import crypto from 'node:crypto'
 import { db } from '../db.js'
 import { signToken, requireAuth } from '../middleware/auth.js'
+import { isValidMobile, isValidSignupName, normalizeMobileDigits } from '../utils/validation.js'
 
 const router = Router()
 
@@ -11,6 +12,15 @@ router.post('/signup', (req, res) => {
 
   if (!name || !restaurant || !email || !phone || !password) {
     return res.status(400).json({ error: 'All fields are required.' })
+  }
+
+  if (!isValidSignupName(name)) {
+    return res.status(400).json({ error: 'Enter a valid first and last name using letters only.' })
+  }
+
+  const mobileDigits = normalizeMobileDigits(phone)
+  if (!isValidMobile(mobileDigits)) {
+    return res.status(400).json({ error: 'Mobile number must be exactly 10 digits.' })
   }
 
   if (password.length < 8) {
@@ -32,7 +42,7 @@ router.post('/signup', (req, res) => {
   )
 
   const result = db.transaction(() => {
-    const userInfo = insertUser.run(name, email, phone, passwordHash, 'owner')
+    const userInfo = insertUser.run(name.trim(), email, mobileDigits, passwordHash, 'owner')
     insertRestaurant.run(userInfo.lastInsertRowid, restaurant)
     return userInfo.lastInsertRowid
   })()

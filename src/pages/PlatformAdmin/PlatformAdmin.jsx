@@ -1,101 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { api, getStoredUser, clearSession } from '../../lib/api'
+import { api } from '../../lib/api'
+import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
+import { useDebounce } from '../../hooks/useDebounce.js'
+import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import './PlatformAdmin.css'
-
-const NAV_GROUPS = [
-  {
-    label: 'OVERVIEW',
-    items: [
-      { key: 'dashboard', label: 'Dashboard', icon: '/images/dashboard.svg' },
-      {
-        key: 'restaurant-profile',
-        label: 'Restaurant Profile',
-        icon: '/images/rest.svg',
-      },
-      {
-        key: 'branding',
-        label: 'Branding',
-        icon: '/images/black.branding.svg',
-      },
-    ],
-  },
-  {
-    label: 'OPERATIONS',
-    items: [
-      { key: 'menu', label: 'Menu', icon: '/images/blackmenu.svg' },
-      {
-        key: 'incoming-orders',
-        label: 'Incoming Orders',
-        icon: '/images/incoming.svg',
-        badge: '12',
-      },
-      {
-        key: 'reservations',
-        label: 'Reservations',
-        icon: '/images/breserve.svg',
-      },
-      { key: 'tables', label: 'Tables', icon: '/images/tabs.svg' },
-      { key: 'staff', label: 'Staff', icon: '/images/stafb.svg' },
-      { key: 'customers', label: 'Customers', icon: '/images/cust.svg' },
-      {
-        key: 'role-permissions',
-        label: 'Role Permissions',
-        icon: '/images/role key.svg',
-      },
-    ],
-  },
-  {
-    label: 'GROWTH',
-    items: [
-      { key: 'analytics', label: 'Analytics', icon: '/images/analy.png' },
-      { key: 'payments', label: 'Payments', icon: '/images/payments.svg' },
-      { key: 'marketing', label: 'Marketing', icon: '/images/market.svg' },
-      { key: 'reviews', label: 'Reviews', icon: '/images/breview.svg' },
-      {
-        key: 'one-link',
-        label: 'One Link',
-        icon: '/images/one link.svg',
-        route: '/one-link',
-      },
-      {
-        key: 'directory-listings',
-        label: 'Directory Listings',
-        icon: '/images/directory.svg',
-        route: '/directory-listings',
-      },
-      {
-        key: 'digital-business-card',
-        label: 'Digital Business Card',
-        icon: '/images/digicard.svg',
-        route: '/digital-business-card',
-      },
-    ],
-  },
-  {
-    label: 'SYSTEM',
-    items: [
-      { key: 'pos', label: 'POS Integration', icon: '/images/pos.svg' },
-      {
-        key: 'notifications',
-        label: 'Notifications',
-        icon: '/images/noti.svg',
-      },
-      { key: 'settings', label: 'Settings', icon: '/images/settings.svg' },
-    ],
-  },
-  {
-    label: 'PLATFORM',
-    items: [
-      {
-        key: 'platform-admin',
-        label: 'Platform Admin',
-        icon: '/images/platad.svg',
-        route: '/platform-admin',
-      },
-    ],
-  },
-]
 
 const INITIAL_FLAGS = [
   {
@@ -166,15 +74,13 @@ const STATUS_LABEL = {
 }
 
 function PlatformAdmin() {
-  const navigate = useNavigate()
-  const admin = getStoredUser()
+  const toast = useToast()
 
-  const [activeNav, setActiveNav] = useState('platform-admin')
   const [tenantSearch, setTenantSearch] = useState('')
+  const debouncedSearch = useDebounce(tenantSearch, 250)
   const [flags, setFlags] = useState(INITIAL_FLAGS)
   const [tenants, setTenants] = useState([])
   const [stats, setStats] = useState(null)
-  const [profileOpen, setProfileOpen] = useState(false)
 
   const loadTenants = (search = '') => {
     api
@@ -192,19 +98,8 @@ function PlatformAdmin() {
   }, [])
 
   useEffect(() => {
-    const handle = setTimeout(() => loadTenants(tenantSearch), 250)
-    return () => clearTimeout(handle)
-  }, [tenantSearch])
-
-  const handleNavClick = (item) => {
-    setActiveNav(item.key)
-    setProfileOpen(false)
-    if (item.route) {
-      navigate(item.route)
-    } else {
-      alert(`${item.label} — coming soon in this demo.`)
-    }
-  }
+    loadTenants(debouncedSearch)
+  }, [debouncedSearch])
 
   const toggleFlag = (key) => {
     setFlags((prev) =>
@@ -215,12 +110,7 @@ function PlatformAdmin() {
   }
 
   const handleImpersonate = (name) => {
-    alert(`Impersonating ${name}`)
-  }
-
-  const handleLogout = () => {
-    clearSession()
-    navigate('/login')
+    toast.info(`Impersonating ${name}`)
   }
 
   const STATS = stats
@@ -232,115 +122,12 @@ function PlatformAdmin() {
     : []
 
   return (
-    <div className="platform-admin-page">
-      <div className="app">
-        {/* LEFT SIDEBAR */}
-        <aside className="sidebar">
-          <div className="logo-area">
-            <img
-              src="/images/Logo9-1 1.svg"
-              alt="IROAS"
-              className="iroas-logo"
-            />
-          </div>
-
-          <div className="restaurant-box">
-            <div className="restaurant-avatar">
-              <img src="/images/Logo9-1 1.svg" alt="icon" />
-            </div>
-
-            <div className="restaurant-info">
-              <div className="restaurant-name">IROAS Platform</div>
-              <div className="restaurant-status">
-                {stats ? `${stats.totalTenants} tenants` : 'All tenants'}
-              </div>
-            </div>
-          </div>
-
-          <nav className="nav-scroll">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label}>
-              <div className="section-title">{group.label}</div>
-
-              {group.items.map((item) => (
-                <div
-                  className={`nav-item ${activeNav === item.key ? 'active' : ''}`}
-                  key={item.key}
-                  onClick={() => handleNavClick(item)}
-                >
-                  <span className="plain-icon">
-                    <img src={item.icon} alt="icon" />
-                  </span>
-                  <span>{item.label}</span>
-                  {item.badge && <span className="badge">{item.badge}</span>}
-                </div>
-              ))}
-            </div>
-          ))}
-          </nav>
-        </aside>
-
-        {/* MAIN CONTENT */}
-        <main className="main-content">
-          {/* TOP SEARCH */}
-          <div className="top-bar">
-            <div className="search-box">
-              <span>Search orders, menu items, customers...</span>
-              <span className="shortcut">⌘ K</span>
-            </div>
-
-            <div className="top-actions">
-              <button
-                className="quick-action"
-                onClick={() => alert('Quick action clicked')}
-              >
-                + Quick action
-              </button>
-
-              <button
-                className="notification"
-                onClick={() => alert('No new notifications.')}
-              >
-                <img src="/images/bell.svg" alt="icon" />
-              </button>
-
-              <div className="profile-wrapper">
-                <div className="profile" onClick={() => setProfileOpen((prev) => !prev)}>
-                  <div className="profile-circle">
-                    {(admin?.name || 'A').charAt(0).toUpperCase()}
-                  </div>
-
-                  <div className="profile-text">
-                    <strong>{admin?.name || 'Admin'}</strong>
-                    <small>Platform Admin</small>
-                  </div>
-
-                  <span>⌄</span>
-                </div>
-
-                {profileOpen && (
-                  <>
-                    <div className="menu-overlay" onClick={() => setProfileOpen(false)} />
-                    <div className="profile-menu">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProfileOpen(false)
-                          alert('Account settings — coming soon in this demo.')
-                        }}
-                      >
-                        Settings
-                      </button>
-                      <button type="button" className="danger" onClick={handleLogout}>
-                        Log out
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
+    <DashboardLayout
+      pageClassName="platform-admin-page"
+      activeNav="platform-admin"
+      variant="admin"
+      adminSubtitle={stats ? `${stats.totalTenants} tenants` : 'All tenants'}
+    >
           {/* PAGE HEADER */}
           <div className="page-header">
             <div>
@@ -356,7 +143,7 @@ function PlatformAdmin() {
 
             <button
               className="new-tenant"
-              onClick={() => alert('New tenant clicked')}
+              onClick={() => toast.info('New tenant flow is not available yet.')}
             >
               <img src="/images/new.svg" alt="New tenant" />
               <span>New tenant</span>
@@ -513,9 +300,7 @@ function PlatformAdmin() {
               </section>
             </div>
           </div>
-        </main>
-      </div>
-    </div>
+    </DashboardLayout>
   )
 }
 

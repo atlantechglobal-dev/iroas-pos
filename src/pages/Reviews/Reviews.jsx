@@ -1,193 +1,200 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { api, getStoredUser, clearSession } from '../../lib/api'
-import { NAV_GROUPS } from '../../lib/navGroups'
-import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
+import { useEffect, useMemo, useState } from 'react'
+import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
+import { useToast } from '../../components/feedback/ToastProvider.jsx'
+import { api } from '../../lib/api'
 import './Reviews.css'
 
-const BREAKDOWN = [
-  { stars: 5, pct: 64 },
-  { stars: 4, pct: 22 },
-  { stars: 3, pct: 8 },
-  { stars: 2, pct: 4 },
-  { stars: 1, pct: 2 },
-]
-
-const INITIAL_REVIEWS = [
-  { name: 'Aarav S.', source: 'Google', time: '2h ago', rating: 5, text: 'Truffle risotto was sublime. Service warm and unhurried. Will return for the wood-fired pizza.', tone: 'Positive' },
-  { name: 'Meera K.', source: 'Zomato', time: 'Yesterday', rating: 4, text: 'Beautiful ambience and great food. Slight delay during peak hours but staff handled it well.', tone: 'Positive' },
-  { name: 'Ritika P.', source: 'Swiggy', time: '2d ago', rating: 2, text: 'Delivery took 70 minutes and the pasta was cold. Disappointed.', tone: 'Negative' },
-  { name: 'Karan G.', source: 'Google', time: '3d ago', rating: 5, text: 'Burrata starter was a 10/10. Cocktails are inventive and reasonably priced.', tone: 'Positive' },
-]
-
 function Reviews() {
-  const navigate = useNavigate()
-  const currentUser = getStoredUser()
+  const toast = useToast()
+  const [reviews, setReviews] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form, setForm] = useState({ author: '', rating: '5', body: '' })
 
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [restaurantName, setRestaurantName] = useState('')
-  const [restaurantStatus, setRestaurantStatus] = useState('')
-  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
-  const [reviews, setReviews] = useState(INITIAL_REVIEWS)
-  const [replying, setReplying] = useState(null)
-  const [replyText, setReplyText] = useState('')
-
-  useEffect(() => {
-    api.getRestaurant().then(({ restaurant }) => {
-      if (restaurant.name) setRestaurantName(restaurant.name)
-      setRestaurantStatus(restaurant.status)
-        if (restaurant.settings?.adminAccentColor) setAccentColor(restaurant.settings.adminAccentColor)
-    }).catch(() => {})
-  }, [])
-const accentStyle = deriveAccentShades(accentColor)
-
-  const displayRestaurant = restaurantName.trim() || 'Your restaurant'
-
-  const submitReply = (name) => {
-    if (!replyText.trim()) return
-    setReviews((prev) => prev.map((r) => (r.name === name ? { ...r, reply: replyText.trim() } : r)))
-    setReplying(null)
-    setReplyText('')
+  const load = async () => {
+    setLoading(true)
+    try {
+      const { reviews: rows } = await api.getReviews()
+      setReviews(rows || [])
+    } catch (err) {
+      toast.error(err.message || 'Unable to load reviews.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleLogout = () => { clearSession(); navigate('/login') }
-  const handleNavClick = (item) => {
-    setProfileOpen(false)
-    if (item.route) navigate(item.route)
-    else alert(`${item.label} — coming soon in this demo.`)
+  useEffect(() => {
+    load()
+  }, [])
+
+  const published = reviews.filter((r) => r.status === 'published')
+  const avg = useMemo(() => {
+    if (!published.length) return 0
+    return published.reduce((s, r) => s + r.rating, 0) / published.length
+  }, [published])
+
+  const breakdown = useMemo(() => {
+    const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+    published.forEach((r) => {
+      counts[r.rating] = (counts[r.rating] || 0) + 1
+    })
+    const total = published.length || 1
+    return [5, 4, 3, 2, 1].map((stars) => ({
+      stars,
+      pct: Math.round((counts[stars] / total) * 100),
+    }))
+  }, [published])
+
+  const toggleStatus = async (review) => {
+    const status = review.status === 'published' ? 'hidden' : 'published'
+    try {
+      const { review: updated } = await api.updateReview(review.id, { status })
+      setReviews((prev) => prev.map((r) => (r.id === review.id ? updated : r)))
+      toast.success(status === 'published' ? 'Review published on site.' : 'Review hidden from site.')
+    } catch (err) {
+      toast.error(err.message || 'Unable to update review.')
+    }
+  }
+
+  const createReview = async (event) => {
+    event.preventDefault()
+    try {
+      const { review } = await api.createReview({
+        author: form.author,
+        rating: Number(form.rating),
+        body: form.body,
+        status: 'published',
+      })
+      setReviews((prev) => [review, ...prev])
+      setModalOpen(false)
+      setForm({ author: '', rating: '5', body: '' })
+      toast.success('Review added.')
+    } catch (err) {
+      toast.error(err.message || 'Unable to add review.')
+    }
   }
 
   return (
-    <div className="reviews-page" style={accentStyle}>
-      <div className="app">
-        <aside className="sidebar">
-          <div className="brand"><img src="/images/Logo9-1 1.svg" alt="logo" /></div>
-          <button className="restaurant-switch" type="button" onClick={() => alert('Switch restaurant — coming soon in this demo.')}>
-            <span className="avatar-badge">{displayRestaurant.charAt(0).toUpperCase()}</span>
-            <span className="restaurant-info">
-              <strong>{displayRestaurant}</strong>
-              <small>{restaurantStatus === 'live' ? 'Live' : 'Onboarding'}</small>
-            </span>
-            <svg className="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
-          <nav className="nav">
-            {NAV_GROUPS.map((group) => (
-              <div className="nav-group" key={group.label}>
-                <p className="nav-label">{group.label}</p>
-                {group.items.map((item) => (
-                  <a href="#top" key={item.key} className={`nav-item ${item.key === 'reviews' ? 'active' : ''}`}
-                    onClick={(e) => { e.preventDefault(); handleNavClick(item) }}>
-                    <img src={item.icon} alt={item.label} />
-                    {item.label}
-                    {item.badge && <span className="badge">{item.badge}</span>}
-                  </a>
-                ))}
+    <DashboardLayout pageClassName="reviews-page" activeNav="reviews">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">Reputation</p>
+          <h1>Reviews</h1>
+          <p className="page-desc">
+            Published reviews appear on your guest website. Hide any you do not want public.
+          </p>
+        </div>
+        <button type="button" className="btn-add-review" onClick={() => setModalOpen(true)}>
+          + Add review
+        </button>
+      </div>
+
+      <div className="review-grid">
+        <section className="card rating-card">
+          <span className="muted-note">Overall rating</span>
+          <div className="rating-big">
+            {published.length ? avg.toFixed(1) : '—'}
+            <span>/ 5</span>
+          </div>
+          <div className="stars">{'★'.repeat(Math.round(avg) || 0)}</div>
+          <span className="muted-note">
+            From {published.length} published review{published.length === 1 ? '' : 's'}
+          </span>
+
+          <div className="breakdown">
+            {breakdown.map((b) => (
+              <div className="breakdown-row" key={b.stars}>
+                <span>{b.stars}</span>
+                <div className="breakdown-track">
+                  <div className="breakdown-fill" style={{ width: `${b.pct}%` }} />
+                </div>
+                <span>{b.pct}%</span>
               </div>
             ))}
-          </nav>
-        </aside>
+          </div>
+        </section>
 
-        <div className="main">
-          <header className="topbar">
-            <div className="search-bar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" /><path d="M20 20L16.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
-              <input type="text" placeholder="Search orders, menu items, customers..." />
-              <span className="kbd">⌘ K</span>
-            </div>
-            <div className="topbar-actions">
-              <button className="btn btn-primary btn-sm" type="button" onClick={() => alert('Quick actions — coming soon in this demo.')}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
-                Quick action
-              </button>
-              <button className="icon-btn" type="button" aria-label="Notifications" onClick={() => navigate('/notifications')}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 8C6 5.79086 7.79086 4 10 4H14C16.2091 4 18 5.79086 18 8V13L20 17H4L6 13V8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M10 20C10 21.1046 10.8954 22 12 22C13.1046 22 14 21.1046 14 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
-                <span className="dot"></span>
-              </button>
-              <div className="user-chip-wrapper">
-                <button className="user-chip" type="button" onClick={() => setProfileOpen((p) => !p)}>
-                  <span className="avatar-dark">{(currentUser?.name || 'A').charAt(0).toUpperCase()}</span>
-                  <span className="user-info"><strong>{currentUser?.name || 'Owner'}</strong><small>Owner</small></span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                </button>
-                {profileOpen && (
-                  <>
-                    <div className="menu-overlay" onClick={() => setProfileOpen(false)} />
-                    <div className="profile-menu">
-                      <button type="button" onClick={() => { setProfileOpen(false); alert('Account settings — coming soon in this demo.') }}>Settings</button>
-                      <button type="button" className="danger" onClick={handleLogout}>Log out</button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </header>
+        <section className="card reviews-card">
+          <h2>All reviews</h2>
+          <span className="muted-note">Toggle visibility for the guest site</span>
 
-          <main className="content" id="top">
-            <div className="page-head">
-              <div>
-                <p className="eyebrow">Reputation</p>
-                <h1>Reviews</h1>
-                <p className="page-desc">What guests are saying across Google, Zomato, Swiggy and direct channels.</p>
-              </div>
-            </div>
-
-            <div className="review-grid">
-              <section className="card rating-card">
-                <span className="muted-note">Overall rating</span>
-                <div className="rating-big">4.7<span>/ 5</span></div>
-                <div className="stars">{'★★★★★'}</div>
-                <span className="muted-note">From 1,284 reviews</span>
-
-                <div className="breakdown">
-                  {BREAKDOWN.map((b) => (
-                    <div className="breakdown-row" key={b.stars}>
-                      <span>{b.stars}</span>
-                      <div className="breakdown-track"><div className="breakdown-fill" style={{ width: `${b.pct}%` }} /></div>
-                      <span>{b.pct}%</span>
-                    </div>
-                  ))}
+          <ul className="review-list">
+            {loading ? <li className="muted-note">Loading…</li> : null}
+            {!loading && reviews.length === 0 ? (
+              <li className="muted-note">No reviews yet. Add one to show on the website.</li>
+            ) : null}
+            {reviews.map((r) => (
+              <li key={r.id}>
+                <div className="review-top">
+                  <div>
+                    <strong>{r.author}</strong>
+                    <span className="review-meta"> · {r.status}</span>
+                  </div>
+                  <span className={`tone-pill ${r.rating >= 4 ? 'positive' : 'negative'}`}>
+                    {r.rating >= 4 ? 'Positive' : 'Critical'}
+                  </span>
                 </div>
-              </section>
-
-              <section className="card reviews-card">
-                <h2>Latest reviews</h2>
-                <span className="muted-note">Reply directly from here</span>
-
-                <ul className="review-list">
-                  {reviews.map((r) => (
-                    <li key={r.name}>
-                      <div className="review-top">
-                        <div>
-                          <strong>{r.name}</strong>
-                          <span className="review-meta"> · {r.source} · {r.time}</span>
-                        </div>
-                        <span className={`tone-pill ${r.tone === 'Positive' ? 'positive' : 'negative'}`}>{r.tone}</span>
-                      </div>
-                      <div className="review-stars">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</div>
-                      <p>{r.text}</p>
-
-                      {r.reply && <div className="review-reply"><strong>Your reply:</strong> {r.reply}</div>}
-
-                      {replying === r.name ? (
-                        <div className="reply-box">
-                          <input type="text" placeholder="Write a reply..." value={replyText} onChange={(e) => setReplyText(e.target.value)} autoFocus />
-                          <button type="button" onClick={() => submitReply(r.name)}>Send</button>
-                          <button type="button" className="cancel" onClick={() => { setReplying(null); setReplyText('') }}>Cancel</button>
-                        </div>
-                      ) : (
-                        <button className="reply-btn" type="button" onClick={() => setReplying(r.name)}>
-                          ↩ Reply
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-          </main>
-        </div>
+                <div className="review-stars">
+                  {'★'.repeat(r.rating)}
+                  {'☆'.repeat(5 - r.rating)}
+                </div>
+                <p>{r.body}</p>
+                <button className="reply-btn" type="button" onClick={() => toggleStatus(r)}>
+                  {r.status === 'published' ? 'Hide from site' : 'Publish on site'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
-    </div>
+
+      {modalOpen ? (
+        <div className="review-modal" role="dialog" aria-modal="true">
+          <div className="review-modal-backdrop" onClick={() => setModalOpen(false)} />
+          <form className="review-modal-card" onSubmit={createReview}>
+            <h3>Add review</h3>
+            <label>
+              Guest name
+              <input
+                required
+                value={form.author}
+                onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
+              />
+            </label>
+            <label>
+              Rating
+              <select
+                value={form.rating}
+                onChange={(e) => setForm((f) => ({ ...f, rating: e.target.value }))}
+              >
+                {[5, 4, 3, 2, 1].map((n) => (
+                  <option key={n} value={n}>
+                    {n} stars
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Review
+              <textarea
+                required
+                rows={4}
+                value={form.body}
+                onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+              />
+            </label>
+            <div className="review-modal-actions">
+              <button type="button" className="reply-btn" onClick={() => setModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-add-review">
+                Save review
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </DashboardLayout>
   )
 }
 

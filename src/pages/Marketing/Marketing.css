@@ -99,7 +99,6 @@
     .campaign-grid { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 900px) {
-    .sidebar { display: none; }
     .topbar, .content { padding-left: 16px; padding-right: 16px; }
   }
   @media (max-width: 560px) {

@@ -1,16 +1,21 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { api, getStoredUser, clearSession } from '../../lib/api'
-import { NAV_GROUPS } from '../../lib/navGroups'
-import { deriveAccentShades, DEFAULT_ACCENT } from '../../lib/accentColor'
-import { COUNTRY_OPTIONS } from '../../lib/countries'
-import { TIMEZONES } from '../../lib/timezones'
-import { getCitiesForCountry } from '../../lib/cities'
-import Select from '../../components/Select'
+import { useState, useEffect } from 'react'
+import { api } from '../../lib/api'
+import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
+import { useToast } from '../../components/feedback/ToastProvider.jsx'
+import { prepareImageDataUrl } from '../../utils/imageFile.js'
+import { COUNTRY_OPTIONS, TIMEZONE_OPTIONS } from '../../constants/locales.js'
 import './RestaurantProfile.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const defaultHours = DAY_NAMES.map((day) => ({ day, open: '', close: '', closed: false }))
+const defaultHours = [
+  { day: 'Mon', open: '', close: '', closed: true },
+  { day: 'Tue', open: '11:00', close: '23:30', closed: false },
+  { day: 'Wed', open: '11:00', close: '23:30', closed: false },
+  { day: 'Thu', open: '11:00', close: '23:30', closed: false },
+  { day: 'Fri', open: '11:00', close: '23:30', closed: false },
+  { day: 'Sat', open: '11:00', close: '23:30', closed: false },
+  { day: 'Sun', open: '11:00', close: '23:30', closed: false },
+]
 
 const TABS = [
   { key: 'basic', label: 'Basic info' },
@@ -24,78 +29,127 @@ const TABS = [
   { key: 'notifications', label: 'Notifications' },
 ]
 
-const TAB_ICONS = {
-  basic: '<path d="M3 8 L4 3 H16 L17 8"/><path d="M3 8 V17 H17 V8"/><rect x="8" y="12" width="4" height="5"/>',
-  hours: '<circle cx="10" cy="10" r="7.2"/><path d="M10 6 V10 L13 12"/>',
-  tax: '<rect x="3" y="3.5" width="14" height="13" rx="2"/><path d="M7 8h6M7 11h6M7 14h3"/>',
-  social: '<circle cx="10" cy="10" r="7.2"/><path d="M2.8 10h14.4M10 2.8c2.2 2 3.4 4.6 3.4 7.2s-1.2 5.2-3.4 7.2c-2.2-2-3.4-4.6-3.4-7.2S7.8 4.8 10 2.8Z"/>',
-  delivery: '<rect x="2" y="6" width="9.5" height="7.5" rx="1"/><path d="M11.5 8.5H15l2.5 2.5V13.5h-6z"/><circle cx="6" cy="15" r="1.6"/><circle cx="14.3" cy="15" r="1.6"/>',
-  brand: '<rect x="2.5" y="3.5" width="15" height="13" rx="1.6"/><circle cx="7" cy="8.2" r="1.6"/><path d="M3 14.5l4-4 3 3 3.5-3.5 3.5 3.5"/>',
-  team: '<circle cx="7" cy="7" r="2.6"/><circle cx="14" cy="8" r="2.1"/><path d="M2.5 17c0-2.8 2-5 4.5-5s4.5 2.2 4.5 5"/><path d="M12.8 12.3c1.9.3 3.4 2.1 3.4 4.3"/>',
-  billing: '<rect x="2.5" y="4.5" width="15" height="11" rx="1.6"/><path d="M2.5 8h15"/>',
-  notifications: '<path d="M5 13.5c0-.9.7-1.1.7-2.9V9a4.3 4.3 0 0 1 8.6 0v1.6c0 1.8.7 2 .7 2.9Z"/><path d="M8.3 16a1.7 1.7 0 0 0 3.4 0"/>',
-}
-
-function TabIcon({ tab }) {
-  return (
-    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
-      dangerouslySetInnerHTML={{ __html: TAB_ICONS[tab] }}
-    />
-  )
+function TabSvg({ name }) {
+  switch (name) {
+    case 'basic':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      )
+    case 'hours':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      )
+    case 'tax':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <polyline points="10 9 9 9 8 9" />
+        </svg>
+      )
+    case 'social':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      )
+    case 'delivery':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="1" y="3" width="15" height="13" />
+          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+          <circle cx="5.5" cy="18.5" r="2.5" />
+          <circle cx="18.5" cy="18.5" r="2.5" />
+        </svg>
+      )
+    case 'brand':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
+        </svg>
+      )
+    case 'team':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      )
+    case 'billing':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+          <line x1="1" y1="10" x2="23" y2="10" />
+        </svg>
+      )
+    case 'notifications':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      )
+    default:
+      return null
+  }
 }
 
 function RestaurantProfile() {
-  const navigate = useNavigate()
-  const currentUser = getStoredUser()
+  const toast = useToast()
 
-  const [activeNav] = useState('restaurant-profile')
-  const [profileOpen, setProfileOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
   const [saving, setSaving] = useState(false)
-  const [restaurantName, setRestaurantName] = useState('')
-  const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [editingContact, setEditingContact] = useState(false)
+  const [displayName, setDisplayName] = useState('Saffron & Fig')
+  const [displayStatus, setDisplayStatus] = useState('Downtown · Open')
 
-  // Real, DB-backed fields
-  const [name, setName] = useState('')
-  const [cuisine, setCuisine] = useState('')
+  const [name, setName] = useState('Saffron & Fig')
+  const [legalEntity, setLegalEntity] = useState('Saffron Hospitality Pvt Ltd')
+  const [cuisine, setCuisine] = useState('Modern Indian - Mediterranean')
+  const [priceRange, setPriceRange] = useState('₹₹₹ · 800–1500 / head')
+  const [tagline, setTagline] = useState('A coastal kitchen, with fire and saffron')
+  const [yearEstablished, setYearEstablished] = useState('2019')
   const [description, setDescription] = useState('')
-  const [phone, setPhone] = useState('')
-  const [website, setWebsite] = useState('')
-  const [email, setEmail] = useState('')
-  const [city, setCity] = useState('')
-  const [country, setCountry] = useState('')
-  const [timezone, setTimezone] = useState('')
-  const [address, setAddress] = useState('')
-
-  const cityOptions = useMemo(() => {
-    return getCitiesForCountry(country).map((name) => ({ value: name, label: name }))
-  }, [country])
+  const [address, setAddress] = useState('14 Bandstand Promenade, Muml')
+  const [phone, setPhone] = useState('+91 98200 12345')
+  const [email, setEmail] = useState('hello@saffronandfig.in')
+  const [website, setWebsite] = useState('saffronandfig.in')
   const [hours, setHours] = useState(defaultHours)
-  const [logoDataUrl, setLogoDataUrl] = useState(null)
-
-  // Settings JSON-backed fields
-  const [legalEntity, setLegalEntity] = useState('')
-  const [priceRange, setPriceRange] = useState('')
-  const [tagline, setTagline] = useState('')
-  const [yearEstablished, setYearEstablished] = useState('')
-  const [gstin, setGstin] = useState('')
-  const [pan, setPan] = useState('')
-  const [fssai, setFssai] = useState('')
-  const [cgst, setCgst] = useState('')
-  const [sgst, setSgst] = useState('')
-  const [serviceCharge, setServiceCharge] = useState('')
-  const [currency, setCurrency] = useState('INR (₹)')
-  const [rounding, setRounding] = useState('Nearest ₹1')
-  const [invoicePrefix, setInvoicePrefix] = useState('')
-  const [instagram, setInstagram] = useState('')
-  const [facebook, setFacebook] = useState('')
-  const [twitter, setTwitter] = useState('')
-  const [youtube, setYoutube] = useState('')
-  const [googleBusiness, setGoogleBusiness] = useState('')
-  const [tripadvisor, setTripadvisor] = useState('')
-  const [lastOrderCutoff, setLastOrderCutoff] = useState('')
+  const [timezone, setTimezone] = useState('Asia/Kolkata')
+  const [lastOrderCutoff, setLastOrderCutoff] = useState('22:45')
   const [pauseOrders, setPauseOrders] = useState(false)
   const [honorHolidays, setHonorHolidays] = useState(true)
+  const [city, setCity] = useState('Mumbai')
+  const [country, setCountry] = useState('India')
+  const [gstin, setGstin] = useState('27ABCDE1234F1Z5')
+  const [pan, setPan] = useState('ABCDE1234F')
+  const [fssai, setFssai] = useState('11522016000123')
+  const [cgst, setCgst] = useState('2.5%')
+  const [sgst, setSgst] = useState('2.5%')
+  const [serviceCharge, setServiceCharge] = useState('0%')
+  const [currency, setCurrency] = useState('INR (₹)')
+  const [rounding, setRounding] = useState('Nearest ₹1')
+  const [invoicePrefix, setInvoicePrefix] = useState('SF-2026-')
+  const [instagram, setInstagram] = useState('@saffronandfig')
+  const [facebook, setFacebook] = useState('facebook.com/saffronandfig')
+  const [twitter, setTwitter] = useState('@saffronandfig')
+  const [youtube, setYoutube] = useState('youtube.com/@saffronandfig')
+  const [googleBusiness, setGoogleBusiness] = useState('g.page/saffronandfig')
+  const [tripadvisor, setTripadvisor] = useState('tripadvisor.com/saffronandfig')
   const [deliveryRadius, setDeliveryRadius] = useState('')
   const [deliveryMinOrder, setDeliveryMinOrder] = useState('')
   const [deliveryBaseFee, setDeliveryBaseFee] = useState('')
@@ -106,9 +160,18 @@ function RestaurantProfile() {
   const [channelZomato, setChannelZomato] = useState(true)
   const [channelSwiggy, setChannelSwiggy] = useState(true)
   const [channelDunzo, setChannelDunzo] = useState(false)
+  const [logoDataUrl, setLogoDataUrl] = useState(null)
   const [coverPhoto, setCoverPhoto] = useState(null)
   const [ogImage, setOgImage] = useState(null)
-  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT)
+  const [emailNotifs, setEmailNotifs] = useState(true)
+  const [smsNotifs, setSmsNotifs] = useState(true)
+  const [pushNotifs, setPushNotifs] = useState(true)
+  const [whatsappNotifs, setWhatsappNotifs] = useState(false)
+  const [newOrderAlert, setNewOrderAlert] = useState(true)
+  const [cancelOrderAlert, setCancelOrderAlert] = useState(true)
+  const [lowStockAlert, setLowStockAlert] = useState(true)
+  const [eodReportAlert, setEodReportAlert] = useState(true)
+  const [profileSetup, setProfileSetup] = useState({})
 
   useEffect(() => {
     api
@@ -116,9 +179,8 @@ function RestaurantProfile() {
       .then(({ restaurant }) => {
         if (restaurant.name) {
           setName(restaurant.name)
-          setRestaurantName(restaurant.name)
+          setDisplayName(restaurant.name)
         }
-        setRestaurantStatus(restaurant.status)
         if (restaurant.cuisine) setCuisine(restaurant.cuisine)
         if (restaurant.description) setDescription(restaurant.description)
         if (restaurant.phone) setPhone(restaurant.phone)
@@ -126,98 +188,160 @@ function RestaurantProfile() {
         if (restaurant.email) setEmail(restaurant.email)
         if (restaurant.city) setCity(restaurant.city)
         if (restaurant.country) setCountry(restaurant.country)
-        if (restaurant.timezone) setTimezone(restaurant.timezone)
+        if (restaurant.timezone) {
+          setTimezone(String(restaurant.timezone).split(' ')[0])
+        }
         if (restaurant.address) setAddress(restaurant.address)
         if (restaurant.logo_data_url) setLogoDataUrl(restaurant.logo_data_url)
+
+        let parsedHours = null
         if (restaurant.operating_hours) {
           try {
-            setHours(JSON.parse(restaurant.operating_hours))
+            parsedHours = JSON.parse(restaurant.operating_hours)
+            setHours(parsedHours)
           } catch {
             // keep defaults
           }
         }
 
-        const s = restaurant.settings || {}
-        if (s.adminAccentColor) setAccentColor(s.adminAccentColor)
-        if (s.legalEntity) setLegalEntity(s.legalEntity)
-        if (s.priceRange) setPriceRange(s.priceRange)
-        if (s.tagline) setTagline(s.tagline)
-        if (s.yearEstablished) setYearEstablished(s.yearEstablished)
-        if (s.gstin) setGstin(s.gstin)
-        if (s.pan) setPan(s.pan)
-        if (s.fssai) setFssai(s.fssai)
-        if (s.cgst) setCgst(s.cgst)
-        if (s.sgst) setSgst(s.sgst)
-        if (s.serviceCharge !== undefined) setServiceCharge(s.serviceCharge)
-        if (s.currency) setCurrency(s.currency)
-        if (s.rounding) setRounding(s.rounding)
-        if (s.invoicePrefix) setInvoicePrefix(s.invoicePrefix)
-        if (s.instagram) setInstagram(s.instagram)
-        if (s.facebook) setFacebook(s.facebook)
-        if (s.twitter) setTwitter(s.twitter)
-        if (s.youtube) setYoutube(s.youtube)
-        if (s.googleBusiness) setGoogleBusiness(s.googleBusiness)
-        if (s.tripadvisor) setTripadvisor(s.tripadvisor)
-        if (s.lastOrderCutoff) setLastOrderCutoff(s.lastOrderCutoff)
-        if (s.pauseOrders !== undefined) setPauseOrders(s.pauseOrders)
-        if (s.honorHolidays !== undefined) setHonorHolidays(s.honorHolidays)
-        if (s.deliveryRadius) setDeliveryRadius(s.deliveryRadius)
-        if (s.deliveryMinOrder) setDeliveryMinOrder(s.deliveryMinOrder)
-        if (s.deliveryBaseFee) setDeliveryBaseFee(s.deliveryBaseFee)
-        if (s.deliveryPerKmFee) setDeliveryPerKmFee(s.deliveryPerKmFee)
-        if (s.deliveryFreeAbove) setDeliveryFreeAbove(s.deliveryFreeAbove)
-        if (s.deliveryPrepTime) setDeliveryPrepTime(s.deliveryPrepTime)
-        if (s.channelInHouse !== undefined) setChannelInHouse(s.channelInHouse)
-        if (s.channelZomato !== undefined) setChannelZomato(s.channelZomato)
-        if (s.channelSwiggy !== undefined) setChannelSwiggy(s.channelSwiggy)
-        if (s.channelDunzo !== undefined) setChannelDunzo(s.channelDunzo)
-        if (s.coverPhoto) setCoverPhoto(s.coverPhoto)
-        if (s.ogImage) setOgImage(s.ogImage)
+        const settings = restaurant.settings || {}
+        if (settings.legalEntity) setLegalEntity(settings.legalEntity)
+        if (settings.priceRange) setPriceRange(settings.priceRange)
+        if (settings.tagline) setTagline(settings.tagline)
+        if (settings.yearEstablished) setYearEstablished(settings.yearEstablished)
+        if (settings.gstin) setGstin(settings.gstin)
+        if (settings.pan) setPan(settings.pan)
+        if (settings.fssai) setFssai(settings.fssai)
+        if (settings.cgst) setCgst(settings.cgst)
+        if (settings.sgst) setSgst(settings.sgst)
+        if (settings.serviceCharge !== undefined) setServiceCharge(settings.serviceCharge)
+        if (settings.currency) setCurrency(settings.currency)
+        if (settings.rounding) setRounding(settings.rounding)
+        if (settings.invoicePrefix) setInvoicePrefix(settings.invoicePrefix)
+        if (settings.instagram) setInstagram(settings.instagram)
+        if (settings.facebook) setFacebook(settings.facebook)
+        if (settings.twitter) setTwitter(settings.twitter)
+        if (settings.youtube) setYoutube(settings.youtube)
+        if (settings.googleBusiness) setGoogleBusiness(settings.googleBusiness)
+        if (settings.tripadvisor) setTripadvisor(settings.tripadvisor)
+        if (settings.lastOrderCutoff) setLastOrderCutoff(settings.lastOrderCutoff)
+        if (settings.pauseOrders !== undefined) setPauseOrders(settings.pauseOrders)
+        if (settings.honorHolidays !== undefined) setHonorHolidays(settings.honorHolidays)
+        if (settings.deliveryRadius) setDeliveryRadius(settings.deliveryRadius)
+        if (settings.deliveryMinOrder) setDeliveryMinOrder(settings.deliveryMinOrder)
+        if (settings.deliveryBaseFee) setDeliveryBaseFee(settings.deliveryBaseFee)
+        if (settings.deliveryPerKmFee) setDeliveryPerKmFee(settings.deliveryPerKmFee)
+        if (settings.deliveryFreeAbove) setDeliveryFreeAbove(settings.deliveryFreeAbove)
+        if (settings.deliveryPrepTime) setDeliveryPrepTime(settings.deliveryPrepTime)
+        if (settings.channelInHouse !== undefined) setChannelInHouse(settings.channelInHouse)
+        if (settings.channelZomato !== undefined) setChannelZomato(settings.channelZomato)
+        if (settings.channelSwiggy !== undefined) setChannelSwiggy(settings.channelSwiggy)
+        if (settings.channelDunzo !== undefined) setChannelDunzo(settings.channelDunzo)
+        if (settings.coverPhoto) setCoverPhoto(settings.coverPhoto)
+        if (settings.ogImage) setOgImage(settings.ogImage)
+        if (settings.emailNotifs !== undefined) setEmailNotifs(settings.emailNotifs)
+        if (settings.smsNotifs !== undefined) setSmsNotifs(settings.smsNotifs)
+        if (settings.pushNotifs !== undefined) setPushNotifs(settings.pushNotifs)
+        if (settings.whatsappNotifs !== undefined) setWhatsappNotifs(settings.whatsappNotifs)
+        if (settings.newOrderAlert !== undefined) setNewOrderAlert(settings.newOrderAlert)
+        if (settings.cancelOrderAlert !== undefined) setCancelOrderAlert(settings.cancelOrderAlert)
+        if (settings.lowStockAlert !== undefined) setLowStockAlert(settings.lowStockAlert)
+        if (settings.eodReportAlert !== undefined) setEodReportAlert(settings.eodReportAlert)
+
+        const savedSetup =
+          settings.profileSetup && typeof settings.profileSetup === 'object'
+            ? { ...settings.profileSetup }
+            : {}
+        const seeded = { ...savedSetup }
+        if (seeded.basic == null && restaurant.name && restaurant.address) seeded.basic = true
+        if (seeded.hours == null && Array.isArray(parsedHours) && parsedHours.length) seeded.hours = true
+        if (seeded.tax == null && (settings.gstin || settings.pan || settings.fssai)) seeded.tax = true
+        if (seeded.social == null && (settings.instagram || settings.facebook || settings.twitter)) {
+          seeded.social = true
+        }
+        if (seeded.delivery == null && settings.deliveryRadius) seeded.delivery = true
+        if (seeded.brand == null && (restaurant.logo_data_url || settings.coverPhoto)) seeded.brand = true
+        if (seeded.notifications == null && settings.emailNotifs !== undefined) seeded.notifications = true
+        setProfileSetup(seeded)
       })
       .catch(() => {})
   }, [])
-
-  const accentStyle = deriveAccentShades(accentColor)
 
   const updateHour = (index, field, value) => {
     setHours((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)))
   }
 
-  const displayRestaurant = restaurantName.trim() || 'Your restaurant'
+  const setupSections = TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.key === 'delivery' ? 'Delivery radius' : tab.label,
+    done: Boolean(profileSetup[tab.key]),
+  }))
 
-  const setupSections = [
-    { key: 'basic', label: 'Basic info', done: Boolean(name.trim() && cuisine.trim() && phone.trim()) },
-    { key: 'hours', label: 'Hours & timezone', done: hours.some((h) => h.open && h.close) },
-    { key: 'tax', label: 'Tax & legal', done: Boolean(gstin.trim()) },
-    { key: 'social', label: 'Social links', done: [instagram, facebook, twitter, youtube, googleBusiness, tripadvisor].some((v) => v.trim()) },
-    { key: 'delivery', label: 'Delivery radius', done: Boolean(deliveryRadius.trim()) },
-  ]
-  const completedCount = setupSections.filter((s) => s.done).length
+  const completedCount = setupSections.filter((section) => section.done).length
   const progressPct = Math.round((completedCount / setupSections.length) * 100)
 
-  const handleLogout = () => {
-    clearSession()
-    navigate('/login')
-  }
-
-  const handleNavClick = (item) => {
-    setProfileOpen(false)
-    if (item.route) {
-      navigate(item.route)
-    } else {
-      alert(`${item.label} — coming soon in this demo.`)
+  const readFileAsDataUrl = async (file, setter) => {
+    const result = await prepareImageDataUrl(file)
+    if (result.error) {
+      toast.error(result.error)
+      return
     }
+    setter(result.dataUrl)
   }
 
-  const readFileAsDataUrl = (file, onLoad) => {
-    const reader = new FileReader()
-    reader.onload = (event) => onLoad(event.target.result)
-    reader.readAsDataURL(file)
-  }
+  const buildSettingsPayload = (nextSetup) => ({
+    legalEntity,
+    priceRange,
+    tagline,
+    yearEstablished,
+    gstin,
+    pan,
+    fssai,
+    cgst,
+    sgst,
+    serviceCharge,
+    currency,
+    rounding,
+    invoicePrefix,
+    instagram,
+    facebook,
+    twitter,
+    youtube,
+    googleBusiness,
+    tripadvisor,
+    lastOrderCutoff,
+    pauseOrders,
+    honorHolidays,
+    deliveryRadius,
+    deliveryMinOrder,
+    deliveryBaseFee,
+    deliveryPerKmFee,
+    deliveryFreeAbove,
+    deliveryPrepTime,
+    channelInHouse,
+    channelZomato,
+    channelSwiggy,
+    channelDunzo,
+    coverPhoto,
+    ogImage,
+    emailNotifs,
+    smsNotifs,
+    pushNotifs,
+    whatsappNotifs,
+    newOrderAlert,
+    cancelOrderAlert,
+    lowStockAlert,
+    eodReportAlert,
+    profileSetup: nextSetup,
+  })
 
-  const handleSave = async () => {
+  const saveProfile = async ({ markTab, goNext } = {}) => {
     setSaving(true)
     try {
+      const nextSetup = markTab
+        ? { ...profileSetup, [markTab]: true }
+        : { ...profileSetup, [activeTab]: true }
+
       await api.updateProfile({
         restaurantName: name,
         cuisine,
@@ -231,182 +355,66 @@ function RestaurantProfile() {
         address,
         hours,
       })
-
-      await api.updateSettings({
-        legalEntity,
-        priceRange,
-        tagline,
-        yearEstablished,
-        gstin,
-        pan,
-        fssai,
-        cgst,
-        sgst,
-        serviceCharge,
-        currency,
-        rounding,
-        invoicePrefix,
-        instagram,
-        facebook,
-        twitter,
-        youtube,
-        googleBusiness,
-        tripadvisor,
-        lastOrderCutoff,
-        pauseOrders,
-        honorHolidays,
-        deliveryRadius,
-        deliveryMinOrder,
-        deliveryBaseFee,
-        deliveryPerKmFee,
-        deliveryFreeAbove,
-        deliveryPrepTime,
-        channelInHouse,
-        channelZomato,
-        channelSwiggy,
-        channelDunzo,
-        coverPhoto,
-        ogImage,
-      })
-
+      await api.updateSettings(buildSettingsPayload(nextSetup))
       if (logoDataUrl) {
         await api.updateBrand({ logoDataUrl })
       }
 
-      setRestaurantName(name)
-      alert('Restaurant profile saved.')
+      setProfileSetup(nextSetup)
+      setDisplayName(name)
+
+      if (goNext && markTab) {
+        const idx = TABS.findIndex((t) => t.key === markTab)
+        const next = TABS[idx + 1]
+        if (next) {
+          setActiveTab(next.key)
+          toast.success(`${TABS[idx].label} saved — continue to ${next.label}.`)
+        } else {
+          toast.success('Restaurant profile complete — 100%.')
+        }
+      } else {
+        toast.success('Restaurant profile saved.')
+      }
     } catch (err) {
-      alert(err.message)
+      toast.error(err.message || 'Failed to save profile.')
     } finally {
       setSaving(false)
     }
   }
 
+  const handleSave = () => saveProfile({ markTab: activeTab, goNext: false })
+
+  const handleSaveAndContinue = () => saveProfile({ markTab: activeTab, goNext: true })
+
+  const tabActions = (
+    <div className="tab-actions">
+      <button
+        type="button"
+        className="btn-save-continue"
+        disabled={saving}
+        onClick={handleSaveAndContinue}
+      >
+        {saving
+          ? 'Saving…'
+          : activeTab === TABS[TABS.length - 1].key
+            ? 'Save and finish'
+            : 'Save and continue'}
+      </button>
+    </div>
+  )
+
   return (
-    <div className="restaurant-profile-page" style={accentStyle}>
-      <div className="app">
-        {/* SIDEBAR */}
-        <aside className="sidebar">
-          <div className="brand">
-            <img src="/images/Logo9-1 1.svg" alt="logo" />
-          </div>
-
-          <button
-            className="restaurant-switch"
-            type="button"
-            onClick={() => alert('Switch restaurant — coming soon in this demo.')}
-          >
-            <span className="avatar-badge">{displayRestaurant.charAt(0).toUpperCase()}</span>
-            <span className="restaurant-info">
-              <strong>{displayRestaurant}</strong>
-              <small>{restaurantStatus === 'live' ? 'Live' : 'Onboarding'}</small>
-            </span>
-            <svg className="chev" width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-
-          <nav className="nav">
-            {NAV_GROUPS.map((group) => (
-              <div className="nav-group" key={group.label}>
-                <p className="nav-label">{group.label}</p>
-                {group.items.map((item) => (
-                  <a
-                    href="#top"
-                    key={item.key}
-                    className={`nav-item ${activeNav === item.key ? 'active' : ''}`}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      handleNavClick(item)
-                    }}
-                  >
-                    <img src={item.icon} alt={item.label} />
-                    {item.label}
-                    {item.badge && <span className="badge">{item.badge}</span>}
-                  </a>
-                ))}
-              </div>
-            ))}
-          </nav>
-        </aside>
-
-        {/* MAIN */}
-        <div className="main">
-          <header className="topbar">
-            <div className="search-bar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M20 20L16.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-              <input type="text" placeholder="Search orders, menu items, customers..." />
-              <span className="kbd">⌘ K</span>
-            </div>
-
-            <div className="topbar-actions">
-              <button
-                className="btn btn-primary btn-sm"
-                type="button"
-                onClick={() => alert('Quick actions — coming soon in this demo.')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                </svg>
-                Quick action
-              </button>
-
-              <button
-                className="icon-btn"
-                type="button"
-                aria-label="Notifications"
-                onClick={() => alert('No new notifications.')}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M6 8C6 5.79086 7.79086 4 10 4H14C16.2091 4 18 5.79086 18 8V13L20 17H4L6 13V8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                  <path d="M10 20C10 21.1046 10.8954 22 12 22C13.1046 22 14 21.1046 14 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-                <span className="dot"></span>
-              </button>
-
-              <div className="user-chip-wrapper">
-                <button className="user-chip" type="button" onClick={() => setProfileOpen((prev) => !prev)}>
-                  <span className="avatar-dark">{(currentUser?.name || 'A').charAt(0).toUpperCase()}</span>
-                  <span className="user-info">
-                    <strong>{currentUser?.name || 'Owner'}</strong>
-                    <small>Owner</small>
-                  </span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-
-                {profileOpen && (
-                  <>
-                    <div className="menu-overlay" onClick={() => setProfileOpen(false)} />
-                    <div className="profile-menu">
-                      <button type="button" onClick={() => { setProfileOpen(false); alert('Account settings — coming soon in this demo.') }}>
-                        Settings
-                      </button>
-                      <button type="button" className="danger" onClick={handleLogout}>
-                        Log out
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </header>
-
-          <main className="content" id="top">
-            <div className="page-head">
+    <DashboardLayout pageClassName="restaurant-profile-page" activeNav="restaurant-profile">
+<div className="page-head">
               <div>
-                <p className="eyebrow">Setup</p>
+                <p className="eyebrow">SETUP</p>
                 <h1>Restaurant profile</h1>
                 <p className="page-desc">
-                  Your restaurant's identity, hours, tax and contact info — shared across POS, online ordering and bookings.
+                  Your restaurant's identity, hours, tax and contact info—shared across POS, online ordering and bookings.
                 </p>
               </div>
 
-              <button className="btn btn-primary" type="button" onClick={handleSave} disabled={saving}>
+              <button className="btn-save" type="button" onClick={handleSave} disabled={saving}>
                 {saving ? 'Saving…' : 'Save changes'}
               </button>
             </div>
@@ -440,7 +448,7 @@ function RestaurantProfile() {
               </div>
             </div>
 
-            {/* TAB BAR */}
+            {/* SUB-NAVIGATION TAB BAR */}
             <div className="tab-bar">
               {TABS.map((tab) => (
                 <button
@@ -449,14 +457,15 @@ function RestaurantProfile() {
                   className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
                   onClick={() => setActiveTab(tab.key)}
                 >
-                  <TabIcon tab={tab.key} />
-                  {tab.label}
+                  <TabSvg name={tab.key} />
+                  <span>{tab.label}</span>
                 </button>
               ))}
             </div>
 
-            {/* BASIC INFO */}
+            {/* TAB 1: BASIC INFO */}
             {activeTab === 'basic' && (
+              <>
               <div className="panel-grid">
                 <section className="panel">
                   <h2>Identity</h2>
@@ -464,105 +473,198 @@ function RestaurantProfile() {
 
                   <div className="field-grid">
                     <div className="field">
-                      <label>Restaurant name</label>
-                      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your restaurant" />
+                      <label>RESTAURANT NAME</label>
+                      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Saffron & Fig" />
                     </div>
                     <div className="field">
-                      <label>Legal entity</label>
-                      <input type="text" value={legalEntity} onChange={(e) => setLegalEntity(e.target.value)} placeholder="Pvt Ltd / LLP name" />
+                      <label>LEGAL ENTITY</label>
+                      <input type="text" value={legalEntity} onChange={(e) => setLegalEntity(e.target.value)} placeholder="Saffron Hospitality Pvt Ltd" />
                     </div>
                     <div className="field">
-                      <label>Cuisine</label>
-                      <input type="text" value={cuisine} onChange={(e) => setCuisine(e.target.value)} placeholder="Modern Indian · Mediterranean" />
+                      <label>CUISINE</label>
+                      <input type="text" value={cuisine} onChange={(e) => setCuisine(e.target.value)} placeholder="Modern Indian - Mediterranean" />
                     </div>
                     <div className="field">
-                      <label>Price range</label>
-                      <input type="text" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} placeholder="₹₹ · 800–1500 / head" />
+                      <label>PRICE RANGE</label>
+                      <input type="text" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} placeholder="₹₹₹ · 800–1500 / head" />
                     </div>
                     <div className="field">
-                      <label>Tagline</label>
-                      <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="A short brand line" />
+                      <label>TAGLINE</label>
+                      <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="A coastal kitchen, with fire and saffron" />
                     </div>
                     <div className="field">
-                      <label>Year established</label>
+                      <label>YEAR ESTABLISHED</label>
                       <input type="text" value={yearEstablished} onChange={(e) => setYearEstablished(e.target.value)} placeholder="2019" />
                     </div>
+                    <div className="field">
+                      <label>CITY</label>
+                      <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai" />
+                    </div>
+                    <div className="field">
+                      <label>COUNTRY</label>
+                      <select value={country} onChange={(e) => setCountry(e.target.value)}>
+                        <option value="">Select country</option>
+                        {COUNTRY_OPTIONS.map((option) => (
+                          <option key={option.code} value={option.name}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="field full">
-                      <label>About</label>
-                      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell guests what makes your place special." />
+                      <label>ABOUT</label>
+                      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="" />
                     </div>
                   </div>
                 </section>
 
-                <aside className="panel side-panel">
+                <aside className="panel">
                   <h2>Contact</h2>
 
                   <div className="contact-list">
-                    <div className="contact-row">
-                      <span className="contact-ico">📍</span>
-                      <div>
-                        <span className="contact-label">Address</span>
-                        <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, area, city" />
-                      </div>
-                    </div>
-                    <div className="contact-row">
-                      <span className="contact-ico">☎</span>
-                      <div>
-                        <span className="contact-label">Phone</span>
-                        <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98200 12345" />
-                      </div>
-                    </div>
-                    <div className="contact-row">
-                      <span className="contact-ico">✉</span>
-                      <div>
-                        <span className="contact-label">Email</span>
-                        <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="hello@yourrestaurant.com" />
-                      </div>
-                    </div>
-                    <div className="contact-row">
-                      <span className="contact-ico">🌐</span>
-                      <div>
-                        <span className="contact-label">Website</span>
-                        <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="yourrestaurant.com" />
-                      </div>
-                    </div>
-                    <div className="contact-row">
-                      <span className="contact-ico">🏳</span>
-                      <div>
-                        <span className="contact-label">Country</span>
-                        <Select
-                          value={country}
-                          onChange={(value) => { setCountry(value); setCity('') }}
-                          options={COUNTRY_OPTIONS}
-                          placeholder="Select country"
-                          searchable
-                        />
-                      </div>
-                    </div>
-                    <div className="contact-row">
-                      <span className="contact-ico">🏙</span>
-                      <div>
-                        <span className="contact-label">City</span>
-                        {cityOptions.length > 0 ? (
-                          <Select
-                            value={city}
-                            onChange={setCity}
-                            options={cityOptions}
-                            placeholder={country ? 'Select city' : 'Select a country first'}
-                            searchable
+                    {editingContact ? (
+                      <>
+                        <div className="field">
+                          <label>ADDRESS</label>
+                          <input
+                            type="text"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            placeholder="Street, area, city"
                           />
-                        ) : (
-                          <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Mumbai" />
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                        <div className="field">
+                          <label>PHONE</label>
+                          <input
+                            type="tel"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            placeholder="+91 …"
+                          />
+                        </div>
+                        <div className="field">
+                          <label>EMAIL</label>
+                          <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="hello@restaurant.com"
+                          />
+                        </div>
+                        <div className="field">
+                          <label>WEBSITE</label>
+                          <input
+                            type="text"
+                            value={website}
+                            onChange={(e) => setWebsite(e.target.value)}
+                            placeholder="yourrestaurant.com"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-edit-contact done"
+                          disabled={saving}
+                          onClick={async () => {
+                            setSaving(true)
+                            try {
+                              await api.updateProfile({
+                                restaurantName: name,
+                                cuisine,
+                                description,
+                                phone,
+                                website,
+                                email,
+                                city,
+                                country,
+                                timezone,
+                                address,
+                                hours,
+                              })
+                              setEditingContact(false)
+                              toast.success('Contact saved.')
+                            } catch (err) {
+                              toast.error(err.message || 'Unable to save contact.')
+                            } finally {
+                              setSaving(false)
+                            }
+                          }}
+                        >
+                          {saving ? 'Saving…' : 'Save contact'}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="contact-item">
+                          <div className="contact-ico-circle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M12 21s-8-4.5-8-11.8A8 8 0 0 1 12 1a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+                              <circle cx="12" cy="9" r="3" />
+                            </svg>
+                          </div>
+                          <div className="contact-details">
+                            <label>ADDRESS</label>
+                            <span>{address || '—'}</span>
+                          </div>
+                        </div>
+
+                        <div className="contact-item">
+                          <div className="contact-ico-circle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                            </svg>
+                          </div>
+                          <div className="contact-details">
+                            <label>PHONE</label>
+                            <span>{phone || '—'}</span>
+                          </div>
+                        </div>
+
+                        <div className="contact-item">
+                          <div className="contact-ico-circle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                              <polyline points="22,6 12,13 2,6" />
+                            </svg>
+                          </div>
+                          <div className="contact-details">
+                            <label>EMAIL</label>
+                            <span>{email || '—'}</span>
+                          </div>
+                        </div>
+
+                        <div className="contact-item">
+                          <div className="contact-ico-circle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="2" y1="12" x2="22" y2="12" />
+                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                            </svg>
+                          </div>
+                          <div className="contact-details">
+                            <label>WEBSITE</label>
+                            <span>{website || '—'}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn-edit-contact"
+                          onClick={() => setEditingContact(true)}
+                        >
+                          Edit contact
+                        </button>
+                      </>
+                    )}
                   </div>
                 </aside>
               </div>
+              {tabActions}
+              </>
             )}
 
-            {/* HOURS & TIMEZONE */}
+            {/* TAB 2: HOURS & TIMEZONE */}
             {activeTab === 'hours' && (
+              <>
               <div className="panel-grid">
                 <section className="panel">
                   <h2>Operating hours</h2>
@@ -570,52 +672,62 @@ function RestaurantProfile() {
 
                   <div className="hours-table">
                     {hours.map((row, index) => (
-                      <div className="hours-row" key={row.day}>
-                        <strong>{row.day}</strong>
-                        <input
-                          type="text"
-                          placeholder="Open"
-                          value={row.open}
-                          disabled={row.closed}
-                          onChange={(e) => updateHour(index, 'open', e.target.value)}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Close"
-                          value={row.close}
-                          disabled={row.closed}
-                          onChange={(e) => updateHour(index, 'close', e.target.value)}
-                        />
+                      <div className="hours-day-block" key={row.day}>
+                        <div className="hours-day-name">{row.day}</div>
+                        <div className="hours-inputs">
+                          <input
+                            type="text"
+                            placeholder="Open"
+                            value={row.open}
+                            disabled={row.closed}
+                            onChange={(e) => updateHour(index, 'open', e.target.value)}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Close"
+                            value={row.close}
+                            disabled={row.closed}
+                            onChange={(e) => updateHour(index, 'close', e.target.value)}
+                          />
+                        </div>
                         <button
                           type="button"
-                          className={`status-bar ${row.closed ? 'closed' : row.open && row.close ? 'open' : ''}`}
+                          className={`status-tag ${row.closed ? 'closed' : 'open'}`}
                           onClick={() => updateHour(index, 'closed', !row.closed)}
                         >
-                          {row.closed ? 'Closed' : row.open && row.close ? 'Open' : 'Set hours'}
+                          {row.closed ? 'Closed' : 'Open'}
                         </button>
                       </div>
                     ))}
                   </div>
                 </section>
 
-                <aside className="panel side-panel">
+                <aside className="panel">
                   <h2>Timezone & holidays</h2>
 
-                  <div className="field">
-                    <label>Time zone</label>
-                    <Select
+                  <div className="field" style={{ marginBottom: '16px' }}>
+                    <label>TIME ZONE</label>
+                    <select
                       value={timezone}
-                      onChange={setTimezone}
-                      options={TIMEZONES.map((tz) => ({ value: tz.value, label: tz.label }))}
-                      placeholder="Select timezone"
-                      searchable
-                    />
+                      onChange={(e) => setTimezone(e.target.value)}
+                    >
+                      <option value="">Select time zone</option>
+                      {TIMEZONE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="field">
-                    <label>Last order cutoff</label>
-                    <input type="text" value={lastOrderCutoff} onChange={(e) => setLastOrderCutoff(e.target.value)} placeholder="22:45" />
-                    <small className="hint">Online orders close before closing time.</small>
+                  <div className="field" style={{ marginBottom: '16px' }}>
+                    <label>LAST ORDER CUTOFF</label>
+                    <input
+                      type="text"
+                      value={lastOrderCutoff}
+                      onChange={(e) => setLastOrderCutoff(e.target.value)}
+                    />
+                    <small className="hint">Online orders close 45 mins before closing</small>
                   </div>
 
                   <div className="toggle-row">
@@ -624,7 +736,11 @@ function RestaurantProfile() {
                       <small>Stops accepting until manually resumed</small>
                     </div>
                     <label className="switch">
-                      <input type="checkbox" checked={pauseOrders} onChange={(e) => setPauseOrders(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={pauseOrders}
+                        onChange={(e) => setPauseOrders(e.target.checked)}
+                      />
                       <span className="slider"></span>
                     </label>
                   </div>
@@ -634,15 +750,21 @@ function RestaurantProfile() {
                       <strong>Honor public holidays</strong>
                     </div>
                     <label className="switch">
-                      <input type="checkbox" checked={honorHolidays} onChange={(e) => setHonorHolidays(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={honorHolidays}
+                        onChange={(e) => setHonorHolidays(e.target.checked)}
+                      />
                       <span className="slider"></span>
                     </label>
                   </div>
                 </aside>
               </div>
+              {tabActions}
+              </>
             )}
 
-            {/* TAX & LEGAL */}
+            {/* TAB 3: TAX & LEGAL */}
             {activeTab === 'tax' && (
               <section className="panel panel-full">
                 <h2>Tax & legal</h2>
@@ -658,7 +780,7 @@ function RestaurantProfile() {
                     <input type="text" value={pan} onChange={(e) => setPan(e.target.value)} placeholder="ABCDE1234F" />
                   </div>
                   <div className="field">
-                    <label>FSSAI license</label>
+                    <label>FSSAI LICENSE</label>
                     <input type="text" value={fssai} onChange={(e) => setFssai(e.target.value)} placeholder="11522016000123" />
                   </div>
                   <div className="field">
@@ -670,27 +792,28 @@ function RestaurantProfile() {
                     <input type="text" value={sgst} onChange={(e) => setSgst(e.target.value)} placeholder="2.5%" />
                   </div>
                   <div className="field">
-                    <label>Service charge</label>
+                    <label>SERVICE CHARGE</label>
                     <input type="text" value={serviceCharge} onChange={(e) => setServiceCharge(e.target.value)} placeholder="0%" />
                     <small className="hint">Optional, applied before tax</small>
                   </div>
                   <div className="field">
-                    <label>Currency</label>
+                    <label>CURRENCY</label>
                     <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} />
                   </div>
                   <div className="field">
-                    <label>Rounding</label>
+                    <label>ROUNDING</label>
                     <input type="text" value={rounding} onChange={(e) => setRounding(e.target.value)} />
                   </div>
                   <div className="field">
-                    <label>Invoice prefix</label>
+                    <label>INVOICE PREFIX</label>
                     <input type="text" value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value)} placeholder="SF-2026-" />
                   </div>
                 </div>
+                {tabActions}
               </section>
             )}
 
-            {/* SOCIAL LINKS */}
+            {/* TAB 4: SOCIAL LINKS */}
             {activeTab === 'social' && (
               <section className="panel panel-full">
                 <h2>Social links</h2>
@@ -698,86 +821,88 @@ function RestaurantProfile() {
 
                 <div className="field-grid two">
                   <div className="field icon-field">
-                    <label>Instagram</label>
+                    <label>INSTAGRAM</label>
                     <div className="icon-input">
                       <span>📷</span>
                       <input type="text" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@yourrestaurant" />
                     </div>
                   </div>
                   <div className="field icon-field">
-                    <label>Facebook</label>
+                    <label>FACEBOOK</label>
                     <div className="icon-input">
                       <span>f</span>
                       <input type="text" value={facebook} onChange={(e) => setFacebook(e.target.value)} placeholder="facebook.com/yourrestaurant" />
                     </div>
                   </div>
                   <div className="field icon-field">
-                    <label>X (Twitter)</label>
+                    <label>X (TWITTER)</label>
                     <div className="icon-input">
                       <span>𝕏</span>
                       <input type="text" value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="@yourrestaurant" />
                     </div>
                   </div>
                   <div className="field icon-field">
-                    <label>YouTube</label>
+                    <label>YOUTUBE</label>
                     <div className="icon-input">
                       <span>▶</span>
                       <input type="text" value={youtube} onChange={(e) => setYoutube(e.target.value)} placeholder="Add link" />
                     </div>
                   </div>
                   <div className="field icon-field">
-                    <label>Google business</label>
+                    <label>GOOGLE BUSINESS</label>
                     <div className="icon-input">
                       <span>🔗</span>
                       <input type="text" value={googleBusiness} onChange={(e) => setGoogleBusiness(e.target.value)} placeholder="g.page/yourrestaurant" />
                     </div>
                   </div>
                   <div className="field icon-field">
-                    <label>TripAdvisor</label>
+                    <label>TRIPADVISOR</label>
                     <div className="icon-input">
                       <span>🔗</span>
                       <input type="text" value={tripadvisor} onChange={(e) => setTripadvisor(e.target.value)} placeholder="Add link" />
                     </div>
                   </div>
                 </div>
+                {tabActions}
               </section>
             )}
 
-            {/* DELIVERY */}
+            {/* TAB 5: DELIVERY */}
             {activeTab === 'delivery' && (
+              <>
               <div className="panel-grid delivery-grid">
                 <section className="panel">
                   <h2>Delivery zone</h2>
 
                   <div className="field-grid two">
                     <div className="field">
-                      <label>Radius</label>
+                      <label>RADIUS</label>
                       <input type="text" value={deliveryRadius} onChange={(e) => setDeliveryRadius(e.target.value)} placeholder="5 km" />
                     </div>
                     <div className="field">
-                      <label>Min order</label>
+                      <label>MIN ORDER</label>
                       <input type="text" value={deliveryMinOrder} onChange={(e) => setDeliveryMinOrder(e.target.value)} placeholder="₹250" />
                     </div>
                     <div className="field">
-                      <label>Base fee</label>
+                      <label>BASE FEE</label>
                       <input type="text" value={deliveryBaseFee} onChange={(e) => setDeliveryBaseFee(e.target.value)} placeholder="₹49" />
                     </div>
                     <div className="field">
-                      <label>Per-km fee</label>
+                      <label>PER-KM FEE</label>
                       <input type="text" value={deliveryPerKmFee} onChange={(e) => setDeliveryPerKmFee(e.target.value)} placeholder="₹8" />
                     </div>
                     <div className="field">
-                      <label>Free delivery above</label>
+                      <label>FREE DELIVERY ABOVE</label>
                       <input type="text" value={deliveryFreeAbove} onChange={(e) => setDeliveryFreeAbove(e.target.value)} placeholder="₹999" />
                     </div>
                     <div className="field">
-                      <label>Avg prep time</label>
+                      <label>AVG PREP TIME</label>
                       <input type="text" value={deliveryPrepTime} onChange={(e) => setDeliveryPrepTime(e.target.value)} placeholder="22 min" />
                     </div>
                   </div>
                 </section>
 
-                <aside className="panel side-panel">
+                <aside className="panel">
                   <h2>Channels</h2>
 
                   <div className="channel-row">
@@ -815,9 +940,11 @@ function RestaurantProfile() {
                   </div>
                 </aside>
               </div>
+              {tabActions}
+              </>
             )}
 
-            {/* BRAND MEDIA */}
+            {/* TAB 6: BRAND MEDIA */}
             {activeTab === 'brand' && (
               <section className="panel panel-full">
                 <h2>Brand media</h2>
@@ -829,9 +956,13 @@ function RestaurantProfile() {
                       <img src={logoDataUrl} alt="Logo" className="upload-preview" />
                     ) : (
                       <>
-                        <span className="upload-ico">⇧</span>
+                        <svg className="upload-tray-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
+                          <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round" />
+                          <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                         <strong>Logo</strong>
-                        <small>PNG, JPG up to 5MB</small>
+                        <small>PNG, JPG, SVG · up to 2 MB</small>
                       </>
                     )}
                     <input
@@ -849,9 +980,13 @@ function RestaurantProfile() {
                       <img src={coverPhoto} alt="Cover" className="upload-preview" />
                     ) : (
                       <>
-                        <span className="upload-ico">⇧</span>
+                        <svg className="upload-tray-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
+                          <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round" />
+                          <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                         <strong>Cover photo</strong>
-                        <small>PNG, JPG up to 5MB</small>
+                        <small>PNG, JPG · up to 2 MB</small>
                       </>
                     )}
                     <input
@@ -869,9 +1004,13 @@ function RestaurantProfile() {
                       <img src={ogImage} alt="OG" className="upload-preview" />
                     ) : (
                       <>
-                        <span className="upload-ico">⇧</span>
+                        <svg className="upload-tray-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
+                          <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round" />
+                          <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                         <strong>Square OG image</strong>
-                        <small>PNG, JPG up to 5MB</small>
+                        <small>PNG, JPG · up to 2 MB</small>
                       </>
                     )}
                     <input
@@ -884,25 +1023,280 @@ function RestaurantProfile() {
                     />
                   </label>
                 </div>
+                {tabActions}
               </section>
             )}
 
-            {/* COMING SOON TABS */}
-            {(activeTab === 'team' || activeTab === 'billing' || activeTab === 'notifications') && (
-              <section className="panel panel-full coming-soon">
-                <div className="coming-soon-icon">
-                  <TabIcon tab={activeTab} />
+            {/* TAB 7: TEAM ACCESS */}
+            {activeTab === 'team' && (
+              <section className="panel panel-full">
+                <div className="team-header">
+                  <div>
+                    <h2>Team & access</h2>
+                    <p className="panel-sub" style={{ margin: 0 }}>Who can access this restaurant's IROAS workspace</p>
+                  </div>
+                  <button type="button" className="btn-invite">
+                    Invite member
+                  </button>
                 </div>
-                <h2>{TABS.find((t) => t.key === activeTab)?.label} — coming soon</h2>
-                <p className="panel-sub">
-                  This section isn't wired up in the demo yet. Everything else on this page saves for real.
-                </p>
+
+                <div className="team-card">
+                  <div className="team-row">
+                    <div className="team-user">
+                      <div className="team-avatar">AR</div>
+                      <div className="team-info">
+                        <strong>Anika Rao</strong>
+                        <small>anika@saffronandfig.in</small>
+                      </div>
+                    </div>
+                    <div className="team-actions">
+                      <span className="role-badge owner">Owner</span>
+                      <button type="button" className="btn-manage">Manage</button>
+                    </div>
+                  </div>
+
+                  <div className="team-row">
+                    <div className="team-user">
+                      <div className="team-avatar">RV</div>
+                      <div className="team-info">
+                        <strong>Rohit Verma</strong>
+                        <small>rohit@saffronandfig.in</small>
+                      </div>
+                    </div>
+                    <div className="team-actions">
+                      <span className="role-badge manager">Manager</span>
+                      <button type="button" className="btn-manage">Manage</button>
+                    </div>
+                  </div>
+
+                  <div className="team-row">
+                    <div className="team-user">
+                      <div className="team-avatar">KS</div>
+                      <div className="team-info">
+                        <strong>Kavya S.</strong>
+                        <small>kavya@saffronandfig.in</small>
+                      </div>
+                    </div>
+                    <div className="team-actions">
+                      <span className="role-badge lead">Floor lead</span>
+                      <button type="button" className="btn-manage">Manage</button>
+                    </div>
+                  </div>
+
+                  <div className="team-row">
+                    <div className="team-user">
+                      <div className="team-avatar">IK</div>
+                      <div className="team-info">
+                        <strong>Imran K.</strong>
+                        <small>imran@saffronandfig.in</small>
+                      </div>
+                    </div>
+                    <div className="team-actions">
+                      <span className="role-badge chef">Chef de cuisine</span>
+                      <button type="button" className="btn-manage">Manage</button>
+                    </div>
+                  </div>
+                </div>
+                {tabActions}
               </section>
             )}
-          </main>
-        </div>
-      </div>
-    </div>
+
+            {/* TAB 8: BILLING */}
+            {activeTab === 'billing' && (
+              <section className="panel panel-full">
+                <div className="billing-header">
+                  <div>
+                    <h2>Billing & subscription</h2>
+                    <p className="panel-sub" style={{ margin: 0 }}>Manage your plan, payment methods, and invoice history</p>
+                  </div>
+                  <button type="button" className="btn-upgrade">
+                    Upgrade plan
+                  </button>
+                </div>
+
+                <div className="plan-card-box">
+                  <div className="plan-info-left">
+                    <div className="plan-title-row">
+                      <span className="plan-name">Pro Plan</span>
+                      <span className="plan-active-badge">Active</span>
+                    </div>
+                    <span className="plan-price">₹3,999 / month · Billed annually. Next renewal on Sep 15, 2026.</span>
+                    <div className="plan-features">
+                      <span className="feature-pill">POS Sync</span>
+                      <span className="feature-pill">Unlimited Orders</span>
+                      <span className="feature-pill">Multi-location</span>
+                      <span className="feature-pill">24/7 Priority Support</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="billing-subgrid">
+                  <div>
+                    <h2 style={{ fontSize: '15px', marginBottom: '12px' }}>Payment method</h2>
+                    <div className="payment-card-box">
+                      <div className="card-left">
+                        <div className="card-ico-box">VISA</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2' }}>
+                          <strong style={{ fontSize: '13px' }}>•••• •••• •••• 4242</strong>
+                          <small style={{ fontSize: '11px', color: 'var(--muted)' }}>Expires 08/28</small>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="paid-badge">Primary</span>
+                        <button type="button" className="btn-manage">Edit</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h2 style={{ fontSize: '15px', marginBottom: '12px' }}>Billing history</h2>
+                    <div className="invoice-table">
+                      <div className="invoice-row">
+                        <div>
+                          <span className="invoice-num">INV-2026-008</span>
+                          <span className="invoice-date" style={{ marginLeft: '8px' }}>Aug 15, 2026</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span className="invoice-amount">₹3,999</span>
+                          <span className="paid-badge">Paid</span>
+                        </div>
+                      </div>
+                      <div className="invoice-row">
+                        <div>
+                          <span className="invoice-num">INV-2026-007</span>
+                          <span className="invoice-date" style={{ marginLeft: '8px' }}>Jul 15, 2026</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span className="invoice-amount">₹3,999</span>
+                          <span className="paid-badge">Paid</span>
+                        </div>
+                      </div>
+                      <div className="invoice-row">
+                        <div>
+                          <span className="invoice-num">INV-2026-006</span>
+                          <span className="invoice-date" style={{ marginLeft: '8px' }}>Jun 15, 2026</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span className="invoice-amount">₹3,999</span>
+                          <span className="paid-badge">Paid</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {tabActions}
+              </section>
+            )}
+
+            {/* TAB 9: NOTIFICATIONS */}
+            {activeTab === 'notifications' && (
+              <section className="panel panel-full">
+                <h2>Notification preferences</h2>
+                <p className="panel-sub">Choose how and when you receive order, system, and summary alerts</p>
+
+                <div className="panel-grid">
+                  <div>
+                    <h2 style={{ fontSize: '15px', marginBottom: '12px' }}>Alert Channels</h2>
+                    <div className="notif-card-box">
+                      <div className="notif-item-row">
+                        <div>
+                          <strong>Email notifications</strong>
+                          <small className="hint" style={{ margin: 0 }}>Receive daily reports, invoices, and system updates</small>
+                        </div>
+                        <label className="switch">
+                          <input type="checkbox" checked={emailNotifs} onChange={(e) => setEmailNotifs(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="notif-item-row">
+                        <div>
+                          <strong>SMS alerts</strong>
+                          <small className="hint" style={{ margin: 0 }}>Instant SMS for urgent kitchen & POS order updates</small>
+                        </div>
+                        <label className="switch">
+                          <input type="checkbox" checked={smsNotifs} onChange={(e) => setSmsNotifs(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="notif-item-row">
+                        <div>
+                          <strong>Push notifications</strong>
+                          <small className="hint" style={{ margin: 0 }}>Browser notifications for incoming online orders</small>
+                        </div>
+                        <label className="switch">
+                          <input type="checkbox" checked={pushNotifs} onChange={(e) => setPushNotifs(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="notif-item-row">
+                        <div>
+                          <strong>WhatsApp order receipts</strong>
+                          <small className="hint" style={{ margin: 0 }}>Send digital receipts directly to customer WhatsApp</small>
+                        </div>
+                        <label className="switch">
+                          <input type="checkbox" checked={whatsappNotifs} onChange={(e) => setWhatsappNotifs(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h2 style={{ fontSize: '15px', marginBottom: '12px' }}>Event Triggers</h2>
+                    <div className="notif-card-box">
+                      <div className="notif-item-row">
+                        <div>
+                          <strong>New incoming order</strong>
+                          <small className="hint" style={{ margin: 0 }}>Alert immediately when a order is placed</small>
+                        </div>
+                        <label className="switch">
+                          <input type="checkbox" checked={newOrderAlert} onChange={(e) => setNewOrderAlert(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="notif-item-row">
+                        <div>
+                          <strong>Order cancellation</strong>
+                          <small className="hint" style={{ margin: 0 }}>Alert when an order is cancelled or refunded</small>
+                        </div>
+                        <label className="switch">
+                          <input type="checkbox" checked={cancelOrderAlert} onChange={(e) => setCancelOrderAlert(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="notif-item-row">
+                        <div>
+                          <strong>Low inventory stock warning</strong>
+                          <small className="hint" style={{ margin: 0 }}>Notify when ingredients drop below minimum threshold</small>
+                        </div>
+                        <label className="switch">
+                          <input type="checkbox" checked={lowStockAlert} onChange={(e) => setLowStockAlert(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="notif-item-row">
+                        <div>
+                          <strong>End of day sales summary</strong>
+                          <small className="hint" style={{ margin: 0 }}>Receive automated nightly store revenue report</small>
+                        </div>
+                        <label className="switch">
+                          <input type="checkbox" checked={eodReportAlert} onChange={(e) => setEodReportAlert(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {tabActions}
+              </section>
+            )}
+    </DashboardLayout>
   )
 }
 
