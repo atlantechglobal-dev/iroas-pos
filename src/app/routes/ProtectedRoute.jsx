@@ -1,8 +1,15 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
 import { ROUTES } from '../../constants/routes.js'
+import { canUseDashboard, isPendingApproval } from '../../constants/restaurantStatus.js'
 
-export function ProtectedRoute({ adminOnly = false, requireLive = false, children }) {
+export function ProtectedRoute({
+  adminOnly = false,
+  requireLive = false,
+  onboardingOnly = false,
+  allowPending = false,
+  children,
+}) {
   const { isAuthenticated, isAdmin, restaurantStatus } = useAuth()
   const location = useLocation()
 
@@ -14,12 +21,14 @@ export function ProtectedRoute({ adminOnly = false, requireLive = false, childre
     return <Navigate to={ROUTES.UNAUTHORIZED} replace />
   }
 
-  // Dashboard-tier pages assume a fully launched restaurant (subdomain, brand,
-  // etc). Resume the onboarding wizard instead of showing a half-configured
-  // dashboard. `restaurantStatus` is null only while it hasn't loaded yet —
-  // don't bounce on that transient state.
-  if (requireLive && !adminOnly && restaurantStatus && restaurantStatus !== 'live') {
+  if (requireLive && !adminOnly && restaurantStatus && !canUseDashboard(restaurantStatus)) {
     return <Navigate to={ROUTES.RESTAURANT_SETUP} replace />
+  }
+
+  if (onboardingOnly && !adminOnly && restaurantStatus && canUseDashboard(restaurantStatus)) {
+    if (!(allowPending && isPendingApproval(restaurantStatus))) {
+      return <Navigate to={ROUTES.DASHBOARD} replace />
+    }
   }
 
   return children

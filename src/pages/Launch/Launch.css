@@ -239,6 +239,65 @@
     background: var(--bg);
   }
 
+  .review-grid {
+    display: grid;
+    gap: 0;
+    padding: 8px 0 12px;
+  }
+
+  .review-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 16px;
+    padding: 14px 36px;
+    border-bottom: 1px solid var(--border);
+    align-items: start;
+  }
+
+  .review-row span {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 2px;
+  }
+
+  .review-row strong {
+    font-size: 15px;
+    font-weight: 650;
+    line-height: 1.45;
+    word-break: break-word;
+  }
+
+  .review-swatches {
+    display: flex;
+    gap: 8px;
+  }
+
+  .review-swatches i {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    display: block;
+  }
+
+  .restaurant-logo-img {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    margin: 18px auto 14px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .preview-note {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
   .link-icon {
     width: 52px;
     text-align: center;
@@ -605,6 +664,12 @@
     transform: translateY(-1px);
   }
 
+  .launch-btn:disabled {
+    opacity: 0.75;
+    cursor: default;
+    transform: none;
+  }
+
   /* TOAST */
 
   .toast {
@@ -666,11 +731,15 @@
     .link-section,
     .action-buttons,
     .preview-title,
-    .real-life-grid {
-      margin-left: 20px;
-      margin-right: 20px;
+    .real-life-grid,
+    .review-row {
       padding-left: 20px;
       padding-right: 20px;
+    }
+
+    .review-row {
+      grid-template-columns: 1fr;
+      gap: 4px;
     }
 
     .top-header,

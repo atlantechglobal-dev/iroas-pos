@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { useRestaurant } from '../../hooks/useRestaurant.js'
 import { useToast } from '../feedback/ToastProvider.jsx'
 import { ROUTES } from '../../constants/routes.js'
+import { isPendingApproval } from '../../constants/restaurantStatus.js'
 import { Sidebar } from './Sidebar.jsx'
 import { Topbar } from './Topbar.jsx'
 import './DashboardShell.css'
@@ -22,7 +23,7 @@ export function DashboardLayout({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout, isAdmin } = useAuth()
+  const { user, logout, isAdmin, restaurantStatus: authRestaurantStatus } = useAuth()
   const toast = useToast()
   const { displayRestaurant, restaurantStatus } = useRestaurant({
     enabled: variant === 'owner' && !isAdmin,
@@ -36,9 +37,14 @@ export function DashboardLayout({
   const workspaceStatus =
     variant === 'admin'
       ? adminSubtitle || 'All tenants'
-      : restaurantStatus === 'live'
-        ? 'Live'
-        : 'Onboarding'
+      : isPendingApproval(authRestaurantStatus || restaurantStatus)
+        ? 'Awaiting approval'
+        : restaurantStatus === 'live' || authRestaurantStatus === 'live'
+          ? 'Live'
+          : 'Onboarding'
+
+  const showApprovalGate =
+    variant === 'owner' && !isAdmin && isPendingApproval(authRestaurantStatus || restaurantStatus)
 
   useEffect(() => {
     setSidebarOpen(false)
@@ -107,7 +113,21 @@ export function DashboardLayout({
           />
 
           <main className="content" id="top">
-            {children}
+            {showApprovalGate ? (
+              <div className="approval-gate" role="status">
+                <div className="approval-gate-card">
+                  <p className="approval-gate-kicker">Pending review</p>
+                  <h1>You are not approved</h1>
+                  <p>
+                    Your restaurant profile is with our admin team. Once they approve it,
+                    your site publishes automatically for customers and this dashboard
+                    unlocks.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              children
+            )}
           </main>
         </div>
       </div>

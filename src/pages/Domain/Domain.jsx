@@ -1,6 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import {
+  businessCategoryFromRestaurant,
+  getBusinessCopy,
+  locationPreviewLine,
+} from '../../constants/businessCopy.js'
 import './Domain.css'
 
 const slugify = (value) =>
@@ -19,7 +24,7 @@ function shuffle(list) {
   return arr
 }
 
-function buildSuggestions(name, city) {
+function buildSuggestions(name, city, copy) {
   const base = slugify(name || '')
   if (!base) return []
 
@@ -27,12 +32,7 @@ function buildSuggestions(name, city) {
 
   const extras = [
     citySlug ? `${base}-${citySlug}` : null,
-    `the-${base}`,
-    `${base}-kitchen`,
-    `eat-${base}`,
-    `${base}-dine`,
-    `${base}-eats`,
-    `${base}-table`,
+    ...(copy.slugExtras(base) || []),
   ].filter(Boolean)
 
   // base name-slug always leads; the rest are shuffled for variety on every visit
@@ -52,6 +52,9 @@ function Domain() {
   const [useIroasHandle, setUseIroasHandle] = useState(true)
   const [domainSuffix, setDomainSuffix] = useState('iroas.com')
   const [saveLabel] = useState('Save & continue later')
+  const [category, setCategory] = useState('')
+
+  const copy = getBusinessCopy(category)
 
   useEffect(() => {
     api
@@ -62,6 +65,7 @@ function Domain() {
         if (restaurant.city) setCity(restaurant.city)
         if (restaurant.subdomain) setSubdomain(restaurant.subdomain)
         if (restaurant.custom_domain) setCustomDomain(restaurant.custom_domain)
+        setCategory(businessCategoryFromRestaurant(restaurant))
         const suffix = (restaurant.domain_suffix || 'iroas.com').replace(/^\./, '')
         setDomainSuffix(suffix)
         setUseIroasHandle(suffix === 'iroas.com')
@@ -70,8 +74,8 @@ function Domain() {
   }, [])
 
   const suggestions = useMemo(
-    () => buildSuggestions(restaurantName, city),
-    [restaurantName, city],
+    () => buildSuggestions(restaurantName, city, copy),
+    [restaurantName, city, copy],
   )
 
   const activeSuffix = useIroasHandle ? 'iroas.com' : domainSuffix === 'iroas.com' ? 'com' : domainSuffix
@@ -103,7 +107,7 @@ function Domain() {
     domainSuffix: activeSuffix,
   })
 
-  const suggestedPlaceholder = slugify(restaurantName || '') || 'yourrestaurant'
+  const suggestedPlaceholder = slugify(restaurantName || '') || 'yourbusiness'
 
   const previewHost = subdomain
     ? `${subdomain}${suffixLabel}`
@@ -234,10 +238,10 @@ function Domain() {
                 STEP 2 OF 4
               </div>
 
-              <h1>Choose your restaurant's web address</h1>
+              <h1>Choose your {copy.nounPossessive} web address</h1>
 
               <p>
-                Customers will use this link to discover your restaurant. Get
+                Customers will use this link to discover your {copy.noun}. Get
                 a free IROAS subdomain or connect your own.
               </p>
             </div>
@@ -314,7 +318,7 @@ function Domain() {
                     ))
                   ) : (
                     <p className="suggestions-empty">
-                      Add your restaurant name in Step 1 to see suggestions.
+                      Add your {copy.nameLabel.toLowerCase()} in Step 1 to see suggestions.
                     </p>
                   )}
                 </div>
@@ -337,7 +341,7 @@ function Domain() {
 
                     <input
                       type="text"
-                      placeholder="yourrestaurant.com"
+                      placeholder={copy.websitePlaceholder.replace(/^www\./, '')}
                       value={customDomain}
                       onChange={(event) =>
                         setCustomDomain(event.target.value)
@@ -365,14 +369,13 @@ function Domain() {
               <div className="website-preview">
                 <div className="restaurant-avatar">{previewLetter}</div>
 
-                <h2>{restaurantName.trim() || 'Your restaurant'}</h2>
+                <h2>{restaurantName.trim() || copy.fallbackName}</h2>
 
                 <p>
-                  {[cuisine.trim(), city.trim()].filter(Boolean).join(' · ') ||
-                    'Cuisine · City'}
+                  {locationPreviewLine(copy, cuisine, city)}
                 </p>
 
-                <button className="reserve-button">Reserve a table</button>
+                <button className="reserve-button">{copy.cta}</button>
               </div>
             </div>
           </aside>

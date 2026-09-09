@@ -6,6 +6,12 @@ export const NAV_GROUPS = [
     items: [
       { key: 'dashboard', label: 'Dashboard', icon: '/images/dashboard.svg', route: ROUTES.DASHBOARD },
       {
+        key: 'digital-business-card',
+        label: 'Digital Business Card',
+        icon: '/images/digicard.svg',
+        route: ROUTES.DIGITAL_BUSINESS_CARD,
+      },
+      {
         key: 'restaurant-profile',
         label: 'Restaurant Profile',
         icon: '/images/rest.svg',
@@ -57,10 +63,10 @@ export const NAV_GROUPS = [
         route: ROUTES.DIRECTORY_LISTINGS,
       },
       {
-        key: 'digital-business-card',
-        label: 'Digital Business Card',
-        icon: '/images/digicard.svg',
-        route: ROUTES.DIGITAL_BUSINESS_CARD,
+        key: 'mobile-app',
+        label: 'Mobile Application',
+        icon: '/images/pos.svg',
+        route: ROUTES.MOBILE_APP,
       },
     ],
   },
@@ -97,6 +103,12 @@ export function getActiveNavKey(pathname) {
 
   if (pathname === ROUTES.BRAND || pathname.startsWith(`${ROUTES.BRAND}/`)) {
     return 'branding'
+  }
+  if (
+    pathname === ROUTES.DIGITAL_BUSINESS_CARD ||
+    pathname.startsWith(`${ROUTES.DIGITAL_BUSINESS_CARD}/`)
+  ) {
+    return 'digital-business-card'
   }
   if (pathname === ROUTES.ORDERS || pathname.startsWith(`${ROUTES.ORDERS}/`)) {
     return 'incoming-orders'

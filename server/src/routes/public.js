@@ -15,8 +15,8 @@ export function findRestaurantBySlug(slug) {
   const clean = slugify(slug)
   if (!clean) return null
   const bySub = db.prepare('SELECT * FROM restaurants WHERE subdomain = ?').get(clean)
-  if (bySub) return bySub
-  const rows = db.prepare('SELECT * FROM restaurants WHERE name IS NOT NULL').all()
+  if (bySub) return bySub.status === 'live' ? bySub : null
+  const rows = db.prepare("SELECT * FROM restaurants WHERE name IS NOT NULL AND status = 'live'").all()
   return rows.find((r) => slugify(r.name) === clean) || null
 }
 
@@ -127,7 +127,7 @@ function seedReviewsIfEmpty(restaurantId, restaurantName) {
 
 function requireRestaurant(req, res) {
   const restaurant = findRestaurantBySlug(req.params.slug)
-  if (!restaurant) {
+  if (!restaurant || restaurant.status !== 'live') {
     res.status(404).json({ error: 'Restaurant not found.' })
     return null
   }

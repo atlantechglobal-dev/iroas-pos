@@ -14,11 +14,15 @@ const RestaurantSetup = lazy(() => import('../../pages/RestaurantSetup/Restauran
 const Domain = lazy(() => import('../../pages/Domain/Domain.jsx'))
 const Brand = lazy(() => import('../../pages/Brand/Brand.jsx'))
 const Launch = lazy(() => import('../../pages/Launch/Launch.jsx'))
+const SetupReview = lazy(() => import('../../pages/SetupReview/SetupReview.jsx'))
 const GoLive = lazy(() => import('../../pages/GoLive/GoLive.jsx'))
 const Dashboard = lazy(() => import('../../pages/Dashboard/Dashboard.jsx'))
 const RestaurantProfile = lazy(() => import('../../pages/RestaurantProfile/RestaurantProfile.jsx'))
 const DirectoryListings = lazy(() => import('../../pages/DirectoryListings/DirectoryListings.jsx'))
 const DigitalBusinessCard = lazy(() => import('../../pages/DigitalBusinessCard/DigitalBusinessCard.jsx'))
+const DigitalIdentity = lazy(() => import('../../pages/DigitalIdentity/DigitalIdentity.jsx'))
+const DigitalIdentityForm = lazy(() => import('../../pages/DigitalIdentity/DigitalIdentityForm.jsx'))
+const MobileApplication = lazy(() => import('../../pages/MobileApplication/MobileApplication.jsx'))
 const OneLink = lazy(() => import('../../pages/OneLink/OneLink.jsx'))
 const GuestOneLink = lazy(() => import('../../pages/GuestOneLink/GuestOneLink.jsx'))
 const GuestBusinessCard = lazy(() => import('../../pages/GuestBusinessCard/GuestBusinessCard.jsx'))
@@ -70,18 +74,26 @@ function RouteFallback() {
   )
 }
 
-function withProtection(Component, { adminOnly = false, requireLive = false } = {}) {
+function withProtection(
+  Component,
+  { adminOnly = false, requireLive = false, onboardingOnly = false, allowPending = false } = {},
+) {
   return (
-    <ProtectedRoute adminOnly={adminOnly} requireLive={requireLive}>
+    <ProtectedRoute
+      adminOnly={adminOnly}
+      requireLive={requireLive}
+      onboardingOnly={onboardingOnly}
+      allowPending={allowPending}
+    >
       <Component />
     </ProtectedRoute>
   )
 }
 
-// Pages that assume a fully launched restaurant (subdomain/brand/etc already
-// set). The onboarding wizard itself (setup/domain/brand/launch/go-live) is
-// intentionally excluded — those must stay reachable mid-onboarding.
+// Pages that assume setup is submitted or live. The onboarding wizard itself
+// stays reachable only while status is still `onboarding`.
 const LIVE_ONLY = { requireLive: true }
+const WIZARD_ONLY = { onboardingOnly: true }
 
 export function AppRoutes() {
   return (
@@ -102,15 +114,22 @@ export function AppRoutes() {
         <Route path={ROUTES.GUEST_SITE} element={<GuestSite />} />
         <Route path={ROUTES.GUEST_SITE_PAGE} element={<GuestSite />} />
 
-        <Route path={ROUTES.RESTAURANT_SETUP} element={withProtection(RestaurantSetup)} />
-        <Route path={ROUTES.DOMAIN} element={withProtection(Domain)} />
+        <Route path={ROUTES.RESTAURANT_SETUP} element={withProtection(RestaurantSetup, WIZARD_ONLY)} />
+        <Route path={ROUTES.DOMAIN} element={withProtection(Domain, WIZARD_ONLY)} />
         <Route path={ROUTES.BRAND} element={withProtection(Brand)} />
-        <Route path={ROUTES.LAUNCH} element={withProtection(Launch)} />
-        <Route path={ROUTES.GO_LIVE} element={withProtection(GoLive)} />
+        <Route path={ROUTES.LAUNCH} element={withProtection(Launch, WIZARD_ONLY)} />
+        <Route
+          path={ROUTES.SETUP_REVIEW}
+          element={withProtection(SetupReview, { onboardingOnly: true, allowPending: true })}
+        />
+        <Route path={ROUTES.GO_LIVE} element={withProtection(GoLive, WIZARD_ONLY)} />
         <Route path={ROUTES.DASHBOARD} element={withProtection(Dashboard, LIVE_ONLY)} />
         <Route path={ROUTES.RESTAURANT_PROFILE} element={withProtection(RestaurantProfile, LIVE_ONLY)} />
         <Route path={ROUTES.DIRECTORY_LISTINGS} element={withProtection(DirectoryListings, LIVE_ONLY)} />
         <Route path={ROUTES.DIGITAL_BUSINESS_CARD} element={withProtection(DigitalBusinessCard, LIVE_ONLY)} />
+        <Route path={ROUTES.DIGITAL_IDENTITY} element={withProtection(DigitalIdentity)} />
+        <Route path={ROUTES.DIGITAL_IDENTITY_FORM} element={withProtection(DigitalIdentityForm)} />
+        <Route path={ROUTES.MOBILE_APP} element={withProtection(MobileApplication)} />
         <Route path={ROUTES.ONE_LINK} element={withProtection(OneLink, LIVE_ONLY)} />
         <Route path={ROUTES.MENU} element={withProtection(Menu, LIVE_ONLY)} />
         <Route path={ROUTES.ORDERS} element={withProtection(Orders, LIVE_ONLY)} />

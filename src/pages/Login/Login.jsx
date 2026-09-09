@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
@@ -16,6 +16,15 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [flash, setFlash] = useState('')
+
+  useEffect(() => {
+    const msg = sessionStorage.getItem('login_flash')
+    if (msg) {
+      setFlash(msg)
+      sessionStorage.removeItem('login_flash')
+    }
+  }, [])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -127,6 +136,13 @@ function Login() {
             <h2>Welcome back</h2>
             <p>Sign in to manage your restaurant.</p>
           </div>
+
+          {flash ? (
+            <div className="login-flash" role="status">
+              <span>✓</span>
+              <p>{flash}</p>
+            </div>
+          ) : null}
 
           <form onSubmit={handleSubmit}>
             {/* EMAIL */}

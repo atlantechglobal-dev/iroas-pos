@@ -449,7 +449,7 @@
 
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
     margin-bottom: 22px;
   }
@@ -492,9 +492,11 @@
   .card-header {
     padding: 18px 22px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 16px;
     border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
   }
 
   .card-header h2,
@@ -523,8 +525,76 @@
     background: var(--bg);
   }
 
+  .tenant-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .tenant-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .tenant-filter {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 650;
+    font-family: inherit;
+    cursor: pointer;
+    color: var(--muted);
+  }
+
+  .tenant-filter.is-active {
+    background: #17171a;
+    border-color: #17171a;
+    color: #fff;
+  }
+
+  .tenant-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .tenant-row {
+    cursor: pointer;
+  }
+
+  .tenant-business {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .tenant-avatar {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 12px;
+    background: #f4f8ec;
+    color: #4c8a1a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+  }
+
   table {
     width: 100%;
+    min-width: 920px;
     border-collapse: collapse;
   }
 
@@ -599,6 +669,22 @@
 
   .impersonate:hover {
     background: #fafafa;
+  }
+
+  tbody tr:hover td {
+    background: #faf9f6;
+  }
+
+  td:last-child,
+  th:last-child {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    box-shadow: -8px 0 12px rgba(23, 23, 26, 0.04);
+  }
+
+  tbody tr:hover td:last-child {
+    background: #faf9f6;
   }
 
   /* BOTTOM */

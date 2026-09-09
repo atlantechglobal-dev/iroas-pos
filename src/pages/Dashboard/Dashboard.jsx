@@ -4,6 +4,7 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useAuth } from '../../hooks/useAuth.js'
 import { useRestaurant } from '../../hooks/useRestaurant.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
+import { HorizontalDragScroll } from '../../components/HorizontalDragScroll.jsx'
 import './Dashboard.css'
 
 function generateSeries(n, base, amplitude) {
@@ -156,7 +157,7 @@ function Dashboard() {
             </div>
 
             {/* STAT CARDS */}
-            <div className="stat-cards">
+            <HorizontalDragScroll className="stat-cards">
               <div className="stat-card">
                 <div className="stat-top">
                   <span className="stat-ico">₹</span>
@@ -206,7 +207,7 @@ function Dashboard() {
                 <p className="stat-sub">Avg. order value</p>
                 <p className="stat-foot">Target ₹720</p>
               </div>
-            </div>
+            </HorizontalDragScroll>
 
             {/* CHARTS */}
             <div className="chart-row">

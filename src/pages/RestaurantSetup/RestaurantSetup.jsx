@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { COUNTRY_OPTIONS, TIMEZONE_OPTIONS } from '../../constants/locales.js'
+import {
+  businessCategoryFromRestaurant,
+  getBusinessCopy,
+} from '../../constants/businessCopy.js'
 import './RestaurantSetup.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -12,6 +16,15 @@ const defaultHours = DAY_NAMES.map((day) => ({
   close: '',
   closed: false,
 }))
+
+function copyHoursFrom(source, row) {
+  return {
+    ...row,
+    open: source.open,
+    close: source.close,
+    closed: source.closed,
+  }
+}
 
 function RestaurantSetup() {
   const navigate = useNavigate()
@@ -28,6 +41,12 @@ function RestaurantSetup() {
   const [address, setAddress] = useState('')
   const [hours, setHours] = useState(defaultHours)
   const [saveLabel, setSaveLabel] = useState('Save & continue later')
+  const [category, setCategory] = useState('')
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [copyDrag, setCopyDrag] = useState(null)
+  const copyDragRef = useRef(null)
+
+  const copy = getBusinessCopy(category)
 
   // Load the restaurant profile already on file for this account
   useEffect(() => {
@@ -44,6 +63,10 @@ function RestaurantSetup() {
         if (restaurant.country) setCountry(restaurant.country)
         if (restaurant.timezone) setTimezone(restaurant.timezone)
         if (restaurant.address) setAddress(restaurant.address)
+        setCategory(businessCategoryFromRestaurant(restaurant))
+        if (restaurant.status === 'rejected' && restaurant.rejection_reason) {
+          setRejectionReason(restaurant.rejection_reason)
+        }
         if (restaurant.operating_hours) {
           try {
             setHours(JSON.parse(restaurant.operating_hours))
@@ -62,6 +85,57 @@ function RestaurantSetup() {
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
     )
   }
+
+  const startHoursCopy = (index, event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.preventDefault()
+    copyDragRef.current = {
+      sourceIndex: index,
+      baseline: hours.map((row) => ({ ...row })),
+    }
+    setCopyDrag({ sourceIndex: index, hoverIndex: index })
+  }
+
+  useEffect(() => {
+    if (!copyDrag) return
+
+    const onMove = (event) => {
+      const session = copyDragRef.current
+      if (!session) return
+      const node = document.elementFromPoint(event.clientX, event.clientY)
+      const row = node?.closest?.('[data-day-index]')
+      if (!row) return
+      const hoverIndex = Number(row.dataset.dayIndex)
+      if (Number.isNaN(hoverIndex)) return
+
+      const start = Math.min(session.sourceIndex, hoverIndex)
+      const end = Math.max(session.sourceIndex, hoverIndex)
+      const source = session.baseline[session.sourceIndex]
+
+      setHours(
+        session.baseline.map((day, i) =>
+          i >= start && i <= end ? copyHoursFrom(source, day) : day,
+        ),
+      )
+      setCopyDrag((prev) =>
+        prev && prev.hoverIndex === hoverIndex ? prev : { sourceIndex: session.sourceIndex, hoverIndex },
+      )
+    }
+
+    const onUp = () => {
+      copyDragRef.current = null
+      setCopyDrag(null)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+  }, [copyDrag])
 
   const buildProfileData = () => ({
     restaurantName,
@@ -90,7 +164,7 @@ function RestaurantSetup() {
 
   const handleContinue = async () => {
     if (restaurantName.trim() === '') {
-      alert('Please enter your restaurant name.')
+      alert(`Please enter your ${copy.nameLabel.toLowerCase()}.`)
       return
     }
 
@@ -181,14 +255,22 @@ function RestaurantSetup() {
 
       {/* MAIN AREA */}
       <main className="main-container">
+        {rejectionReason ? (
+          <div className="rejection-banner" role="status">
+            <strong>Your application was sent back</strong>
+            <p>{rejectionReason}</p>
+            <span>Update your details, then submit again from Launch.</span>
+          </div>
+        ) : null}
+
         {/* FORM */}
         <section className="form-card">
           <div className="step-number">◉ &nbsp; STEP 1 OF 4</div>
 
-          <h1>Let's set up your restaurant</h1>
+          <h1>Let's set up your {copy.noun}</h1>
 
           <p className="subtitle">
-            Tell us about your restaurant so we can create your digital
+            Tell us about your {copy.noun} so we can create your digital
             presence. Everything autosaves as you type.
           </p>
 
@@ -196,7 +278,7 @@ function RestaurantSetup() {
 
           <div className="form-grid">
             <div className="field">
-              <label>RESTAURANT NAME</label>
+              <label>{copy.nameLabel.toUpperCase()}</label>
 
               <input
                 type="text"
@@ -208,7 +290,7 @@ function RestaurantSetup() {
 
             <div className="field">
               <label>
-                CUISINE TYPE
+                {copy.specialtyLabel.toUpperCase()}
                 <span className="smart">Smart suggestions</span>
               </label>
 
@@ -217,7 +299,7 @@ function RestaurantSetup() {
 
                 <input
                   type="text"
-                  placeholder="Search cuisines"
+                  placeholder={copy.specialtyPlaceholder}
                   value={cuisine}
                   onChange={(event) => setCuisine(event.target.value)}
                 />
@@ -226,13 +308,13 @@ function RestaurantSetup() {
 
             <div className="field">
               <label>
-                RESTAURANT DESCRIPTION
+                {copy.descriptionLabel.toUpperCase()}
                 <span id="charCount">{description.length} / 200</span>
               </label>
 
               <textarea
                 maxLength={200}
-                placeholder="A modern bistro serving seasonal small plates and natural wine in the heart of downtown."
+                placeholder={copy.descriptionPlaceholder}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
               ></textarea>
@@ -268,7 +350,7 @@ function RestaurantSetup() {
 
                 <input
                   type="text"
-                  placeholder="www.yourrestaurant.com"
+                  placeholder={copy.websitePlaceholder}
                   value={website}
                   onChange={(event) => setWebsite(event.target.value)}
                 />
@@ -285,7 +367,7 @@ function RestaurantSetup() {
 
                 <input
                   type="email"
-                  placeholder="hello@yourrestaurant.com"
+                  placeholder={copy.emailPlaceholder}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
@@ -361,15 +443,45 @@ function RestaurantSetup() {
           </div>
 
           {/* OPERATING HOURS */}
-          <div className="hours-section">
+          <div className={`hours-section${copyDrag ? ' is-copying' : ''}`}>
             <div className="hours-title">
               <span>OPERATING HOURS</span>
-              <small>Drag to copy across days</small>
+              <small>Drag a day onto others to copy hours</small>
             </div>
 
-            {hours.map((row, index) => (
-              <div className="day-row" key={row.day}>
-                <span className="day-name">{row.day}</span>
+            {hours.map((row, index) => {
+              const inCopyRange =
+                copyDrag &&
+                index >= Math.min(copyDrag.sourceIndex, copyDrag.hoverIndex) &&
+                index <= Math.max(copyDrag.sourceIndex, copyDrag.hoverIndex)
+              const rowClass = [
+                'day-row',
+                copyDrag?.sourceIndex === index ? 'is-copy-source' : '',
+                inCopyRange && copyDrag?.sourceIndex !== index ? 'is-copy-target' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
+
+              return (
+              <div
+                className={rowClass}
+                key={row.day}
+                data-day-index={index}
+              >
+                <button
+                  type="button"
+                  className="day-drag-handle"
+                  aria-label={`Drag to copy ${row.day} hours to other days`}
+                  onPointerDown={(event) => startHoursCopy(index, event)}
+                >
+                  ⋮⋮
+                </button>
+                <span
+                  className="day-name"
+                  onPointerDown={(event) => startHoursCopy(index, event)}
+                >
+                  {row.day}
+                </span>
 
                 <input
                   type="text"
@@ -403,7 +515,8 @@ function RestaurantSetup() {
                   Closed
                 </label>
               </div>
-            ))}
+              )
+            })}
           </div>
         </section>
 
@@ -416,8 +529,8 @@ function RestaurantSetup() {
               <div className="preview-logo">{previewLetter}</div>
 
               <div>
-                <h3>{restaurantName.trim() || 'Your restaurant'}</h3>
-                <p>{cuisine.trim() || 'Cuisine'}</p>
+                <h3>{restaurantName.trim() || copy.fallbackName}</h3>
+                <p>{cuisine.trim() || copy.specialtyPreview}</p>
               </div>
             </div>
 

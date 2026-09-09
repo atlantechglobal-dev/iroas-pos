@@ -71,6 +71,13 @@
   font-size: 14.5px;
 }
 
+.business-card-page .dbc-identity-hint {
+  margin-top: 8px !important;
+  color: #4c8a1a;
+  font-size: 13px !important;
+  font-weight: 650;
+}
+
 .business-card-page .page-actions {
   display: flex;
   gap: 10px;

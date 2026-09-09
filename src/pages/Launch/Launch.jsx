@@ -4,15 +4,19 @@ import { api } from '../../lib/api'
 import { QrCodePreview, downloadQrPng, qrDataUrl } from '../../components/QrCodePreview.jsx'
 import { restaurantHostname } from '../../utils/restaurantUrl.js'
 import { guestSiteUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
-import { useAuth } from '../../hooks/useAuth.js'
+import { ROUTES } from '../../constants/routes.js'
+import {
+  businessCategoryFromRestaurant,
+  getBusinessCopy,
+  locationPreviewLine,
+} from '../../constants/businessCopy.js'
 import './Launch.css'
 
 function Launch() {
   const navigate = useNavigate()
-  const { setRestaurantStatus } = useAuth()
+  const [continuing, setContinuing] = useState(false)
 
   const [toast, setToast] = useState('')
-  const [launched, setLaunched] = useState(false)
   const [restaurantName, setRestaurantName] = useState('')
   const [cuisine, setCuisine] = useState('')
   const [city, setCity] = useState('')
@@ -21,7 +25,11 @@ function Launch() {
   const [primaryColor, setPrimaryColor] = useState('#F97316')
   const [secondaryColor, setSecondaryColor] = useState('#F0F72A')
   const [accentColor, setAccentColor] = useState('#BDB8A4')
+  const [category, setCategory] = useState('')
+  const [restaurantStatus, setRestaurantStatus] = useState('')
   const qrCache = useRef('')
+
+  const copy = getBusinessCopy(category)
 
   useEffect(() => {
     api
@@ -33,24 +41,23 @@ function Launch() {
         if (restaurant.primary_color) setPrimaryColor(restaurant.primary_color)
         if (restaurant.secondary_color) setSecondaryColor(restaurant.secondary_color)
         if (restaurant.accent_color) setAccentColor(restaurant.accent_color)
+        setCategory(businessCategoryFromRestaurant(restaurant))
+        if (restaurant.status) setRestaurantStatus(restaurant.status)
 
         const host = restaurantHostname(restaurant)
         if (host) setDomain(host)
-        setSlug(
-          restaurantPublicSlug(restaurant, 'your-restaurant'),
-        )
+        setSlug(restaurantPublicSlug(restaurant, 'your-restaurant'))
       })
       .catch(() => {})
   }, [])
 
-  const displayName = restaurantName.trim() || 'Your restaurant'
+  const displayName = restaurantName.trim() || copy.fallbackName
   const previewInitial = restaurantName.trim()
     ? restaurantName.trim().charAt(0).toUpperCase()
     : 'R'
-  const locationLine = [cuisine.trim(), city.trim()].filter(Boolean).join(' · ')
 
   const hasDomain = Boolean(domain)
-  const hostname = domain || 'yourrestaurant.iroas.com'
+  const hostname = domain || 'yourbusiness.iroas.com'
   const marketingLink = hasDomain ? `https://${hostname}` : ''
   const LIVE_LINK = guestSiteUrl(slug, 'website') || marketingLink
 
@@ -212,28 +219,20 @@ function Launch() {
     showMessage('Link copied — sharing is not supported here.')
   }
 
-  const handleSaveLater = () => {
-    navigate('/dashboard')
-  }
-
-  const handleLaunch = async () => {
+  const handleContinue = async () => {
+    if (continuing) return
+    setContinuing(true)
     try {
       await api.launch()
-      setLaunched(true)
-      setRestaurantStatus('live')
-      showMessage('Your restaurant has been launched!')
-
-      setTimeout(() => {
-        navigate('/go-live')
-      }, 1200)
+      navigate(ROUTES.SETUP_REVIEW, { replace: true })
     } catch (err) {
       showMessage(err.message)
+      setContinuing(false)
     }
   }
 
   return (
     <div className="launch-page">
-      {/* TOP HEADER */}
       <header className="top-header">
         <div className="brand-logo">
           <img src="/images/Logo9-1 1.svg" alt="IROAS" />
@@ -246,14 +245,9 @@ function Launch() {
             <span className="green-dot"></span>
             Auto-saved
           </span>
-
-          <button className="save-btn" onClick={handleSaveLater}>
-            Save & continue later
-          </button>
         </div>
       </header>
 
-      {/* PROGRESS STEPS */}
       <nav className="steps">
         <div className="step completed">
           <div className="step-icon">✓</div>
@@ -290,30 +284,27 @@ function Launch() {
         </div>
       </nav>
 
-      {/* MAIN CONTENT */}
       <main className="main-container">
-        {/* LEFT CARD */}
         <section className="launch-card">
           <div className="card-heading">
-            <div className="step-label">✣ STEP 4 OF 4</div>
+            <div className="step-label">STEP 4 OF 4</div>
 
-            <h1>Your digital restaurant is ready</h1>
+            <h1>Your digital {copy.noun} is ready</h1>
 
             <p>
-              Print your QR code, share your link, and welcome your first
-              guests.
+              Print your QR code, share your link, then launch to send your
+              profile for admin review.
             </p>
           </div>
 
-          {/* LIVE LINK */}
           <div className="link-section">
             <div className="link-icon">
               <img src="/images/website icon.svg" alt="" />
             </div>
 
             <div className="link-content">
-              <span>YOUR LIVE LINK</span>
-              <strong>{LIVE_LINK}</strong>
+              <span>YOUR WEB ADDRESS</span>
+              <strong>{LIVE_LINK || hostname}</strong>
             </div>
 
             <button className="link-action" onClick={copyRestaurantLink}>
@@ -325,7 +316,6 @@ function Launch() {
             </button>
           </div>
 
-          {/* ACTION BUTTONS */}
           <div className="action-buttons">
             <button className="action-card" onClick={handleDownloadQR}>
               <span className="action-icon">⇩</span>
@@ -348,7 +338,6 @@ function Launch() {
             </button>
           </div>
 
-          {/* REAL LIFE PREVIEW */}
           <div className="preview-title">HOW IT LOOKS IN REAL LIFE</div>
 
           <div className="real-life-grid">
@@ -357,7 +346,6 @@ function Launch() {
                 <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
                 <span>{displayName}</span>
               </div>
-
               <div className="real-label">Table tent</div>
             </div>
 
@@ -366,7 +354,6 @@ function Launch() {
                 <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
                 <span>{displayName}</span>
               </div>
-
               <div className="real-label">Sticker</div>
             </div>
 
@@ -375,7 +362,6 @@ function Launch() {
                 <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
                 <span>{displayName}</span>
               </div>
-
               <div className="real-label">Business card</div>
             </div>
 
@@ -384,13 +370,11 @@ function Launch() {
                 <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
                 <span>{displayName}</span>
               </div>
-
               <div className="real-label">Poster</div>
             </div>
           </div>
         </section>
 
-        {/* PHONE PREVIEW */}
         <section className="phone-area">
           <div className="phone">
             <div
@@ -410,7 +394,7 @@ function Launch() {
               <h2>{displayName}</h2>
 
               <p className="restaurant-location">
-                {locationLine || 'Cuisine · City'}
+                {locationPreviewLine(copy, cuisine, city)}
               </p>
 
               <div className="phone-qr">
@@ -419,52 +403,13 @@ function Launch() {
 
               <div className="qr-bottom-content">
                 <div className="qr-link">{hostname}</div>
-
-                <div className="qr-actions">
-                  <button
-                    className="qr-action"
-                    title="Download"
-                    onClick={handleDownloadQR}
-                  >
-                    <svg viewBox="0 0 24 24">
-                      <path d="M12 3v12"></path>
-                      <path d="M7 10l5 5 5-5"></path>
-                      <path d="M5 21h14"></path>
-                    </svg>
-                  </button>
-
-                  <button
-                    className="qr-action"
-                    title="Share"
-                    onClick={handleShareQR}
-                  >
-                    <svg viewBox="0 0 24 24">
-                      <circle cx="18" cy="5" r="2"></circle>
-                      <circle cx="6" cy="12" r="2"></circle>
-                      <circle cx="18" cy="19" r="2"></circle>
-                      <path d="M8 11l8-5"></path>
-                      <path d="M8 13l8 5"></path>
-                    </svg>
-                  </button>
-
-                  <button
-                    className="qr-action"
-                    title="Copy"
-                    onClick={copyRestaurantLink}
-                  >
-                    <svg viewBox="0 0 24 24">
-                      <rect x="9" y="9" width="11" height="11" rx="2"></rect>
-                      <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                  </button>
-                </div>
+                <p className="preview-note">Preview · goes live after approval</p>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      {/* BOTTOM BAR */}
       <footer className="bottom-bar">
         <button className="back-btn" onClick={() => navigate('/brand')}>
           ← &nbsp;Back
@@ -472,12 +417,12 @@ function Launch() {
 
         <div className="step-counter">Step 4 of 4 · Launch</div>
 
-        <button
-          className="launch-btn"
-          style={launched ? { background: '#45bd6c', color: 'white' } : undefined}
-          onClick={handleLaunch}
-        >
-          {launched ? '✓ Restaurant launched!' : '✣  Launch my restaurant'}
+        <button className="launch-btn" disabled={continuing} onClick={handleContinue}>
+          {continuing
+            ? 'Submitting…'
+            : restaurantStatus === 'rejected'
+              ? 'Resubmit for review'
+              : 'Launch'}
         </button>
       </footer>
 

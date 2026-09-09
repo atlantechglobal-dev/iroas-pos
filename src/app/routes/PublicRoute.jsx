@@ -2,6 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
 import { ROUTES } from '../../constants/routes.js'
 import { isAdmin } from '../../constants/roles.js'
+import { canUseDashboard } from '../../constants/restaurantStatus.js'
 
 export function PublicRoute({ children }) {
   const { isAuthenticated, user, restaurantStatus } = useAuth()
@@ -16,10 +17,9 @@ export function PublicRoute({ children }) {
     if (location.pathname === ROUTES.CREATE_ACCOUNT) {
       return <Navigate to={ROUTES.RESTAURANT_SETUP} replace />
     }
-    // Don't drop an unfinished onboarding into the live dashboard — resume the wizard instead.
     return (
       <Navigate
-        to={restaurantStatus === 'live' ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP}
+        to={canUseDashboard(restaurantStatus) ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP}
         replace
       />
     )

@@ -3,6 +3,7 @@ import { api } from '../../lib/api'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
+import { TenantReviewDrawer } from '../../components/admin/TenantReviewDrawer.jsx'
 import './PlatformAdmin.css'
 
 const INITIAL_FLAGS = [
@@ -66,12 +67,24 @@ const AUDIT_LOG = [
 const STATUS_CLASS = {
   live: 'active-status',
   onboarding: 'trial-status',
+  pending_approval: 'past-status',
+  rejected: 'suspended-status',
 }
 
 const STATUS_LABEL = {
   live: 'Active',
   onboarding: 'Onboarding',
+  pending_approval: 'Awaiting approval',
+  rejected: 'Rejected',
 }
+
+const TENANT_FILTERS = [
+  { id: '', label: 'All' },
+  { id: 'pending_approval', label: 'Awaiting' },
+  { id: 'onboarding', label: 'Onboarding' },
+  { id: 'live', label: 'Live' },
+  { id: 'rejected', label: 'Rejected' },
+]
 
 function PlatformAdmin() {
   const toast = useToast()
@@ -81,10 +94,12 @@ function PlatformAdmin() {
   const [flags, setFlags] = useState(INITIAL_FLAGS)
   const [tenants, setTenants] = useState([])
   const [stats, setStats] = useState(null)
+  const [reviewTenantId, setReviewTenantId] = useState(null)
+  const [tenantFilter, setTenantFilter] = useState('')
 
-  const loadTenants = (search = '') => {
+  const loadTenants = (search = debouncedSearch, status = tenantFilter) => {
     api
-      .adminTenants(search)
+      .adminTenants(search, status)
       .then(({ tenants }) => setTenants(tenants))
       .catch(() => setTenants([]))
   }
@@ -98,8 +113,8 @@ function PlatformAdmin() {
   }, [])
 
   useEffect(() => {
-    loadTenants(debouncedSearch)
-  }, [debouncedSearch])
+    loadTenants(debouncedSearch, tenantFilter)
+  }, [debouncedSearch, tenantFilter])
 
   const toggleFlag = (key) => {
     setFlags((prev) =>
@@ -113,11 +128,25 @@ function PlatformAdmin() {
     toast.info(`Impersonating ${name}`)
   }
 
+  const refreshTenants = () => {
+    loadTenants(debouncedSearch, tenantFilter)
+    api.adminStats().then(setStats).catch(() => {})
+  }
+
   const STATS = stats
     ? [
         { title: '▣   Active tenants', number: stats.activeTenants, small: 'currently live' },
         { title: '⌁   Onboarding', number: stats.onboardingTenants, small: 'in setup' },
-        { title: '♧   Total tenants', number: stats.totalTenants, small: 'all time' },
+        {
+          title: '◐   Pending approval',
+          number: stats.pendingApprovals ?? 0,
+          small: 'awaiting review',
+        },
+        {
+          title: '⊘   Rejected',
+          number: stats.rejectedTenants ?? 0,
+          small: 'sent back',
+        },
       ]
     : []
 
@@ -166,24 +195,39 @@ function PlatformAdmin() {
             <div className="card-header">
               <div>
                 <h2>Tenants</h2>
-                <span>{tenants.length} shown</span>
+                <span>{tenants.length} shown · review before publish</span>
               </div>
 
-              <input
-                type="text"
-                placeholder="Search tenants..."
-                value={tenantSearch}
-                onChange={(event) => setTenantSearch(event.target.value)}
-              />
+              <div className="tenant-toolbar">
+                <div className="tenant-filters">
+                  {TENANT_FILTERS.map((filter) => (
+                    <button
+                      key={filter.id || 'all'}
+                      type="button"
+                      className={`tenant-filter ${tenantFilter === filter.id ? 'is-active' : ''}`}
+                      onClick={() => setTenantFilter(filter.id)}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search tenants..."
+                  value={tenantSearch}
+                  onChange={(event) => setTenantSearch(event.target.value)}
+                />
+              </div>
             </div>
 
             <div className="table-wrapper">
               <table>
                 <thead>
                   <tr>
-                    <th>RESTAURANT</th>
+                    <th>BUSINESS</th>
                     <th>OWNER</th>
                     <th>PLAN</th>
+                    <th>SUBMITTED</th>
                     <th>STATUS</th>
                     <th>ACTIONS</th>
                   </tr>
@@ -191,10 +235,21 @@ function PlatformAdmin() {
 
                 <tbody>
                   {tenants.map((tenant) => (
-                    <tr key={tenant.id}>
+                    <tr
+                      key={tenant.id}
+                      className="tenant-row"
+                      onClick={() => setReviewTenantId(tenant.id)}
+                    >
                       <td>
-                        <strong>{tenant.name || 'Untitled restaurant'}</strong>
-                        <small>{tenant.city || 'No city set'}</small>
+                        <div className="tenant-business">
+                          <span className="tenant-avatar" aria-hidden="true">
+                            {(tenant.name || 'B').charAt(0).toUpperCase()}
+                          </span>
+                          <span>
+                            <strong>{tenant.name || 'Untitled business'}</strong>
+                            <small>{tenant.city || 'No city set'}</small>
+                          </span>
+                        </div>
                       </td>
                       <td>
                         <strong>{tenant.owner_name}</strong>
@@ -202,24 +257,46 @@ function PlatformAdmin() {
                       </td>
                       <td>{tenant.plan}</td>
                       <td>
-                        <span className={`status ${STATUS_CLASS[tenant.status]}`}>
-                          {STATUS_LABEL[tenant.status]}
+                        {tenant.submitted_at
+                          ? new Date(tenant.submitted_at).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : '—'}
+                      </td>
+                      <td>
+                        <span className={`status ${STATUS_CLASS[tenant.status] || 'trial-status'}`}>
+                          {STATUS_LABEL[tenant.status] || tenant.status}
                         </span>
                       </td>
                       <td>
-                        <button
-                          className="impersonate"
-                          onClick={() => handleImpersonate(tenant.name || tenant.owner_name)}
-                        >
-                          Impersonate
-                        </button>
+                        <div className="tenant-actions" onClick={(event) => event.stopPropagation()}>
+                          <button
+                            className="impersonate"
+                            type="button"
+                            onClick={() => setReviewTenantId(tenant.id)}
+                          >
+                            {tenant.status === 'pending_approval' ? 'Review' : 'View'}
+                          </button>
+                          {tenant.status !== 'pending_approval' && (
+                            <button
+                              className="impersonate"
+                              type="button"
+                              onClick={() =>
+                                handleImpersonate(tenant.name || tenant.owner_name)
+                              }
+                            >
+                              Impersonate
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
 
                   {tenants.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: '24px' }}>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '24px' }}>
                         No tenants match this search.
                       </td>
                     </tr>
@@ -300,6 +377,13 @@ function PlatformAdmin() {
               </section>
             </div>
           </div>
+          {reviewTenantId ? (
+            <TenantReviewDrawer
+              tenantId={reviewTenantId}
+              onClose={() => setReviewTenantId(null)}
+              onChanged={refreshTenants}
+            />
+          ) : null}
     </DashboardLayout>
   )
 }

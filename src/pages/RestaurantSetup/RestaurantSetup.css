@@ -184,6 +184,33 @@
     align-items: start;
   }
 
+  .rejection-banner {
+    grid-column: 1 / -1;
+    background: #fff6f4;
+    border: 1px solid #f3c7c2;
+    border-radius: 16px;
+    padding: 16px 18px;
+    color: #17171a;
+  }
+
+  .rejection-banner strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+
+  .rejection-banner p {
+    margin: 0 0 8px;
+    color: #8b3a34;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .rejection-banner span {
+    color: #8b8b8f;
+    font-size: 13px;
+  }
+
   /* FORM CARD */
 
   .form-card {
@@ -398,20 +425,59 @@
   .day-row {
     height: 52px;
     display: grid;
-    grid-template-columns: 52px 1fr 1fr 90px;
+    grid-template-columns: 18px 52px 1fr 1fr 90px;
     gap: 14px;
     align-items: center;
     border-bottom: 1px solid #f1efe9;
+    border-radius: 10px;
+    margin: 0 -8px;
+    padding: 0 8px;
   }
 
   .day-row:last-child {
     border-bottom: none;
   }
 
+  .day-row.is-copy-source {
+    background: #eef6da;
+  }
+
+  .day-row.is-copy-target {
+    background: #f7faef;
+  }
+
+  .hours-section.is-copying {
+    user-select: none;
+    cursor: grabbing;
+  }
+
+  .day-drag-handle {
+    width: 18px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #c4c1b8;
+    font-size: 12px;
+    letter-spacing: -2px;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+  }
+
+  .day-drag-handle:active,
+  .hours-section.is-copying .day-drag-handle {
+    cursor: grabbing;
+  }
+
   .day-name {
     color: #444;
     font-size: 13.5px;
     font-weight: 700;
+    cursor: grab;
+    user-select: none;
   }
 
   .time-input {
@@ -654,7 +720,7 @@
     }
 
     .day-row {
-      grid-template-columns: 40px 1fr 1fr 70px;
+      grid-template-columns: 16px 36px 1fr 1fr 70px;
       gap: 8px;
     }
 

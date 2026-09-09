@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AuthContext } from './authContext.js'
 import { ROUTES } from '../constants/routes.js'
 import { isAdmin } from '../constants/roles.js'
+import { canUseDashboard } from '../constants/restaurantStatus.js'
 import { authApi, setUnauthorizedHandler } from '../services/api/index.js'
 import { restaurantApi } from '../services/api/restaurantApi.js'
 import {
@@ -16,7 +17,7 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate()
   const [user, setUser] = useState(() => getStoredUser())
   const [initializing, setInitializing] = useState(Boolean(getToken()))
-  // null = unknown/not fetched yet (e.g. admin, or not loaded), 'onboarding' | 'live' otherwise.
+  // null = unknown/not fetched yet (e.g. admin, or not loaded).
   const [restaurantStatus, setRestaurantStatus] = useState(null)
 
   const logout = useCallback(() => {
@@ -88,7 +89,7 @@ export function AuthProvider({ children }) {
         const { restaurant } = await restaurantApi.get()
         const status = restaurant?.status || 'onboarding'
         setRestaurantStatus(status)
-        navigate(status === 'live' ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP, {
+        navigate(canUseDashboard(status) ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP, {
           replace: true,
         })
       } catch {

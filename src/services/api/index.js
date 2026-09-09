@@ -3,6 +3,7 @@ import { restaurantApi } from './restaurantApi.js'
 import { adminApi } from './adminApi.js'
 import { menuApi } from './menuApi.js'
 import { publicApi } from './publicApi.js'
+import { identityApi, productApi, notificationApi } from './identityApi.js'
 
 /** Unified API surface — preserves existing call sites during migration. */
 export const api = {
@@ -40,7 +41,38 @@ export const api = {
 
   adminStats: adminApi.stats,
   adminTenants: adminApi.tenants,
+  adminTenantStatus: adminApi.tenantStatus,
+  adminTenant: adminApi.tenant,
+  adminUpdateTenant: adminApi.updateTenant,
+  adminApproveTenant: adminApi.approveTenant,
+  adminRejectTenant: adminApi.rejectTenant,
+  adminDeleteTenant: adminApi.deleteTenant,
+  adminIdentities: adminApi.identities,
+  adminIdentity: adminApi.identity,
+  adminIdentityNote: adminApi.identityNote,
+  adminIdentityStatus: adminApi.identityStatus,
+  adminProducts: adminApi.products,
+  adminUpdateProduct: adminApi.updateProduct,
+
+  getIdentity: identityApi.get,
+  saveIdentity: identityApi.save,
+  submitIdentity: identityApi.submit,
+  getProducts: productApi.list,
+  getProduct: productApi.get,
+  requestProduct: productApi.request,
+  updateProduct: productApi.update,
+  getNotifications: notificationApi.list,
+  markNotificationsRead: notificationApi.markRead,
 }
 
-export { authApi, restaurantApi, adminApi, menuApi, publicApi }
+export {
+  authApi,
+  restaurantApi,
+  adminApi,
+  menuApi,
+  publicApi,
+  identityApi,
+  productApi,
+  notificationApi,
+}
 export { apiRequest, ApiError, setUnauthorizedHandler } from './client.js'

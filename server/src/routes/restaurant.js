@@ -22,6 +22,9 @@ function parseSettings(restaurant) {
 router.get('/', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  if (restaurant.status === 'deleted') {
+    return res.status(403).json({ error: 'This account has been closed.' })
+  }
   res.json({ restaurant: { ...restaurant, settings: parseSettings(restaurant) } })
 })
 
@@ -139,20 +142,35 @@ router.post('/launch', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
 
+  if (restaurant.status === 'live') {
+    return res.json({ ok: true, status: 'live' })
+  }
+
+  if (restaurant.status === 'pending_approval') {
+    return res.json({ ok: true, status: 'pending_approval' })
+  }
+
+  if (restaurant.status === 'deleted') {
+    return res.status(403).json({ error: 'This account has been closed.' })
+  }
+
   if (!restaurant.name) {
-    return res.status(400).json({ error: 'Complete the restaurant profile before launching.' })
+    return res.status(400).json({ error: 'Complete the restaurant profile before submitting.' })
   }
 
   if (!restaurant.subdomain && !restaurant.custom_domain) {
-    return res.status(400).json({ error: 'Choose a web address before launching.' })
+    return res.status(400).json({ error: 'Choose a web address before submitting.' })
   }
 
   db.prepare(
-    `UPDATE restaurants SET status = 'live', launched_at = datetime('now'),
+    `UPDATE restaurants SET status = 'pending_approval',
+     submitted_at = datetime('now'),
+     rejection_reason = NULL,
+     rejected_at = NULL,
      updated_at = datetime('now') WHERE id = ?`,
   ).run(restaurant.id)
 
-  res.json({ ok: true })
+  res.json({ ok: true, status: 'pending_approval' })
 })
 
 function mapReservation(row) {

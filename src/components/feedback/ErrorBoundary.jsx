@@ -16,7 +16,24 @@ export class ErrorBoundary extends Component {
     }
   }
 
+  componentDidMount() {
+    if (import.meta.env.DEV && import.meta.hot) {
+      import.meta.hot.on('vite:afterUpdate', this.clearError)
+    }
+  }
+
+  componentWillUnmount() {
+    if (import.meta.env.DEV && import.meta.hot) {
+      import.meta.hot.off('vite:afterUpdate', this.clearError)
+    }
+  }
+
+  clearError = () => {
+    if (this.state.hasError) this.setState({ hasError: false })
+  }
+
   handleRefresh = () => {
+    this.setState({ hasError: false })
     window.location.reload()
   }
 

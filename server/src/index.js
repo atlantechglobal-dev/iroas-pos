@@ -9,6 +9,9 @@ import restaurantRoutes from './routes/restaurant.js'
 import adminRoutes from './routes/admin.js'
 import menuRoutes from './routes/menu.js'
 import publicRoutes from './routes/public.js'
+import identityRoutes from './routes/identity.js'
+import productRoutes from './routes/products.js'
+import notificationRoutes from './routes/notifications.js'
 
 if (!process.env.JWT_SECRET) {
   console.error('JWT_SECRET is not set. Copy server/.env.example to server/.env and set it.')
@@ -26,6 +29,9 @@ app.use('/api/restaurant', restaurantRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/menu', menuRoutes)
 app.use('/api/public', publicRoutes)
+app.use('/api/identity', identityRoutes)
+app.use('/api/products', productRoutes)
+app.use('/api/notifications', notificationRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 

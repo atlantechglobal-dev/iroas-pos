@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { prepareImageDataUrl } from '../../utils/imageFile.js'
+import {
+  businessCategoryFromRestaurant,
+  getBusinessCopy,
+} from '../../constants/businessCopy.js'
 import './BrandWizard.css'
 
 const FONTS = [
@@ -105,6 +109,9 @@ function BrandWizard() {
   const [previewMode, setPreviewMode] = useState('light')
   const [restaurantName, setRestaurantName] = useState('')
   const [cuisine, setCuisine] = useState('')
+  const [category, setCategory] = useState('')
+
+  const copy = getBusinessCopy(category)
 
   useEffect(() => {
     api
@@ -118,6 +125,7 @@ function BrandWizard() {
         if (restaurant.font) setSelectedFont(restaurant.font)
         if (restaurant.theme) setSelectedTheme(restaurant.theme)
         if (restaurant.logo_data_url) setLogoDataUrl(restaurant.logo_data_url)
+        setCategory(businessCategoryFromRestaurant(restaurant))
       })
       .catch(() => {})
   }, [])
@@ -170,7 +178,7 @@ function BrandWizard() {
     previewMode === 'dark' ? '#10182a' : activeTheme.background
   const previewColor = previewMode === 'dark' ? '#ffffff' : activeTheme.color
 
-  const displayName = restaurantName.trim() || 'Your restaurant'
+  const displayName = restaurantName.trim() || copy.fallbackName
   const previewInitial = restaurantName.trim()
     ? restaurantName.trim().charAt(0).toUpperCase()
     : 'R'
@@ -510,13 +518,9 @@ function BrandWizard() {
               <div className="preview-content">
                 <span className="welcome">WELCOME</span>
 
-                <h2>Taste what makes {displayName} special.</h2>
+                <h2>{copy.welcomeLine(displayName)}</h2>
 
-                <p>
-                  {cuisine.trim()
-                    ? `${cuisine.trim()} flavors, crafted with care.`
-                    : 'Fresh flavors, crafted with care.'}
-                </p>
+                <p>{copy.flavorLine(cuisine.trim())}</p>
 
                 <div className="preview-buttons">
                   <button
@@ -526,10 +530,10 @@ function BrandWizard() {
                       borderColor: primaryColor,
                     }}
                   >
-                    View menu
+                    {copy.secondaryCta}
                   </button>
 
-                  <button className="reserve">Reserve</button>
+                  <button className="reserve">{copy.ctaShort}</button>
                 </div>
 
                 <div className="preview-blocks">

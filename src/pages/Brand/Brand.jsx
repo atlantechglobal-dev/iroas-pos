@@ -17,7 +17,11 @@ function Brand() {
       .getRestaurant()
       .then(({ restaurant }) => {
         if (cancelled) return
-        setMode(restaurant?.status === 'live' ? 'studio' : 'wizard')
+        setMode(
+          restaurant?.status === 'live' || restaurant?.status === 'pending_approval'
+            ? 'studio'
+            : 'wizard',
+        )
       })
       .catch(() => {
         if (!cancelled) setMode('wizard')

@@ -1,0 +1,26 @@
+.h-drag-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: inherit;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  cursor: grab;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.h-drag-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.h-drag-scroll.is-dragging {
+  cursor: grabbing;
+  scroll-behavior: auto;
+  user-select: none;
+}
+
+.h-drag-scroll.is-dragging * {
+  cursor: grabbing;
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import QRCode from 'qrcode'
+import QRCode from 'qrcode/lib/browser.js'
 
 /**
  * Generate a PNG data URL for a QR code (client-side, no CDN).

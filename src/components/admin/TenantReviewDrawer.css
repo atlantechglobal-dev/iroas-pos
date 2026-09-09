@@ -1,0 +1,567 @@
+.tenant-review-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  justify-content: flex-end;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Inter",
+    "Segoe UI", sans-serif;
+}
+
+.tenant-review-backdrop {
+  border: 0;
+  background: rgba(23, 23, 26, 0.42);
+  flex: 1;
+  cursor: pointer;
+}
+
+.tenant-review-drawer {
+  width: min(720px, 100%);
+  height: 100%;
+  position: relative;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -24px 0 60px rgba(20, 16, 8, 0.16);
+  animation: tenant-review-slide 0.22s ease;
+}
+
+.tenant-review-loading {
+  padding: 40px 32px;
+  color: #8b8b8f;
+}
+
+.tenant-review-head {
+  padding: 22px 24px 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #ece8df;
+}
+
+.tenant-review-head-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tenant-review-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b8b8f;
+}
+
+.tenant-review-status {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #fbf3d3;
+  color: #a9821a;
+}
+
+.tenant-review-status.is-live {
+  background: #eaf5db;
+  color: #4c8a1a;
+}
+
+.tenant-review-status.is-onboarding {
+  background: #e8f3fb;
+  color: #4083b3;
+}
+
+.tenant-review-status.is-rejected {
+  background: #fbe4e2;
+  color: #d3453b;
+}
+
+.tenant-review-head h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.tenant-review-head p {
+  margin: 8px 0 0;
+  color: #8b8b8f;
+  font-size: 13px;
+}
+
+.tenant-review-close,
+.tenant-review-footer button,
+.tenant-review-dialog-actions button,
+.tenant-review-tabs button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tenant-review-close {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid #ece8df;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #17171a;
+  flex-shrink: 0;
+}
+
+.tenant-review-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid #ece8df;
+}
+
+.tenant-review-tabs button {
+  border: 0;
+  background: transparent;
+  padding: 12px 14px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b8b8f;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tenant-review-tabs button.is-active {
+  color: #17171a;
+  border-bottom-color: #8bc53f;
+}
+
+.tenant-review-body {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px;
+  background: #fcfbf8;
+}
+
+.tenant-review-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.tenant-review-span {
+  grid-column: 1 / -1;
+}
+
+.tenant-review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #ece8df;
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.tenant-review-field span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8b8b8f;
+}
+
+.tenant-review-field strong {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #17171a;
+  word-break: break-word;
+}
+
+.tenant-review-field input,
+.tenant-review-field textarea {
+  border: 1px solid #ece8df;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-family: inherit;
+  font-size: 14px;
+  background: #fcfbf8;
+}
+
+.tenant-review-hours {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.tenant-review-hours li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.tenant-review-hours em {
+  font-style: normal;
+  font-weight: 700;
+  width: 40px;
+}
+
+.tenant-review-brand-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #ece8df;
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.tenant-review-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid #ece8df;
+  background: #f7f6f2;
+}
+
+.tenant-review-logo.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #8b8b8f;
+}
+
+.tenant-review-brand-name {
+  margin: 0;
+  font-weight: 800;
+}
+
+.tenant-review-brand-meta {
+  margin: 4px 0 0;
+  color: #8b8b8f;
+  font-size: 13px;
+}
+
+.tenant-review-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tenant-review-swatch {
+  background: #fff;
+  border: 1px solid #ece8df;
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tenant-review-swatch input {
+  width: 100%;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.tenant-review-swatch span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b8b8f;
+}
+
+.tenant-review-swatch strong {
+  font-size: 12px;
+}
+
+.tenant-review-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.tenant-review-phone {
+  width: 240px;
+  border-radius: 32px;
+  padding: 28px 18px 22px;
+  text-align: center;
+  box-shadow: 0 18px 40px rgba(20, 16, 8, 0.12);
+}
+
+.tenant-review-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+}
+
+.tenant-review-phone h3 {
+  margin: 0;
+}
+
+.tenant-review-phone p,
+.tenant-review-phone small {
+  display: block;
+  margin: 6px 0 12px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.tenant-review-preview-link {
+  display: inline-flex;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid #ece8df;
+  background: #fff;
+  color: #17171a;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tenant-review-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tenant-review-activity li {
+  padding: 14px;
+  border: 1px solid #ece8df;
+  border-radius: 14px;
+  background: #fff;
+  margin-bottom: 10px;
+}
+
+.tenant-review-activity strong {
+  text-transform: capitalize;
+}
+
+.tenant-review-activity span {
+  display: block;
+  color: #8b8b8f;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.tenant-review-activity p {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.tenant-review-checks {
+  padding: 14px 24px;
+  border-top: 1px solid #ece8df;
+  background: #fff;
+}
+
+.tenant-review-checks p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b8b8f;
+}
+
+.tenant-review-check-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tenant-review-check-grid label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #ece8df;
+  border-radius: 12px;
+  background: #fcfbf8;
+}
+
+.tenant-review-check-grid label.is-on {
+  border-color: #cfe6a4;
+  background: #f4f8ec;
+}
+
+.tenant-review-dialog {
+  padding: 14px 24px 12px;
+  border-top: 1px solid #f3c7c2;
+  background: #fff8f6;
+}
+
+.tenant-review-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(23, 23, 26, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 2;
+}
+
+.tenant-review-modal-card {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: 0 24px 60px rgba(20, 16, 8, 0.18);
+}
+
+.tenant-review-modal-card h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.tenant-review-modal-card p {
+  margin: 0 0 12px;
+  color: #8b8b8f;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tenant-review-modal-card textarea,
+.tenant-review-modal-card input {
+  width: 100%;
+  border: 1px solid #ece8df;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  background: #fcfbf8;
+}
+
+.tenant-review-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.tenant-review-dialog textarea,
+.tenant-review-dialog input {
+  width: 100%;
+  border: 1px solid #ece8df;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.tenant-review-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tenant-review-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid #ece8df;
+  background: #fff;
+}
+
+.tenant-review-footer-left,
+.tenant-review-footer-right {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tenant-review-footer button,
+.tenant-review-dialog-actions button {
+  border: 1px solid #ece8df;
+  background: #fff;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tenant-review-footer .is-save,
+.tenant-review-footer .is-primary {
+  background: #8bc53f;
+  border-color: #8bc53f;
+  color: #16210a;
+}
+
+.tenant-review-footer .is-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.is-danger-text {
+  color: #d3453b;
+  border-color: #f3c7c2 !important;
+}
+
+.is-danger {
+  background: #d3453b !important;
+  border-color: #d3453b !important;
+  color: #fff !important;
+}
+
+@keyframes tenant-review-slide {
+  from {
+    transform: translateX(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .tenant-review-grid,
+  .tenant-review-check-grid,
+  .tenant-review-swatches {
+    grid-template-columns: 1fr;
+  }
+
+  .tenant-review-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tenant-review-footer-left,
+  .tenant-review-footer-right {
+    width: 100%;
+  }
+
+  .tenant-review-footer button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tenant-review-drawer {
+    animation: none;
+  }
+}

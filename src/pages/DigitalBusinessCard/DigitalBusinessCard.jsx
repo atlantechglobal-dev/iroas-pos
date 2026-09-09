@@ -79,16 +79,25 @@ function DigitalBusinessCard() {
   const [cardSlug, setCardSlug] = useState(() =>
     restaurantPublicSlug(user?.name, 'your-card'),
   )
+  const [fromIdentity, setFromIdentity] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    api
-      .getRestaurant()
-      .then(({ restaurant }) => {
+    Promise.all([api.getRestaurant().catch(() => null), api.getIdentity().catch(() => null)])
+      .then(([restaurantRes, identityRes]) => {
         if (cancelled) return
-        if (restaurant.name) setRestaurantName(restaurant.name)
+        const restaurant = restaurantRes?.restaurant
+        const identity = identityRes?.identity
+        const unlocked =
+          identity && (identity.status === 'approved' || identity.status === 'completed')
 
-        const slug = restaurantPublicSlug(restaurant, 'your-card')
+        if (restaurant?.name) setRestaurantName(restaurant.name)
+        else if (identity?.businessName) setRestaurantName(identity.businessName)
+
+        const slug = restaurantPublicSlug(
+          restaurant || { name: identity?.businessName, subdomain: null },
+          'your-card',
+        )
         setCardSlug(slug)
         const saved = loadCardPreview(slug)
 
@@ -98,44 +107,72 @@ function DigitalBusinessCard() {
         setCard((prev) => ({
           ...prev,
           ...(saved?.card || {}),
-          name: saved?.card?.name || prev.name || user?.name || '',
-          email: saved?.card?.email || prev.email || user?.email || '',
+          name:
+            saved?.card?.name ||
+            prev.name ||
+            (unlocked ? identity.contactPerson : '') ||
+            user?.name ||
+            '',
+          email:
+            saved?.card?.email ||
+            prev.email ||
+            (unlocked ? identity.email : '') ||
+            user?.email ||
+            '',
           role:
             saved?.card?.role ||
-            `Owner · ${restaurant.name || 'Your restaurant'}`,
-          phone: saved?.card?.phone || restaurant.phone || prev.phone,
-          website: saved?.card?.website || restaurant.website || prev.website,
-          address: saved?.card?.address || restaurant.address || prev.address,
+            `Owner · ${restaurant?.name || identity?.businessName || 'Your business'}`,
+          phone:
+            saved?.card?.phone ||
+            restaurant?.phone ||
+            (unlocked ? identity.phone : '') ||
+            prev.phone,
+          website:
+            saved?.card?.website ||
+            restaurant?.website ||
+            (unlocked ? identity.website : '') ||
+            prev.website,
+          address:
+            saved?.card?.address ||
+            restaurant?.address ||
+            (unlocked
+              ? [identity.address, identity.city, identity.country].filter(Boolean).join(', ')
+              : '') ||
+            prev.address,
           logoDataUrl:
             saved?.card?.logoDataUrl ||
-            restaurant.logoDataUrl ||
-            restaurant.logo_data_url ||
+            restaurant?.logoDataUrl ||
+            restaurant?.logo_data_url ||
+            (unlocked ? identity.logoDataUrl : '') ||
             prev.logoDataUrl ||
             '',
-          tagline: saved?.card?.tagline || prev.tagline || '',
+          tagline:
+            saved?.card?.tagline ||
+            (unlocked ? identity.primaryBrandInfo || identity.description : '') ||
+            prev.tagline ||
+            '',
           heroDataUrl: saved?.card?.heroDataUrl || prev.heroDataUrl || '',
           circleDataUrl: saved?.card?.circleDataUrl || prev.circleDataUrl || '',
-          insta: saved?.card?.insta || prev.insta || '',
+          insta:
+            saved?.card?.insta ||
+            (unlocked ? identity.social?.instagram : '') ||
+            prev.insta ||
+            '',
         }))
+
+        if (unlocked && !saved?.card) {
+          // Mark that fields came from Digital Identity for UI hint
+          setFromIdentity(true)
+        }
       })
-      .catch(() => {
-        if (cancelled) return
-        const slug = restaurantPublicSlug(user?.name, 'your-card')
-        setCardSlug(slug)
-        const saved = loadCardPreview(slug)
-        if (saved?.theme) setTheme(saved.theme)
-        if (saved?.layout) setLayout(saved.layout)
-        if (saved?.card) setCard((prev) => ({ ...prev, ...saved.card }))
-        if (saved?.restaurantName) setRestaurantName(saved.restaurantName)
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setHydrated(true)
       })
-
     return () => {
       cancelled = true
     }
-  }, [user?.name, user?.email])
+  }, [user])
 
   const displayRestaurant = restaurantName.trim() || 'Your restaurant'
   const cardLink = cardDisplayHost(cardSlug)
@@ -217,6 +254,9 @@ function DigitalBusinessCard() {
               Restaurant-style landscape cards with your photos, contact details and QR —
               ready to share or preview for guests.
             </p>
+            {fromIdentity ? (
+              <p className="dbc-identity-hint">Prefilled from your approved Digital Identity.</p>
+            ) : null}
           </div>
 
           <div className="page-actions">

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, setSession } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth.js'
+import { BUSINESS_CATEGORIES } from '../../constants/digitalIdentity.js'
+import { getBusinessCopy } from '../../constants/businessCopy.js'
 import {
   isValidEmail,
   isValidMobile,
@@ -14,6 +16,7 @@ const initialErrors = {
   firstName: '',
   lastName: '',
   restaurant: '',
+  category: '',
   email: '',
   phone: '',
   password: '',
@@ -27,6 +30,7 @@ function CreateAccount() {
     firstName: '',
     lastName: '',
     restaurant: '',
+    category: '',
     email: '',
     phone: '',
     password: '',
@@ -36,6 +40,7 @@ function CreateAccount() {
   const [terms, setTerms] = useState(false)
   const [serverError, setServerError] = useState('')
   const [loading, setLoading] = useState(false)
+  const copy = getBusinessCopy(form.category)
 
   const updateField = (field) => (event) => {
     const value = event.target.value
@@ -64,7 +69,12 @@ function CreateAccount() {
     }
 
     if (!form.restaurant.trim()) {
-      nextErrors.restaurant = 'Restaurant name is required.'
+      const nameLabel = getBusinessCopy(form.category).nameLabel.toLowerCase()
+      nextErrors.restaurant = `${nameLabel.charAt(0).toUpperCase()}${nameLabel.slice(1)} is required.`
+    }
+
+    if (!form.category.trim()) {
+      nextErrors.category = 'Category is required.'
     }
 
     if (!form.email.trim()) {
@@ -106,6 +116,7 @@ function CreateAccount() {
       const { token, user } = await api.signup({
         name: fullName,
         restaurant: form.restaurant.trim(),
+        category: form.category,
         email: form.email.trim(),
         phone: normalizeMobileDigits(form.phone),
         password: form.password,
@@ -136,14 +147,14 @@ function CreateAccount() {
           </div>
 
           <h1>
-            Set up your restaurant in
+            Set up your {copy.noun} in
             <br />
             minutes.
           </h1>
 
           <p className="description">
             Create your owner account, then our onboarding wizard builds your
-            menu, website and QR codes.
+            digital presence.
           </p>
 
           <div className="features">
@@ -236,9 +247,30 @@ function CreateAccount() {
               </div>
             </div>
 
-            {/* RESTAURANT */}
+            {/* CATEGORY first so later labels match the business type */}
             <div className="field-group">
-              <label htmlFor="restaurant">RESTAURANT</label>
+              <label htmlFor="category">CATEGORY</label>
+
+              <div className={`input-wrapper ${errors.category ? 'error' : ''}`}>
+                <i className="fa-solid fa-list"></i>
+                <select
+                  id="category"
+                  value={form.category}
+                  onChange={updateField('category')}
+                >
+                  <option value="">Select category</option>
+                  {BUSINESS_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {errors.category && <p className="field-error">{errors.category}</p>}
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="restaurant">{copy.nameLabel.toUpperCase()}</label>
 
               <div className={`input-wrapper ${errors.restaurant ? 'error' : ''}`}>
                 <i className="fa-solid fa-shop"></i>
@@ -246,7 +278,7 @@ function CreateAccount() {
                 <input
                   type="text"
                   id="restaurant"
-                  placeholder="Saffron & Fig"
+                  placeholder={copy.fallbackName}
                   value={form.restaurant}
                   onChange={updateField('restaurant')}
                 />
@@ -264,7 +296,7 @@ function CreateAccount() {
                 <input
                   type="email"
                   id="email"
-                  placeholder="you@restaurant.com"
+                  placeholder={copy.emailPlaceholder.replace('hello@', 'you@')}
                   value={form.email}
                   onChange={updateField('email')}
                 />

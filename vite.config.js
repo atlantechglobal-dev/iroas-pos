@@ -7,6 +7,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    optimizeDeps: {
+      include: ['qrcode'],
+    },
     server: {
       proxy: {
         '/api': {
