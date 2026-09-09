@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { useRestaurant } from '../../hooks/useRestaurant.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { HorizontalDragScroll } from '../../components/HorizontalDragScroll.jsx'
+import { ROUTES } from '../../constants/routes.js'
 import './Dashboard.css'
 
 function generateSeries(n, base, amplitude) {
@@ -282,7 +283,7 @@ function Dashboard() {
                     <h2>Recent orders</h2>
                     <span>Live stream from POS &amp; delivery channels</span>
                   </div>
-                  <button className="link-btn" type="button" onClick={() => previewAction('Orders')}>
+                  <button className="link-btn" type="button" onClick={() => navigate(ROUTES.ORDERS)}>
                     View all
                   </button>
                 </div>
@@ -312,7 +313,7 @@ function Dashboard() {
                     <h2>Tonight's reservations</h2>
                     <span>4 of {RESERVATIONS.length + 5} arriving next hour</span>
                   </div>
-                  <button className="link-btn" type="button" onClick={() => previewAction('Reservations')}>
+                  <button className="link-btn" type="button" onClick={() => navigate(ROUTES.RESERVATIONS)}>
                     Calendar
                   </button>
                 </div>

@@ -163,6 +163,18 @@ function fontStack(list, name) {
   return list.find((f) => f.name === name)?.stack || name
 }
 
+function normalizeGallery(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item, index) => {
+      if (typeof item === 'string') return { id: `g-${index}`, dataUrl: item }
+      const dataUrl = item?.dataUrl || item?.url || item?.src || ''
+      if (!dataUrl) return null
+      return { id: item.id || `g-${index}`, dataUrl, caption: item.caption || '' }
+    })
+    .filter(Boolean)
+}
+
 function BrandStudio() {
   const toast = useToast()
 
@@ -207,7 +219,7 @@ function BrandStudio() {
         if (settings.coverDataUrl || settings.coverPhoto) {
           setCoverDataUrl(settings.coverDataUrl || settings.coverPhoto)
         }
-        if (Array.isArray(settings.gallery)) setGallery(settings.gallery)
+        if (Array.isArray(settings.gallery)) setGallery(normalizeGallery(settings.gallery))
         if (settings.bodyFont) setBodyFont(settings.bodyFont)
         if (settings.brandPalette) {
           setPalette((prev) => ({ ...prev, ...settings.brandPalette }))
@@ -366,7 +378,11 @@ function BrandStudio() {
   }
 
   return (
-    <DashboardLayout pageClassName="branding-studio-page" activeNav="branding">
+    <DashboardLayout
+      pageClassName="branding-studio-page"
+      activeNav="branding"
+      allowPendingContent
+    >
       <div className="branding-studio">
         <div className="branding-main">
           <header className="branding-head">
@@ -447,6 +463,9 @@ function BrandStudio() {
                     Remove
                   </button>
                 </div>
+              ))}
+              {Array.from({ length: Math.max(0, 3 - gallery.length) }).map((_, index) => (
+                <div className="gallery-slot" key={`slot-${index}`} aria-hidden="true" />
               ))}
               <label className="gallery-add">
                 + Add photo

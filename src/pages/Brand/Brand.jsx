@@ -1,45 +1,27 @@
-import { useEffect, useState } from 'react'
-import { api } from '../../lib/api'
+import { useAuth } from '../../hooks/useAuth.js'
+import { RESTAURANT_STATUS } from '../../constants/restaurantStatus.js'
 import BrandWizard from './BrandWizard.jsx'
 import BrandStudio from './BrandStudio.jsx'
 
 /**
- * /brand serves two connected experiences:
- * - Onboarding / register flow → BrandWizard (setup chrome)
- * - Live restaurant (dashboard Branding nav) → BrandStudio
+ * /brand:
+ * - Onboarding wizard while the restaurant is still in setup
+ * - Dashboard Branding studio once there is a tenant to brand (live, review, rejected)
+ *   or when a platform admin opens the nav item
  */
 function Brand() {
-  const [mode, setMode] = useState('loading') // loading | wizard | studio
+  const { isAdmin, restaurantStatus } = useAuth()
 
-  useEffect(() => {
-    let cancelled = false
-    api
-      .getRestaurant()
-      .then(({ restaurant }) => {
-        if (cancelled) return
-        setMode(
-          restaurant?.status === 'live' || restaurant?.status === 'pending_approval'
-            ? 'studio'
-            : 'wizard',
-        )
-      })
-      .catch(() => {
-        if (!cancelled) setMode('wizard')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (mode === 'loading') {
+  if (isAdmin) return <BrandStudio />
+  if (!restaurantStatus) {
     return (
       <div className="app-loading" role="status" aria-live="polite">
         Loading…
       </div>
     )
   }
-
-  return mode === 'studio' ? <BrandStudio /> : <BrandWizard />
+  if (restaurantStatus === RESTAURANT_STATUS.ONBOARDING) return <BrandWizard />
+  return <BrandStudio />
 }
 
 export default Brand

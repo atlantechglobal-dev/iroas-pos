@@ -19,6 +19,7 @@ export function DashboardLayout({
   variant = 'owner',
   adminSubtitle,
   shellStyle,
+  allowPendingContent = false,
   children,
 }) {
   const navigate = useNavigate()
@@ -44,7 +45,10 @@ export function DashboardLayout({
           : 'Onboarding'
 
   const showApprovalGate =
-    variant === 'owner' && !isAdmin && isPendingApproval(authRestaurantStatus || restaurantStatus)
+    variant === 'owner' &&
+    !isAdmin &&
+    !allowPendingContent &&
+    isPendingApproval(authRestaurantStatus || restaurantStatus)
 
   useEffect(() => {
     setSidebarOpen(false)
