@@ -160,29 +160,35 @@ router.post('/signup', (req, res) => {
       ? JSON.stringify({ businessCategory })
       : null
 
-    const result = db.transaction(() => {
+    // Everything below — including the optional Digital Identity submission —
+    // runs in one transaction so a validation failure there doesn't leave a
+    // signed-up user with no way to retry (email already taken, no token issued).
+    const { user, submittedIdentity } = db.transaction(() => {
       const userInfo = insertUser.run(name.trim(), email, mobileDigits, passwordHash, 'owner')
       insertRestaurant.run(
         userInfo.lastInsertRowid,
         String(businessName).trim(),
         settingsJson,
       )
-      return userInfo.lastInsertRowid
-    })()
 
-    const user = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(result)
+      const createdUser = db
+        .prepare('SELECT id, name, email, role FROM users WHERE id = ?')
+        .get(userInfo.lastInsertRowid)
 
-    let submittedIdentity = null
-    if (identity) {
-      const payload = {
-        ...identity,
-        businessName: identity.businessName || businessName,
-        contactPerson: identity.contactPerson || name.trim(),
-        email: identity.email || email,
-        phone: identity.phone || mobileDigits,
+      let identityResult = null
+      if (identity) {
+        const payload = {
+          ...identity,
+          businessName: identity.businessName || businessName,
+          contactPerson: identity.contactPerson || name.trim(),
+          email: identity.email || email,
+          phone: identity.phone || mobileDigits,
+        }
+        identityResult = createSubmittedIdentity(createdUser.id, createdUser, payload)
       }
-      submittedIdentity = createSubmittedIdentity(user.id, user, payload)
-    }
+
+      return { user: createdUser, submittedIdentity: identityResult }
+    })()
 
     res.status(201).json({
       token: signToken(user),
