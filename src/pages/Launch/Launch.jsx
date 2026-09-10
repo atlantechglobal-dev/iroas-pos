@@ -230,7 +230,6 @@ function Launch() {
       .writeText(qrUrl)
       .then(() => showMessage('Link copied — sharing is not supported here.'))
       .catch(() => showMessage('Unable to copy link'))
-    showMessage('Link copied — sharing is not supported here.')
   }
 
   const handleContinue = async () => {
