@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { QrCodePreview, downloadQrPng, qrDataUrl } from '../../components/QrCodePreview.jsx'
 import { restaurantHostname } from '../../utils/restaurantUrl.js'
-import { guestSiteUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
+import { cardPublicUrl, guestSiteUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
 import { ROUTES } from '../../constants/routes.js'
 import OnboardingProgress from '../../components/onboarding/OnboardingProgress.jsx'
 import {
@@ -21,6 +21,7 @@ function Launch() {
   const [restaurantName, setRestaurantName] = useState('')
   const [cuisine, setCuisine] = useState('')
   const [city, setCity] = useState('')
+  const [address, setAddress] = useState('')
   const [domain, setDomain] = useState('')
   const [slug, setSlug] = useState('your-restaurant')
   const [primaryColor, setPrimaryColor] = useState('#F97316')
@@ -39,6 +40,7 @@ function Launch() {
         if (restaurant.name) setRestaurantName(restaurant.name)
         if (restaurant.cuisine) setCuisine(restaurant.cuisine)
         if (restaurant.city) setCity(restaurant.city)
+        if (restaurant.address) setAddress(restaurant.address)
         if (restaurant.primary_color) setPrimaryColor(restaurant.primary_color)
         if (restaurant.secondary_color) setSecondaryColor(restaurant.secondary_color)
         if (restaurant.accent_color) setAccentColor(restaurant.accent_color)
@@ -61,6 +63,14 @@ function Launch() {
   const hostname = domain || 'yourbusiness.iroas.com'
   const marketingLink = hasDomain ? `https://${hostname}` : ''
   const LIVE_LINK = guestSiteUrl(slug, 'website') || marketingLink
+  const businessCardLink = cardPublicUrl(slug)
+  const mapQuery = address.trim() || city.trim()
+  const locationLink = mapQuery
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
+    : ''
+  const mapEmbedLink = mapQuery
+    ? `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`
+    : ''
 
   useEffect(() => {
     if (!LIVE_LINK) {
@@ -96,13 +106,13 @@ function Launch() {
     window.open(LIVE_LINK, '_blank')
   }
 
-  const handleDownloadQR = async () => {
-    if (!LIVE_LINK) {
-      showMessage('Set your web address first')
+  const handleDownloadQR = async (qrUrl = LIVE_LINK, fileName = `${hostname.split('.')[0]}-QR.png`) => {
+    if (!qrUrl) {
+      showMessage('Add the required details first')
       return
     }
     try {
-      await downloadQrPng(LIVE_LINK, `${hostname.split('.')[0]}-QR.png`)
+      await downloadQrPng(qrUrl, fileName)
     } catch {
       showMessage('Unable to download QR')
     }
@@ -117,13 +127,13 @@ function Launch() {
       "'": '&#39;',
     })[char])
 
-  const handlePrintQR = async () => {
-    if (!LIVE_LINK) {
-      showMessage('Set your web address first')
+  const handlePrintQR = async (qrUrl = LIVE_LINK, label = displayName, linkLabel = hostname) => {
+    if (!qrUrl) {
+      showMessage('Add the required details first')
       return
     }
 
-    const qrSrc = qrCache.current || (await qrDataUrl(LIVE_LINK, { width: 300 }))
+    const qrSrc = await qrDataUrl(qrUrl, { width: 300 })
     const printWindow = window.open('', '_blank', 'width=420,height=640')
 
     if (!printWindow) {
@@ -131,8 +141,8 @@ function Launch() {
       return
     }
 
-    const safeName = escapeHtml(displayName)
-    const safeHost = escapeHtml(hostname)
+    const safeName = escapeHtml(label)
+    const safeHost = escapeHtml(linkLabel)
 
     printWindow.document.write(`
       <!doctype html>
@@ -177,9 +187,9 @@ function Launch() {
     printWindow.onafterprint = () => printWindow.close()
   }
 
-  const handleShareQR = async () => {
-    if (!LIVE_LINK) {
-      showMessage('Set your web address first')
+  const handleShareQR = async (qrUrl = LIVE_LINK, label = displayName) => {
+    if (!qrUrl) {
+      showMessage('Add the required details first')
       return
     }
 
@@ -187,17 +197,17 @@ function Launch() {
 
     try {
       if (canNativeShare && navigator.canShare) {
-        const dataUrl = qrCache.current || (await qrDataUrl(LIVE_LINK, { width: 300 }))
+        const dataUrl = await qrDataUrl(qrUrl, { width: 300 })
         const res = await fetch(dataUrl)
         const blob = await res.blob()
-        const file = new File([blob], `${hostname.split('.')[0]}-QR.png`, {
+        const file = new File([blob], `${label.replace(/\s+/g, '-').toLowerCase()}-QR.png`, {
           type: 'image/png',
         })
 
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
-            title: displayName,
-            text: `Scan to visit ${displayName}`,
+            title: label,
+            text: `Scan to visit ${label}`,
             files: [file],
           })
           return
@@ -206,9 +216,9 @@ function Launch() {
 
       if (canNativeShare) {
         await navigator.share({
-          title: displayName,
-          text: `Visit ${displayName}`,
-          url: LIVE_LINK,
+          title: label,
+          text: `Visit ${label}`,
+          url: qrUrl,
         })
         return
       }
@@ -216,7 +226,10 @@ function Launch() {
       if (err && err.name === 'AbortError') return
     }
 
-    copyRestaurantLink()
+    navigator.clipboard
+      .writeText(qrUrl)
+      .then(() => showMessage('Link copied — sharing is not supported here.'))
+      .catch(() => showMessage('Unable to copy link'))
     showMessage('Link copied — sharing is not supported here.')
   }
 
@@ -375,6 +388,67 @@ function Launch() {
               <div className="real-label">Poster</div>
             </div>
           </div>
+          <section className="qr-card-grid" aria-label="QR codes">
+            <article
+              className="qr-card"
+              style={{ '--qr-card-primary': primaryColor, '--qr-card-secondary': secondaryColor, '--qr-card-accent': accentColor }}
+            >
+              <div className="qr-card-heading">
+                <span className="qr-card-icon">ID</span>
+                <div>
+                  <span>BUSINESS ID</span>
+                  <strong>{displayName}</strong>
+                </div>
+              </div>
+              <QrCodePreview value={businessCardLink} size={164} alt={`${displayName} business ID QR code`} />
+              <p>Scan to open the digital business card.</p>
+              <div className="qr-icon-actions" aria-label="Business ID QR actions">
+                <button type="button" onClick={() => handleDownloadQR(businessCardLink, `${displayName}-business-id-QR.png`)} aria-label="Download business ID QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
+                <button type="button" onClick={() => handleShareQR(businessCardLink, `${displayName} business ID`)} aria-label="Share business ID QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
+                <button type="button" onClick={() => handlePrintQR(businessCardLink, `${displayName} business ID`, businessCardLink)} aria-label="Print business ID QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
+              </div>
+            </article>
+
+            <article
+              className="qr-card location-qr-card"
+              style={{ '--qr-card-primary': primaryColor, '--qr-card-secondary': secondaryColor, '--qr-card-accent': accentColor }}
+            >
+              <div className="qr-card-heading">
+                <span className="qr-card-icon">⌖</span>
+                <div>
+                  <span>BUSINESS LOCATION</span>
+                  <strong>{mapQuery || 'Add your address in Profile'}</strong>
+                </div>
+              </div>
+              {mapEmbedLink ? <iframe className="location-map" src={mapEmbedLink} title={`${displayName} location map`} loading="lazy" /> : null}
+              <QrCodePreview value={locationLink} size={110} alt={`${displayName} location QR code`} emptyMessage="Add an address in Profile to create a location QR." />
+              {locationLink ? <a href={locationLink} target="_blank" rel="noreferrer">Open in Google Maps</a> : null}
+              <div className="qr-icon-actions" aria-label="Business location QR actions">
+                <button type="button" disabled={!locationLink} onClick={() => handleDownloadQR(locationLink, `${displayName}-location-QR.png`)} aria-label="Download business location QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
+                <button type="button" disabled={!locationLink} onClick={() => handleShareQR(locationLink, `${displayName} location`)} aria-label="Share business location QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
+                <button type="button" disabled={!locationLink} onClick={() => handlePrintQR(locationLink, `${displayName} location`, mapQuery)} aria-label="Print business location QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
+              </div>
+            </article>
+
+            <article
+              className="qr-card website-qr-card"
+              style={{ '--qr-card-primary': primaryColor, '--qr-card-secondary': secondaryColor, '--qr-card-accent': accentColor }}
+            >
+              <div className="qr-card-heading">
+                <span className="qr-card-icon">⌁</span>
+                <div>
+                  <span>WEBSITE QR</span>
+                  <strong>{hostname}</strong>
+                </div>
+              </div>
+              <QrCodePreview value={LIVE_LINK} size={164} alt={`${displayName} website QR code`} />
+              <div className="qr-icon-actions" aria-label="Website QR actions">
+                <button type="button" onClick={() => handleDownloadQR(LIVE_LINK)} aria-label="Download website QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
+                <button type="button" onClick={() => handleShareQR(LIVE_LINK, `${displayName} website`)} aria-label="Share website QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
+                <button type="button" onClick={() => handlePrintQR(LIVE_LINK, `${displayName} website`, hostname)} aria-label="Print website QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
+              </div>
+            </article>
+          </section>
         </section>
 
         <section className="phone-area">

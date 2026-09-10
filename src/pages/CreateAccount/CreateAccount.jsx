@@ -19,8 +19,7 @@ import {
 } from '../../utils/validation.js'
 import './CreateAccount.css'
 
-/** Set to `true` to restore the category picker and vertical-specific copy. */
-const ENABLE_CATEGORY_FLOW = false
+const ENABLE_CATEGORY_FLOW = true
 const DEFAULT_CATEGORY = 'Restaurant'
 
 const initialErrors = {

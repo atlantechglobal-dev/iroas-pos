@@ -438,7 +438,9 @@ function RestaurantSetup() {
 
                 <input
                   type="text"
-                  defaultValue="142, Hill Road, Bandra West, Mumbai 400050"
+                  placeholder="142, Hill Road, Bandra West, Mumbai 400050"
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
                 />
               </div>
             </div>
