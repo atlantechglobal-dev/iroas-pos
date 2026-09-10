@@ -7,8 +7,16 @@ export function isValidEmail(value) {
 
 export function isValidPassword(value) {
   const password = String(value || '')
-  return password.length >= 8 && /[A-Z]/.test(password) && /\d/.test(password)
+  return (
+    password.length >= 8 &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password)
+  )
 }
+
+export const passwordRequirements =
+  'Use at least 8 characters, including uppercase, lowercase, and a number.'
 
 export function passwordsMatch(password, confirmPassword) {
   return password === confirmPassword && password.length > 0
@@ -32,9 +40,27 @@ export function mobileDigitsOnly(value) {
 }
 
 export function normalizeMobileDigits(value) {
-  return mobileDigitsOnly(value).slice(0, 10)
+  return mobileDigitsOnly(value).slice(0, 15)
+}
+
+export function formatE164(dialCode, nationalNumber) {
+  const code = mobileDigitsOnly(dialCode)
+  const national = mobileDigitsOnly(nationalNumber)
+  if (!code || !national) return ''
+  return `+${code}${national}`
+}
+
+/** E.164: country code 1–3 digits, subscriber 4–14, total 8–15. */
+export function isValidInternationalMobile(dialCode, nationalNumber) {
+  const code = mobileDigitsOnly(dialCode)
+  const national = mobileDigitsOnly(nationalNumber)
+  if (code.length < 1 || code.length > 3) return false
+  if (national.length < 4 || national.length > 14) return false
+  const total = code.length + national.length
+  return total >= 8 && total <= 15
 }
 
 export function isValidMobile(value) {
-  return mobileDigitsOnly(value).length === 10
+  const digits = mobileDigitsOnly(value)
+  return digits.length >= 8 && digits.length <= 15
 }

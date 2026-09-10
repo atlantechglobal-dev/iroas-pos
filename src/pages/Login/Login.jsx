@@ -15,6 +15,7 @@ function Login() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [errors, setErrors] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [flash, setFlash] = useState('')
 
@@ -29,16 +30,13 @@ function Login() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
+    const nextErrors = { email: '', password: '' }
 
-    if (!email.trim() || !password.trim()) {
-      setError('Please enter your email and password.')
-      return
-    }
-
-    if (!isValidEmail(email)) {
-      setError('Please enter a valid email address.')
-      return
-    }
+    if (!email.trim()) nextErrors.email = 'Email is required.'
+    else if (!isValidEmail(email)) nextErrors.email = 'Enter a valid email address.'
+    if (!password) nextErrors.password = 'Password is required.'
+    setErrors(nextErrors)
+    if (nextErrors.email || nextErrors.password) return
 
     setLoading(true)
 
@@ -51,6 +49,14 @@ function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const updateField = (field) => (event) => {
+    const value = event.target.value
+    if (field === 'email') setEmail(value)
+    else setPassword(value)
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }))
+    if (error) setError('')
   }
 
   const handleForgotPassword = () => {
@@ -149,7 +155,7 @@ function Login() {
             <div className="form-group">
               <label htmlFor="email">EMAIL OR USERNAME</label>
 
-              <div className="input-wrapper">
+              <div className={`input-wrapper ${errors.email ? 'error' : ''}`}>
                 <span className="input-icon">
                   <img src="/images/msg.svg" alt="" />
                 </span>
@@ -159,10 +165,13 @@ function Login() {
                   id="email"
                   placeholder="you@restaurant.com"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={updateField('email')}
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? 'login-email-error' : undefined}
                   required
                 />
               </div>
+              {errors.email ? <p className="field-error" id="login-email-error">{errors.email}</p> : null}
             </div>
 
             {/* PASSWORD */}
@@ -179,7 +188,7 @@ function Login() {
                 </button>
               </div>
 
-              <div className="input-wrapper">
+              <div className={`input-wrapper ${errors.password ? 'error' : ''}`}>
                 <span className="input-icon">
                   <img src="/images/lock.svg" alt="" />
                 </span>
@@ -189,7 +198,9 @@ function Login() {
                   id="password"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={updateField('password')}
+                  aria-invalid={Boolean(errors.password)}
+                  aria-describedby={errors.password ? 'login-password-error' : undefined}
                   required
                 />
 
@@ -201,6 +212,7 @@ function Login() {
                   <img src="/images/eyee.svg" alt="" />
                 </button>
               </div>
+              {errors.password ? <p className="field-error" id="login-password-error">{errors.password}</p> : null}
             </div>
 
             {/* REMEMBER */}

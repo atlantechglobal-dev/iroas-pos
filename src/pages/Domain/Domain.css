@@ -760,3 +760,7 @@
     }
   }
 }
+
+.domain-page .static-progress {
+  display: none;
+}

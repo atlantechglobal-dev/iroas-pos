@@ -5,6 +5,7 @@ import { QrCodePreview, downloadQrPng, qrDataUrl } from '../../components/QrCode
 import { restaurantHostname } from '../../utils/restaurantUrl.js'
 import { guestSiteUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
 import { ROUTES } from '../../constants/routes.js'
+import OnboardingProgress from '../../components/onboarding/OnboardingProgress.jsx'
 import {
   businessCategoryFromRestaurant,
   getBusinessCopy,
@@ -248,7 +249,7 @@ function Launch() {
         </div>
       </header>
 
-      <nav className="steps">
+      <nav className="steps static-progress" aria-hidden="true">
         <div className="step completed">
           <div className="step-icon">✓</div>
           <div>
@@ -283,6 +284,7 @@ function Launch() {
           </div>
         </div>
       </nav>
+      <OnboardingProgress className="steps dynamic-progress" compact />
 
       <main className="main-container">
         <section className="launch-card">

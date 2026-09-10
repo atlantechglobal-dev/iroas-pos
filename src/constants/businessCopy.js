@@ -17,6 +17,19 @@ const DEFAULT_COPY = {
   flavorLine: (specialty) =>
     specialty ? `${specialty}, delivered with care.` : 'Quality service, delivered with care.',
   slugExtras: (base) => [`the-${base}`, `${base}-hq`, `${base}-online`],
+  signupDescription:
+    'Create your owner account, then our onboarding wizard builds your digital presence.',
+  signupDeliverables: [
+    'Services, bookings & customers in one dashboard',
+    'Branded website live in minutes',
+    'QR codes, One Link & analytics built in',
+    'Payments, reviews & marketing tools',
+  ],
+  signupQuote:
+    '"IROAS cut our onboarding to a single afternoon. Our site, QR and bookings just work."',
+  signupPersonName: 'Aarav Kapoor',
+  signupPersonRole: 'Owner',
+  signupPersonInitials: 'AK',
 }
 
 const BY_CATEGORY = {
@@ -46,6 +59,15 @@ const BY_CATEGORY = {
       `${base}-eats`,
       `${base}-table`,
     ],
+    signupDeliverables: [
+      'Menu, orders & tables in one dashboard',
+      'Branded ordering website in minutes',
+      'QR codes, KDS & analytics built in',
+      'Payments, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"IROAS cut our onboarding to a single afternoon. Orders, QR menus and staff scheduling just work."',
+    signupPersonRole: 'Owner, Saffron & Fig',
   },
   'Retail Store': {
     noun: 'store',
@@ -66,6 +88,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} — find your next favorite.` : 'Find your next favorite.',
     slugExtras: (base) => [`${base}-shop`, `${base}-store`, `${base}-mart`],
+    signupDeliverables: [
+      'Catalog, inventory & orders in one dashboard',
+      'Branded shop website in minutes',
+      'QR storefront, POS & analytics built in',
+      'Payments, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"We launched a shop site and QR storefront the same day we signed up. Stock and orders finally live in one place."',
+    signupPersonName: 'Meera Shah',
+    signupPersonRole: 'Owner, Olive & Oak',
+    signupPersonInitials: 'MS',
   },
   Salon: {
     noun: 'salon',
@@ -86,6 +119,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} — tailored to you.` : 'Treatments tailored to you.',
     slugExtras: (base) => [`${base}-salon`, `${base}-studio`, `${base}-beauty`],
+    signupDeliverables: [
+      'Services, appointments & stylists in one dashboard',
+      'Branded booking website in minutes',
+      'QR check-in, reminders & analytics built in',
+      'Payments, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"Clients book from our QR card now. Chair time, stylists and payments finally sit in one dashboard."',
+    signupPersonName: 'Leah Mendes',
+    signupPersonRole: 'Owner, Atelier Lume',
+    signupPersonInitials: 'LM',
   },
   Clinic: {
     noun: 'clinic',
@@ -106,6 +150,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} care, focused on you.` : 'Care focused on you.',
     slugExtras: (base) => [`${base}-clinic`, `${base}-care`, `${base}-health`],
+    signupDeliverables: [
+      'Services, appointments & patients in one dashboard',
+      'Branded clinic website in minutes',
+      'QR check-in, reminders & analytics built in',
+      'Payments, reviews & follow-up tools',
+    ],
+    signupQuote:
+      '"Patients book from their phones. Our front desk stopped juggling three different tools."',
+    signupPersonName: 'Dr. Nisha Varghese',
+    signupPersonRole: 'Director, CarePoint Clinic',
+    signupPersonInitials: 'NV',
   },
   Consultancy: {
     noun: 'consultancy',
@@ -126,6 +181,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} expertise for growing teams.` : 'Expertise for growing teams.',
     slugExtras: (base) => [`${base}-consult`, `${base}-advisory`, `${base}-partners`],
+    signupDeliverables: [
+      'Services, leads & calendar in one dashboard',
+      'Branded consultancy website in minutes',
+      'QR business card, One Link & analytics',
+      'Invoices, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"Prospects reach us from one link. Proposals, calendar and follow-ups finally share a home."',
+    signupPersonName: 'Rohan Iyer',
+    signupPersonRole: 'Principal, Northline Advisory',
+    signupPersonInitials: 'RI',
   },
   Freelancer: {
     noun: 'profile',
@@ -146,6 +212,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} for ambitious projects.` : 'Craft for ambitious projects.',
     slugExtras: (base) => [`${base}-studio`, `hi-${base}`, `${base}-works`],
+    signupDeliverables: [
+      'Portfolio, inquiries & calendar in one dashboard',
+      'Branded profile site in minutes',
+      'QR card, One Link & analytics built in',
+      'Invoices, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"My QR card replaced a stack of paper ones. Clients book and pay without the email chase."',
+    signupPersonName: 'Tara Gill',
+    signupPersonRole: 'Independent designer',
+    signupPersonInitials: 'TG',
   },
   'Professional Services': {
     noun: 'practice',
@@ -166,6 +243,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} you can rely on.` : 'Advice you can rely on.',
     slugExtras: (base) => [`${base}-group`, `${base}-associates`, `${base}-partners`],
+    signupDeliverables: [
+      'Services, clients & appointments in one dashboard',
+      'Branded practice website in minutes',
+      'QR card, One Link & analytics built in',
+      'Billing, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"Clients find our practice online and book from the site. Intake is cleaner than our old forms."',
+    signupPersonName: 'Arjun Malhotra',
+    signupPersonRole: 'Partner, Malhotra & Co.',
+    signupPersonInitials: 'AM',
   },
   'Real Estate': {
     noun: 'agency',
@@ -184,8 +272,21 @@ const BY_CATEGORY = {
     secondaryCta: 'Listings',
     welcomeLine: (name) => `Find your next place with ${name}.`,
     flavorLine: (specialty) =>
-      specialty ? `${specialty} across the neighborhoods you want.` : 'Homes across the neighborhoods you want.',
+      specialty
+        ? `${specialty} across the neighborhoods you want.`
+        : 'Homes across the neighborhoods you want.',
     slugExtras: (base) => [`${base}-homes`, `${base}-realty`, `${base}-estates`],
+    signupDeliverables: [
+      'Listings, inquiries & viewings in one dashboard',
+      'Branded agency website in minutes',
+      'QR listing cards, One Link & analytics',
+      'Leads, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"Every listing has a QR now. Viewings and WhatsApp leads land in one place instead of three inboxes."',
+    signupPersonName: 'Sana Qureshi',
+    signupPersonRole: 'Broker, Qureshi Estates',
+    signupPersonInitials: 'SQ',
   },
   Education: {
     noun: 'school',
@@ -206,6 +307,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} for every learner.` : 'Programs for every learner.',
     slugExtras: (base) => [`${base}-academy`, `${base}-learn`, `${base}-institute`],
+    signupDeliverables: [
+      'Programs, enrollments & schedules in one dashboard',
+      'Branded school website in minutes',
+      'QR campus links, One Link & analytics',
+      'Fees, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"Parents enrol from the site. Class lists and fee reminders stopped living in spreadsheets."',
+    signupPersonName: 'Kavya Nair',
+    signupPersonRole: 'Director, Nair Learning Studio',
+    signupPersonInitials: 'KN',
   },
   'Fitness/Gym': {
     noun: 'gym',
@@ -226,6 +338,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} training that fits your life.` : 'Training that fits your life.',
     slugExtras: (base) => [`${base}-fitness`, `${base}-gym`, `${base}-train`],
+    signupDeliverables: [
+      'Classes, memberships & trainers in one dashboard',
+      'Branded gym website in minutes',
+      'QR check-in, bookings & analytics built in',
+      'Payments, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"Members book classes from a QR at the desk. Attendance and memberships finally match."',
+    signupPersonName: 'Dev Patel',
+    signupPersonRole: 'Founder, Ironhouse',
+    signupPersonInitials: 'DP',
   },
   'Local Business': {
     ...DEFAULT_COPY,
@@ -250,6 +373,17 @@ const BY_CATEGORY = {
     flavorLine: (specialty) =>
       specialty ? `${specialty} delivered to your door.` : 'Products delivered to your door.',
     slugExtras: (base) => [`${base}-shop`, `buy-${base}`, `${base}-store`],
+    signupDeliverables: [
+      'Catalog, orders & customers in one dashboard',
+      'Branded online shop in minutes',
+      'QR storefront, One Link & analytics',
+      'Payments, reviews & marketing tools',
+    ],
+    signupQuote:
+      '"We went from Instagram DMs to a real shop site in an afternoon. Orders stopped getting lost."',
+    signupPersonName: 'Isha Rao',
+    signupPersonRole: 'Founder, Atelier Isha',
+    signupPersonInitials: 'IR',
   },
   Other: {
     ...DEFAULT_COPY,
@@ -260,7 +394,9 @@ const BY_CATEGORY = {
 }
 
 export function getBusinessCopy(category) {
-  return BY_CATEGORY[category] || DEFAULT_COPY
+  const specific = BY_CATEGORY[category]
+  if (!specific) return { ...DEFAULT_COPY }
+  return { ...DEFAULT_COPY, ...specific }
 }
 
 export function businessCategoryFromRestaurant(restaurant) {

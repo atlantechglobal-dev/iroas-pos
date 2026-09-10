@@ -374,6 +374,18 @@
   color: #a5a7aa;
 }
 
+.login-page .input-wrapper.error {
+  border-color: #c0392b;
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1);
+}
+
+.login-page .field-error {
+  margin: 6px 0 0;
+  color: #c0392b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .login-page .show-password {
   margin-right: 16px;
 

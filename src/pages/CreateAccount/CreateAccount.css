@@ -381,6 +381,41 @@
     border-color: #e45b5b !important;
   }
 
+  .phone-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .phone-row.error .input-wrapper {
+    border-color: #e45b5b !important;
+  }
+
+  .dial-wrapper {
+    flex: 0 0 142px;
+    padding: 0 10px 0 14px;
+    min-width: 0;
+    background: #f4f5f6;
+    border-color: #e3e3e3;
+  }
+
+  .dial-wrapper select {
+    font-size: 13px;
+    font-weight: 500;
+    width: 100%;
+    color: #8d9296;
+  }
+
+  .dial-wrapper select option {
+    color: #25282b;
+    background: #ffffff;
+  }
+
+  .phone-wrapper {
+    flex: 1;
+    min-width: 0;
+  }
+
   .field-error {
     margin: 6px 0 0;
     color: #c0392b;

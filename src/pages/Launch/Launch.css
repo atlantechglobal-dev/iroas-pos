@@ -755,3 +755,7 @@
     }
   }
 }
+
+.launch-page .static-progress {
+  display: none;
+}

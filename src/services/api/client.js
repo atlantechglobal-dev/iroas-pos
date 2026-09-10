@@ -56,7 +56,9 @@ export async function apiRequest(path, { method = 'GET', body, auth = true, sign
   }
 
   if (!response.ok) {
-    throw new ApiError(data.error || MESSAGES.GENERIC_ERROR, {
+    const fallback =
+      response.status >= 500 ? MESSAGES.NETWORK_ERROR : MESSAGES.GENERIC_ERROR
+    throw new ApiError(data.error || fallback, {
       status: response.status,
       data,
     })

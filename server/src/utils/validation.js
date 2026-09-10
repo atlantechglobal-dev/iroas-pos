@@ -1,4 +1,23 @@
 const PERSON_NAME_RE = /^[\p{L}][\p{L}\s'.-]*$/u
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+export function isValidEmail(value) {
+  return EMAIL_RE.test(normalizeEmail(value))
+}
+
+export function isValidPassword(value) {
+  const password = String(value || '')
+  return (
+    password.length >= 8 &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password)
+  )
+}
 
 export function isValidPersonName(value) {
   const trimmed = String(value || '').trim()
@@ -18,9 +37,10 @@ export function isValidSignupName(fullName) {
 }
 
 export function normalizeMobileDigits(value) {
-  return String(value || '').replace(/\D/g, '')
+  return String(value || '').replace(/\D/g, '').slice(0, 15)
 }
 
 export function isValidMobile(value) {
-  return normalizeMobileDigits(value).length === 10
+  const digits = normalizeMobileDigits(value)
+  return digits.length >= 8 && digits.length <= 15
 }

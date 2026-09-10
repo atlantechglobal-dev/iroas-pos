@@ -873,3 +873,7 @@
     }
   }
 }
+
+.brand-page .static-progress {
+  display: none;
+}

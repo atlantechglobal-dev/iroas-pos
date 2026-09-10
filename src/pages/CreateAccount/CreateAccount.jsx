@@ -5,12 +5,23 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { BUSINESS_CATEGORIES } from '../../constants/digitalIdentity.js'
 import { getBusinessCopy } from '../../constants/businessCopy.js'
 import {
+  CALLING_CODES,
+  DEFAULT_DIAL_CODE,
+} from '../../constants/callingCodes.js'
+import {
   isValidEmail,
-  isValidMobile,
+  isValidInternationalMobile,
   isValidPersonName,
-  normalizeMobileDigits,
+  isValidPassword,
+  passwordRequirements,
+  formatE164,
+  mobileDigitsOnly,
 } from '../../utils/validation.js'
 import './CreateAccount.css'
+
+/** Set to `true` to restore the category picker and vertical-specific copy. */
+const ENABLE_CATEGORY_FLOW = false
+const DEFAULT_CATEGORY = 'Restaurant'
 
 const initialErrors = {
   firstName: '',
@@ -24,15 +35,16 @@ const initialErrors = {
 
 function CreateAccount() {
   const navigate = useNavigate()
-  const { setUser } = useAuth()
+  const { setUser, setRestaurantStatus } = useAuth()
 
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
     restaurant: '',
-    category: '',
+    category: DEFAULT_CATEGORY,
     email: '',
     phone: '',
+    dialIso: 'IN',
     password: '',
   })
   const [errors, setErrors] = useState(initialErrors)
@@ -40,13 +52,13 @@ function CreateAccount() {
   const [terms, setTerms] = useState(false)
   const [serverError, setServerError] = useState('')
   const [loading, setLoading] = useState(false)
-  const copy = getBusinessCopy(form.category)
+  const copy = getBusinessCopy(ENABLE_CATEGORY_FLOW ? form.category : DEFAULT_CATEGORY)
 
   const updateField = (field) => (event) => {
     const value = event.target.value
     setForm((prev) => ({
       ...prev,
-      [field]: field === 'phone' ? normalizeMobileDigits(value) : value,
+      [field]: field === 'phone' ? mobileDigitsOnly(value).slice(0, 14) : value,
     }))
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: '' }))
@@ -69,11 +81,11 @@ function CreateAccount() {
     }
 
     if (!form.restaurant.trim()) {
-      const nameLabel = getBusinessCopy(form.category).nameLabel.toLowerCase()
+      const nameLabel = copy.nameLabel.toLowerCase()
       nextErrors.restaurant = `${nameLabel.charAt(0).toUpperCase()}${nameLabel.slice(1)} is required.`
     }
 
-    if (!form.category.trim()) {
+    if (ENABLE_CATEGORY_FLOW && !form.category.trim()) {
       nextErrors.category = 'Category is required.'
     }
 
@@ -85,12 +97,17 @@ function CreateAccount() {
 
     if (!form.phone.trim()) {
       nextErrors.phone = 'Mobile number is required.'
-    } else if (!isValidMobile(form.phone)) {
-      nextErrors.phone = 'Mobile number must be exactly 10 digits.'
+    } else if (
+      !isValidInternationalMobile(
+        CALLING_CODES.find((c) => c.iso === form.dialIso)?.dial || DEFAULT_DIAL_CODE,
+        form.phone,
+      )
+    ) {
+      nextErrors.phone = 'Enter a valid mobile number for the selected country.'
     }
 
-    if (form.password.length < 8) {
-      nextErrors.password = 'Password must be at least 8 characters.'
+    if (!isValidPassword(form.password)) {
+      nextErrors.password = passwordRequirements
     }
 
     setErrors(nextErrors)
@@ -116,14 +133,18 @@ function CreateAccount() {
       const { token, user } = await api.signup({
         name: fullName,
         restaurant: form.restaurant.trim(),
-        category: form.category,
+        category: ENABLE_CATEGORY_FLOW ? form.category : DEFAULT_CATEGORY,
         email: form.email.trim(),
-        phone: normalizeMobileDigits(form.phone),
+        phone: formatE164(
+          CALLING_CODES.find((c) => c.iso === form.dialIso)?.dial || DEFAULT_DIAL_CODE,
+          form.phone,
+        ),
         password: form.password,
       })
 
       setSession(token, user)
       setUser(user)
+      setRestaurantStatus('onboarding')
       navigate('/restaurant-setup')
     } catch (err) {
       setServerError(err.message)
@@ -152,47 +173,27 @@ function CreateAccount() {
             minutes.
           </h1>
 
-          <p className="description">
-            Create your owner account, then our onboarding wizard builds your
-            digital presence.
-          </p>
+          <p className="description">{copy.signupDescription}</p>
 
-          <div className="features">
-            <div className="feature">
-              <span className="check">✓</span>
-              <span>Menu, orders & tables in one dashboard</span>
-            </div>
-
-            <div className="feature">
-              <span className="check">✓</span>
-              <span>Branded ordering website in minutes</span>
-            </div>
-
-            <div className="feature">
-              <span className="check">✓</span>
-              <span>QR codes, KDS & analytics built in</span>
-            </div>
-
-            <div className="feature">
-              <span className="check">✓</span>
-              <span>Payments, reviews & marketing tools</span>
-            </div>
+          <div className="features" key={ENABLE_CATEGORY_FLOW ? form.category : DEFAULT_CATEGORY}>
+            {copy.signupDeliverables.map((item) => (
+              <div className="feature" key={item}>
+                <span className="check">✓</span>
+                <span>{item}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Testimonial */}
         <div className="testimonial">
-          <p>
-            "IROAS cut our onboarding to a single afternoon. Orders, QR menus
-            and staff scheduling just work."
-          </p>
+          <p>{copy.signupQuote}</p>
 
           <div className="person">
-            <div className="avatar">AK</div>
+            <div className="avatar">{copy.signupPersonInitials}</div>
 
             <div>
-              <strong>Aarav Kapoor</strong>
-              <small>Owner, Saffron & Fig</small>
+              <strong>{copy.signupPersonName}</strong>
+              <small>{copy.signupPersonRole}</small>
             </div>
           </div>
         </div>
@@ -247,27 +248,28 @@ function CreateAccount() {
               </div>
             </div>
 
-            {/* CATEGORY first so later labels match the business type */}
-            <div className="field-group">
-              <label htmlFor="category">CATEGORY</label>
+            {ENABLE_CATEGORY_FLOW ? (
+              <div className="field-group">
+                <label htmlFor="category">CATEGORY</label>
 
-              <div className={`input-wrapper ${errors.category ? 'error' : ''}`}>
-                <i className="fa-solid fa-list"></i>
-                <select
-                  id="category"
-                  value={form.category}
-                  onChange={updateField('category')}
-                >
-                  <option value="">Select category</option>
-                  {BUSINESS_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                <div className={`input-wrapper ${errors.category ? 'error' : ''}`}>
+                  <i className="fa-solid fa-list"></i>
+                  <select
+                    id="category"
+                    value={form.category}
+                    onChange={updateField('category')}
+                  >
+                    <option value="">Select category</option>
+                    {BUSINESS_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {errors.category && <p className="field-error">{errors.category}</p>}
               </div>
-              {errors.category && <p className="field-error">{errors.category}</p>}
-            </div>
+            ) : null}
 
             <div className="field-group">
               <label htmlFor="restaurant">{copy.nameLabel.toUpperCase()}</label>
@@ -304,24 +306,39 @@ function CreateAccount() {
               {errors.email && <p className="field-error">{errors.email}</p>}
             </div>
 
-            {/* PHONE */}
             <div className="field-group">
               <label htmlFor="phone">MOBILE</label>
 
-              <div className={`input-wrapper ${errors.phone ? 'error' : ''}`}>
-                <img src="/images/call.svg" alt="" />
+              <div className={`phone-row ${errors.phone ? 'error' : ''}`}>
+                <div className="input-wrapper dial-wrapper">
+                  <select
+                    id="dialIso"
+                    aria-label="Country code"
+                    value={form.dialIso}
+                    onChange={updateField('dialIso')}
+                  >
+                    {CALLING_CODES.map((country) => (
+                      <option key={country.iso} value={country.iso}>
+                        +{country.dial} {country.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  placeholder="9876543210"
-                  maxLength={10}
-                  value={form.phone}
-                  onChange={updateField('phone')}
-                />
+                <div className="input-wrapper phone-wrapper">
+                  <img src="/images/call.svg" alt="" />
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    placeholder="9876543210"
+                    maxLength={14}
+                    value={form.phone}
+                    onChange={updateField('phone')}
+                  />
+                </div>
               </div>
               {errors.phone && <p className="field-error">{errors.phone}</p>}
             </div>

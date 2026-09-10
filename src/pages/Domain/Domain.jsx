@@ -6,6 +6,7 @@ import {
   getBusinessCopy,
   locationPreviewLine,
 } from '../../constants/businessCopy.js'
+import OnboardingProgress from '../../components/onboarding/OnboardingProgress.jsx'
 import './Domain.css'
 
 const slugify = (value) =>
@@ -181,7 +182,7 @@ function Domain() {
       </header>
 
       {/* PROGRESS NAVIGATION */}
-      <nav className="progress-nav">
+      <nav className="progress-nav static-progress" aria-hidden="true">
         <div className="step completed">
           <div className="step-icon">✓</div>
 
@@ -224,6 +225,7 @@ function Domain() {
           </div>
         </div>
       </nav>
+      <OnboardingProgress className="progress-nav dynamic-progress" />
 
       {/* MAIN CONTENT */}
       <main className="main-area">

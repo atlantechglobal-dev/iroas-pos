@@ -6,6 +6,7 @@ import {
   businessCategoryFromRestaurant,
   getBusinessCopy,
 } from '../../constants/businessCopy.js'
+import OnboardingProgress from '../../components/onboarding/OnboardingProgress.jsx'
 import './RestaurantSetup.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -207,7 +208,7 @@ function RestaurantSetup() {
       </header>
 
       {/* PROGRESS STEPS */}
-      <nav className="steps-container">
+      <nav className="steps-container static-progress" aria-hidden="true">
         <div className="step active">
           <div className="step-icon">
             <img src="/images/profile.png" alt="Profile" />
@@ -252,6 +253,7 @@ function RestaurantSetup() {
           </div>
         </div>
       </nav>
+      <OnboardingProgress className="steps-container dynamic-progress" />
 
       {/* MAIN AREA */}
       <main className="main-container">

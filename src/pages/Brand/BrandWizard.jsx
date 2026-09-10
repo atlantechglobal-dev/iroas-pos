@@ -6,6 +6,7 @@ import {
   businessCategoryFromRestaurant,
   getBusinessCopy,
 } from '../../constants/businessCopy.js'
+import OnboardingProgress from '../../components/onboarding/OnboardingProgress.jsx'
 import './BrandWizard.css'
 
 const FONTS = [
@@ -213,7 +214,7 @@ function BrandWizard() {
       </header>
 
       {/* PROGRESS NAVIGATION */}
-      <nav className="progress-nav">
+      <nav className="progress-nav static-progress" aria-hidden="true">
         <div className="step completed">
           <div className="step-icon">✓</div>
 
@@ -254,6 +255,7 @@ function BrandWizard() {
           </div>
         </div>
       </nav>
+      <OnboardingProgress className="progress-nav dynamic-progress" />
 
       {/* MAIN */}
       <main className="main-area">

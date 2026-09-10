@@ -729,3 +729,7 @@
     }
   }
 }
+
+.restaurant-setup-page .static-progress {
+  display: none;
+}

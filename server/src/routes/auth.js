@@ -3,7 +3,14 @@ import bcrypt from 'bcryptjs'
 import crypto from 'node:crypto'
 import { db } from '../db.js'
 import { signToken, requireAuth } from '../middleware/auth.js'
-import { isValidMobile, isValidSignupName, normalizeMobileDigits } from '../utils/validation.js'
+import {
+  isValidEmail,
+  isValidMobile,
+  isValidPassword,
+  isValidSignupName,
+  normalizeEmail,
+  normalizeMobileDigits,
+} from '../utils/validation.js'
 import {
   appendIdentityEvent,
   createNotification,
@@ -119,12 +126,13 @@ function createSubmittedIdentity(userId, user, identityPayload) {
 
 router.post('/signup', (req, res) => {
   const { name, restaurant, category, email, phone, password, identity } = req.body || {}
+  const normalizedEmail = normalizeEmail(email)
 
   const businessName =
     restaurant || identity?.businessName || identity?.brandName || ''
   const businessCategory = String(category || identity?.category || '').trim()
 
-  if (!name || !businessName || !email || !phone || !password) {
+  if (!name || !businessName || !normalizedEmail || !phone || !password) {
     return res.status(400).json({ error: 'All fields are required.' })
   }
 
@@ -132,16 +140,20 @@ router.post('/signup', (req, res) => {
     return res.status(400).json({ error: 'Enter a valid first and last name using letters only.' })
   }
 
+  if (!isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ error: 'Enter a valid email address.' })
+  }
+
   const mobileDigits = normalizeMobileDigits(phone)
   if (!isValidMobile(mobileDigits)) {
-    return res.status(400).json({ error: 'Mobile number must be exactly 10 digits.' })
+    return res.status(400).json({ error: 'Enter a valid mobile number with country code.' })
   }
 
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters.' })
+  if (!isValidPassword(password)) {
+    return res.status(400).json({ error: 'Use at least 8 characters, including uppercase, lowercase, and a number.' })
   }
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail)
   if (existing) {
     return res.status(409).json({ error: 'An account with this email already exists.' })
   }
@@ -164,7 +176,7 @@ router.post('/signup', (req, res) => {
     // runs in one transaction so a validation failure there doesn't leave a
     // signed-up user with no way to retry (email already taken, no token issued).
     const { user, submittedIdentity } = db.transaction(() => {
-      const userInfo = insertUser.run(name.trim(), email, mobileDigits, passwordHash, 'owner')
+      const userInfo = insertUser.run(name.trim(), normalizedEmail, mobileDigits, passwordHash, 'owner')
       insertRestaurant.run(
         userInfo.lastInsertRowid,
         String(businessName).trim(),
@@ -181,7 +193,7 @@ router.post('/signup', (req, res) => {
           ...identity,
           businessName: identity.businessName || businessName,
           contactPerson: identity.contactPerson || name.trim(),
-          email: identity.email || email,
+          email: identity.email || normalizedEmail,
           phone: identity.phone || mobileDigits,
         }
         identityResult = createSubmittedIdentity(createdUser.id, createdUser, payload)
@@ -209,12 +221,17 @@ router.post('/signup', (req, res) => {
 
 router.post('/login', (req, res) => {
   const { email, password } = req.body || {}
+  const normalizedEmail = normalizeEmail(email)
 
-  if (!email || !password) {
+  if (!normalizedEmail || !password) {
     return res.status(400).json({ error: 'Email and password are required.' })
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
+  if (!isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ error: 'Enter a valid email address.' })
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(normalizedEmail)
 
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'Invalid email or password.' })
