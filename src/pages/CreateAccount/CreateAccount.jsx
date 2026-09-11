@@ -8,6 +8,7 @@ import {
   CALLING_CODES,
   DEFAULT_DIAL_CODE,
 } from '../../constants/callingCodes.js'
+import { getDefaultCountryIso } from '../../utils/countryDetection.js'
 import {
   isValidEmail,
   isValidInternationalMobile,
@@ -43,7 +44,7 @@ function CreateAccount() {
     category: DEFAULT_CATEGORY,
     email: '',
     phone: '',
-    dialIso: 'IN',
+    dialIso: getDefaultCountryIso(),
     password: '',
   })
   const [errors, setErrors] = useState(initialErrors)

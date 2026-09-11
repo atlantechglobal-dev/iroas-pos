@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { isValidEmail } from '../../utils/validation.js'
 import { ROUTES } from '../../constants/routes.js'
+import { getBusinessCopy } from '../../constants/businessCopy.js'
 import './Login.css'
 
 function Login() {
@@ -18,6 +19,7 @@ function Login() {
   const [errors, setErrors] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [flash, setFlash] = useState('')
+  const copy = getBusinessCopy('Other')
 
   useEffect(() => {
     const msg = sessionStorage.getItem('login_flash')
@@ -81,54 +83,38 @@ function Login() {
           </div>
           <div className="badge">
             <img src="/images/security.svg" alt="Restaurant OS" />
-            RESTAURANT OS
+            BUSINESS OS
           </div>
 
           <h1>
-            Run your restaurant,
+            Run your business,
             <br />
             beautifully.
           </h1>
 
           <p className="description">
-            IROAS gives you a modern ordering site, kitchen display, staff
-            tools and analytics — all from one login.
+            IROAS gives you a modern website, customer tools, payments and
+            analytics — all from one login.
           </p>
 
           <ul className="features">
-            <li>
-              <span className="check">✓</span>
-              <span>Menu, orders & tables in one dashboard</span>
-            </li>
-
-            <li>
-              <span className="check">✓</span>
-              <span>Branded ordering website in minutes</span>
-            </li>
-
-            <li>
-              <span className="check">✓</span>
-              <span>QR codes, KDS and analytics built in</span>
-            </li>
-
-            <li>
-              <span className="check">✓</span>
-              <span>Payments, reviews & marketing tools</span>
-            </li>
+            {copy.signupDeliverables.map((item) => (
+              <li key={item}>
+                <span className="check">✓</span>
+                <span>{item}</span>
+              </li>
+            ))}
           </ul>
 
           <div className="testimonial">
-            <p>
-              "IROAS cut our onboarding to a single afternoon. Orders, QR
-              menus and staff scheduling just work."
-            </p>
+            <p>{copy.signupQuote}</p>
 
             <div className="user">
-              <div className="avatar">AK</div>
+              <div className="avatar">{copy.signupPersonInitials}</div>
 
               <div>
-                <strong>Aarav Kapoor</strong>
-                <span>Owner, Saffron & Fig</span>
+                <strong>{copy.signupPersonName}</strong>
+                <span>{copy.signupPersonRole}</span>
               </div>
             </div>
           </div>
@@ -140,7 +126,7 @@ function Login() {
         <div className="login-container">
           <div className="login-header">
             <h2>Welcome back</h2>
-            <p>Sign in to manage your restaurant.</p>
+            <p>Sign in to manage your business.</p>
           </div>
 
           {flash ? (
@@ -163,7 +149,7 @@ function Login() {
                 <input
                   type="email"
                   id="email"
-                  placeholder="you@restaurant.com"
+                  placeholder="you@yourbusiness.com"
                   value={email}
                   onChange={updateField('email')}
                   aria-invalid={Boolean(errors.email)}
