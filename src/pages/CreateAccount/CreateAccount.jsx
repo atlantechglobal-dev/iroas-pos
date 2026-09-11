@@ -9,7 +9,6 @@ import {
   DEFAULT_DIAL_CODE,
 } from '../../constants/callingCodes.js'
 import { CountryCodePicker } from '../../components/CountryCodePicker.jsx'
-import { getDefaultCountryIso } from '../../utils/countryDetection.js'
 import {
   isValidEmail,
   isValidInternationalMobile,
@@ -23,6 +22,7 @@ import './CreateAccount.css'
 
 const ENABLE_CATEGORY_FLOW = true
 const DEFAULT_CATEGORY = 'Restaurant'
+const DEFAULT_SIGNUP_COUNTRY_ISO = 'ZA'
 
 const initialErrors = {
   firstName: '',
@@ -45,7 +45,7 @@ function CreateAccount() {
     category: '',
     email: '',
     phone: '',
-    dialIso: getDefaultCountryIso(),
+    dialIso: DEFAULT_SIGNUP_COUNTRY_ISO,
     password: '',
   })
   const [errors, setErrors] = useState(initialErrors)
