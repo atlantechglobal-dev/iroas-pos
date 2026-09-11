@@ -6,10 +6,10 @@ import { BUSINESS_CATEGORIES } from '../../constants/digitalIdentity.js'
 import { getBusinessCopy } from '../../constants/businessCopy.js'
 import {
   CALLING_CODES,
-  DEFAULT_COUNTRY_ISO,
   DEFAULT_DIAL_CODE,
 } from '../../constants/callingCodes.js'
 import { CountryCodePicker } from '../../components/CountryCodePicker.jsx'
+import { getDefaultCountryIso } from '../../utils/countryDetection.js'
 import {
   isValidEmail,
   isValidInternationalMobile,
@@ -45,7 +45,7 @@ function CreateAccount() {
     category: '',
     email: '',
     phone: '',
-    dialIso: DEFAULT_COUNTRY_ISO,
+    dialIso: getDefaultCountryIso(),
     password: '',
   })
   const [errors, setErrors] = useState(initialErrors)
