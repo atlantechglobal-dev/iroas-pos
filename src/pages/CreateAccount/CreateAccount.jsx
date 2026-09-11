@@ -6,9 +6,10 @@ import { BUSINESS_CATEGORIES } from '../../constants/digitalIdentity.js'
 import { getBusinessCopy } from '../../constants/businessCopy.js'
 import {
   CALLING_CODES,
+  DEFAULT_COUNTRY_ISO,
   DEFAULT_DIAL_CODE,
 } from '../../constants/callingCodes.js'
-import { getDefaultCountryIso } from '../../utils/countryDetection.js'
+import { CountryCodePicker } from '../../components/CountryCodePicker.jsx'
 import {
   isValidEmail,
   isValidInternationalMobile,
@@ -41,10 +42,10 @@ function CreateAccount() {
     firstName: '',
     lastName: '',
     restaurant: '',
-    category: DEFAULT_CATEGORY,
+    category: '',
     email: '',
     phone: '',
-    dialIso: getDefaultCountryIso(),
+    dialIso: DEFAULT_COUNTRY_ISO,
     password: '',
   })
   const [errors, setErrors] = useState(initialErrors)
@@ -310,20 +311,14 @@ function CreateAccount() {
               <label htmlFor="phone">MOBILE</label>
 
               <div className={`phone-row ${errors.phone ? 'error' : ''}`}>
-                <div className="input-wrapper dial-wrapper">
-                  <select
-                    id="dialIso"
-                    aria-label="Country code"
-                    value={form.dialIso}
-                    onChange={updateField('dialIso')}
-                  >
-                    {CALLING_CODES.map((country) => (
-                      <option key={country.iso} value={country.iso}>
-                        +{country.dial} {country.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CountryCodePicker
+                  value={form.dialIso}
+                  error={Boolean(errors.phone)}
+                  onChange={(iso) => {
+                    setForm((prev) => ({ ...prev, dialIso: iso }))
+                    if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }))
+                  }}
+                />
 
                 <div className="input-wrapper phone-wrapper">
                   <img src="/images/call.svg" alt="" />

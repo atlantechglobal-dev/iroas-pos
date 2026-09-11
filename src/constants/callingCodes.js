@@ -83,4 +83,10 @@ export function callingCodeFlag(iso) {
   return String.fromCodePoint(...[...code].map((char) => 127397 + char.charCodeAt(0)))
 }
 
+export function callingCodeFlagUrl(iso, width = 40) {
+  if (!iso || iso.length !== 2) return ''
+  return `https://flagcdn.com/w${width}/${iso.toLowerCase()}.png`
+}
+
 export const DEFAULT_DIAL_CODE = '91'
+export const DEFAULT_COUNTRY_ISO = 'IN'
