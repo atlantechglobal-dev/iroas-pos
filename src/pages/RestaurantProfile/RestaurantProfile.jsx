@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { api } from '../../lib/api'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { prepareImageDataUrl } from '../../utils/imageFile.js'
 import { COUNTRY_OPTIONS, TIMEZONE_OPTIONS } from '../../constants/locales.js'
+import { guestSiteUrl, loadCardPreview, restaurantPublicSlug, saveCardPreview } from '../../utils/guestLinks.js'
 import './RestaurantProfile.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -172,11 +173,18 @@ function RestaurantProfile() {
   const [lowStockAlert, setLowStockAlert] = useState(true)
   const [eodReportAlert, setEodReportAlert] = useState(true)
   const [profileSetup, setProfileSetup] = useState({})
+  const [restaurantMeta, setRestaurantMeta] = useState(null)
+
+  const websitePreviewUrl = useMemo(() => {
+    if (!restaurantMeta) return ''
+    return guestSiteUrl(restaurantPublicSlug(restaurantMeta), 'website')
+  }, [restaurantMeta])
 
   useEffect(() => {
     api
       .getRestaurant()
       .then(({ restaurant }) => {
+        setRestaurantMeta(restaurant)
         if (restaurant.name) {
           setName(restaurant.name)
           setDisplayName(restaurant.name)
@@ -360,6 +368,26 @@ function RestaurantProfile() {
         await api.updateBrand({ logoDataUrl })
       }
 
+      const slug = restaurantPublicSlug(
+        restaurantMeta || { name, subdomain: null },
+        'your-card',
+      )
+      const previous = loadCardPreview(slug) || {}
+      saveCardPreview(slug, {
+        ...previous,
+        restaurantName: name,
+        card: {
+          ...(previous.card || {}),
+          phone: phone || previous.card?.phone || '',
+          email: email || previous.card?.email || '',
+          website: website || previous.card?.website || '',
+          address: address || previous.card?.address || '',
+          city: city || previous.card?.city || '',
+          country: country || previous.card?.country || '',
+          logoDataUrl: logoDataUrl || previous.card?.logoDataUrl || '',
+        },
+      })
+
       setProfileSetup(nextSetup)
       setDisplayName(name)
 
@@ -520,6 +548,17 @@ function RestaurantProfile() {
 
                 <aside className="panel">
                   <h2>Contact</h2>
+                  <p className="panel-sub publish-cue">
+                    Phone, email, and address publish to your guest website when you&apos;re live.
+                    {websitePreviewUrl ? (
+                      <>
+                        {' '}
+                        <a href={websitePreviewUrl} target="_blank" rel="noopener noreferrer">
+                          View website
+                        </a>
+                      </>
+                    ) : null}
+                  </p>
 
                   <div className="contact-list">
                     {editingContact ? (
@@ -669,6 +708,17 @@ function RestaurantProfile() {
                 <section className="panel">
                   <h2>Operating hours</h2>
                   <p className="panel-sub">Service hours per day, with optional split shifts</p>
+                  <p className="panel-sub publish-cue">
+                    These hours appear on your guest website and drive reservation slots.
+                    {websitePreviewUrl ? (
+                      <>
+                        {' '}
+                        <a href={websitePreviewUrl} target="_blank" rel="noopener noreferrer">
+                          View website
+                        </a>
+                      </>
+                    ) : null}
+                  </p>
 
                   <div className="hours-table">
                     {hours.map((row, index) => (

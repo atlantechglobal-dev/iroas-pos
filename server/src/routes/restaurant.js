@@ -1,6 +1,12 @@
 import { Router } from 'express'
 import { db } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
+import {
+  assertBookable,
+  listSlots,
+  maxCoversFromSettings,
+  parseHoursJson,
+} from '../services/reservationAvailability.js'
 
 const router = Router()
 
@@ -213,6 +219,41 @@ router.get('/reservations', (req, res) => {
   res.json({ reservations: rows.map(mapReservation) })
 })
 
+router.get('/availability', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+
+  const date = String(req.query.date || '').trim()
+  const guests = Math.max(1, Math.min(20, Number(req.query.guests) || 2))
+  if (!date) return res.status(400).json({ error: 'date query parameter is required.' })
+
+  const settings = parseSettings(restaurant)
+  const hours = parseHoursJson(restaurant.operating_hours)
+  const existing = db
+    .prepare(
+      `SELECT date, time, guests, status FROM reservations
+       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+    )
+    .all(restaurant.id, date)
+
+  const result = listSlots({
+    hours,
+    date,
+    guests,
+    existingRows: existing,
+    maxCovers: maxCoversFromSettings(settings),
+  })
+
+  res.json({
+    date,
+    guests,
+    maxCovers: maxCoversFromSettings(settings),
+    closed: result.closed,
+    reason: result.reason || null,
+    slots: result.slots,
+  })
+})
+
 router.post('/reservations', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
@@ -221,6 +262,28 @@ router.post('/reservations', (req, res) => {
   const guest = String(guestName || name || '').trim()
   if (!guest || !String(phone || '').trim() || !date || !time) {
     return res.status(400).json({ error: 'Guest name, phone, date and time are required.' })
+  }
+
+  const guestCount = Math.max(1, Math.min(20, Number(guests) || 2))
+  const settings = parseSettings(restaurant)
+  const hours = parseHoursJson(restaurant.operating_hours)
+  const existing = db
+    .prepare(
+      `SELECT date, time, guests, status FROM reservations
+       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+    )
+    .all(restaurant.id, String(date))
+
+  const check = assertBookable({
+    hours,
+    date: String(date),
+    time: String(time),
+    guests: guestCount,
+    existingRows: existing,
+    maxCovers: maxCoversFromSettings(settings),
+  })
+  if (!check.ok) {
+    return res.status(check.status).json({ error: check.error })
   }
 
   const result = db
@@ -233,7 +296,7 @@ router.post('/reservations', (req, res) => {
       restaurant.id,
       guest,
       String(phone).trim(),
-      Math.max(1, Math.min(20, Number(guests) || 2)),
+      guestCount,
       String(date),
       String(time),
       String(notes || '').trim() || null,

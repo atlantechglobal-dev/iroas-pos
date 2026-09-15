@@ -167,6 +167,7 @@ router.get('/public/:slug', (req, res) => {
         tag: item.tag,
         imageDataUrl: item.imageDataUrl ? mediaPath(slug, 'menu', item.id) : '',
         prepMinutes: item.prepMinutes,
+        stockStatus: item.stockStatus || 'in_stock',
       })),
   }))
 

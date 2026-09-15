@@ -13,6 +13,18 @@ import {
   setSession,
 } from '../services/storage/authStorage.js'
 
+function resolvePostLoginPath(status, redirectTo) {
+  if (redirectTo && typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
+    if (canUseDashboard(status)) {
+      if (redirectTo.startsWith('/c/') || redirectTo.startsWith('/s/') || redirectTo.startsWith('/l/')) {
+        return ROUTES.BUSINESS_ID
+      }
+      return redirectTo
+    }
+  }
+  return canUseDashboard(status) ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP
+}
+
 export function AuthProvider({ children }) {
   const navigate = useNavigate()
   const [user, setUser] = useState(() => getStoredUser())
@@ -75,7 +87,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = useCallback(
-    async (credentials) => {
+    async (credentials, redirectTo) => {
       const { token, user: loggedInUser } = await authApi.login(credentials)
       setSession(token, loggedInUser)
       setUser(loggedInUser)
@@ -89,9 +101,7 @@ export function AuthProvider({ children }) {
         const { restaurant } = await restaurantApi.get()
         const status = restaurant?.status || 'onboarding'
         setRestaurantStatus(status)
-        navigate(canUseDashboard(status) ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP, {
-          replace: true,
-        })
+        navigate(resolvePostLoginPath(status, redirectTo), { replace: true })
       } catch {
         setRestaurantStatus('onboarding')
         navigate(ROUTES.RESTAURANT_SETUP, { replace: true })

@@ -293,6 +293,20 @@
     color: var(--muted);
   }
 
+  .panel-sub.publish-cue {
+    margin-top: -12px;
+  }
+
+  .panel-sub.publish-cue a {
+    color: var(--primary, #1a7a4c);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .panel-sub.publish-cue a:hover {
+    text-decoration: underline;
+  }
+
   .field-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

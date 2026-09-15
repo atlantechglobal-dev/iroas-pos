@@ -1,5 +1,11 @@
 import { Router } from 'express'
 import { db } from '../db.js'
+import {
+  assertBookable,
+  listSlots,
+  maxCoversFromSettings,
+  parseHoursJson,
+} from '../services/reservationAvailability.js'
 
 const router = Router()
 
@@ -11,13 +17,28 @@ function slugify(value) {
     .replace(/^-|-$/g, '')
 }
 
-export function findRestaurantBySlug(slug) {
+export function findRestaurantBySlug(slug, { liveOnly = false } = {}) {
   const clean = slugify(slug)
   if (!clean) return null
+
   const bySub = db.prepare('SELECT * FROM restaurants WHERE subdomain = ?').get(clean)
-  if (bySub) return bySub.status === 'live' ? bySub : null
-  const rows = db.prepare("SELECT * FROM restaurants WHERE name IS NOT NULL AND status = 'live'").all()
-  return rows.find((r) => slugify(r.name) === clean) || null
+  if (bySub) {
+    if (bySub.status === 'deleted') return null
+    if (liveOnly && bySub.status !== 'live') return null
+    return bySub
+  }
+
+  const rows = db
+    .prepare(
+      liveOnly
+        ? "SELECT * FROM restaurants WHERE name IS NOT NULL AND status = 'live'"
+        : "SELECT * FROM restaurants WHERE name IS NOT NULL AND status != 'deleted'",
+    )
+    .all()
+
+  return (
+    rows.find((r) => slugify(r.subdomain || '') === clean || slugify(r.name) === clean) || null
+  )
 }
 
 function parseSettings(restaurant) {
@@ -73,7 +94,7 @@ function mapPublicMenu(restaurant, slug) {
 
   const items = db
     .prepare(
-      `SELECT id, category_id, name, description, price, veg, tag, prep_minutes, image_data_url
+      `SELECT id, category_id, name, description, price, veg, tag, prep_minutes, stock_status, image_data_url
        FROM menu_items
        WHERE restaurant_id = ? AND status = 'live'
        ORDER BY sort_order ASC, id ASC`,
@@ -96,6 +117,7 @@ function mapPublicMenu(restaurant, slug) {
           tag: item.tag || '',
           imageDataUrl: item.image_data_url ? mediaPath(slug, 'menu', item.id) : '',
           prepMinutes: item.prep_minutes ?? 15,
+          stockStatus: item.stock_status || 'in_stock',
         })),
     }))
     .filter((c) => c.items.length > 0)
@@ -125,9 +147,9 @@ function seedReviewsIfEmpty(restaurantId, restaurantName) {
   )
 }
 
-function requireRestaurant(req, res) {
-  const restaurant = findRestaurantBySlug(req.params.slug)
-  if (!restaurant || restaurant.status !== 'live') {
+function requireRestaurant(req, res, { liveOnly = false } = {}) {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly })
+  if (!restaurant || (liveOnly && restaurant.status !== 'live')) {
     res.status(404).json({ error: 'Restaurant not found.' })
     return null
   }
@@ -233,6 +255,7 @@ router.get('/:slug', (req, res) => {
         googleReview: settings.googleReviewUrl || settings.reviewUrl || '',
       },
       yearEstablished: settings.yearEstablished || '',
+      stories: settings.businessIdStories || null,
     },
     brand: {
       primaryColor: restaurant.primary_color || '#F97316',
@@ -262,9 +285,45 @@ router.get('/:slug', (req, res) => {
   })
 })
 
+/** Availability slots for a date + party size (live restaurants only). */
+router.get('/:slug/availability', (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+
+  const date = String(req.query.date || '').trim()
+  const guests = Math.max(1, Math.min(20, Number(req.query.guests) || 2))
+  if (!date) return res.status(400).json({ error: 'date query parameter is required.' })
+
+  const settings = parseSettings(restaurant)
+  const hours = parseHoursJson(restaurant.operating_hours)
+  const existing = db
+    .prepare(
+      `SELECT date, time, guests, status FROM reservations
+       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+    )
+    .all(restaurant.id, date)
+
+  const result = listSlots({
+    hours,
+    date,
+    guests,
+    existingRows: existing,
+    maxCovers: maxCoversFromSettings(settings),
+  })
+
+  res.json({
+    date,
+    guests,
+    maxCovers: maxCoversFromSettings(settings),
+    closed: result.closed,
+    reason: result.reason || null,
+    slots: result.slots,
+  })
+})
+
 /** Guest creates a reservation */
 router.post('/:slug/reservations', (req, res) => {
-  const restaurant = findRestaurantBySlug(req.params.slug)
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
   if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
 
   const { name, phone, guests, date, time, notes } = req.body || {}
@@ -276,6 +335,26 @@ router.post('/:slug/reservations', (req, res) => {
   }
 
   const guestCount = Math.max(1, Math.min(20, Number(guests) || 2))
+  const settings = parseSettings(restaurant)
+  const hours = parseHoursJson(restaurant.operating_hours)
+  const existing = db
+    .prepare(
+      `SELECT date, time, guests, status FROM reservations
+       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+    )
+    .all(restaurant.id, String(date))
+
+  const check = assertBookable({
+    hours,
+    date: String(date),
+    time: String(time),
+    guests: guestCount,
+    existingRows: existing,
+    maxCovers: maxCoversFromSettings(settings),
+  })
+  if (!check.ok) {
+    return res.status(check.status).json({ error: check.error })
+  }
 
   const result = db
     .prepare(

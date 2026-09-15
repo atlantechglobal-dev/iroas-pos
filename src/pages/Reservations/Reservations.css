@@ -360,7 +360,9 @@
 .reservations-page .res-modal-card {
   position: relative;
   z-index: 1;
-  width: min(420px, 100%);
+  width: min(480px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
   background: #fff;
   border-radius: 16px;
   padding: 22px;
@@ -391,6 +393,65 @@
   padding: 0 12px;
   font: inherit;
   color: var(--ink);
+}
+
+.reservations-page .res-slot-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reservations-page .res-slot-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.reservations-page .res-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+}
+
+.reservations-page .res-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fafafa;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+
+.reservations-page .res-slot strong {
+  font-size: 13px;
+}
+
+.reservations-page .res-slot span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.reservations-page .res-slot.is-selected {
+  border-color: var(--green-text);
+  background: var(--green-soft);
+  box-shadow: 0 0 0 2px rgba(142, 224, 0, 0.35);
+}
+
+.reservations-page .res-slot.is-full,
+.reservations-page .res-slot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reservations-page .btn-new-booking:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .reservations-page .res-modal-actions {

@@ -43,8 +43,12 @@ export const ONE_LINK_THEMES = {
 export const GUEST_SITE_PAGES = {
   website: { path: '', label: 'Home' },
   menu: { path: 'menu', label: 'Menu' },
-  order: { path: 'order', label: 'Order' },
+  order: { path: 'order', label: 'Cart' },
+  checkout: { path: 'checkout', label: 'Checkout' },
+  placed: { path: 'placed', label: 'Order placed' },
+  tracking: { path: 'tracking', label: 'Tracking' },
   book: { path: 'book', label: 'Book' },
+  account: { path: 'account', label: 'Account' },
 }
 
 /** Origin used in QR codes and share links (deploy-safe). */
@@ -71,6 +75,10 @@ export function guestSitePath(slug, pageKey = 'website') {
   const page = GUEST_SITE_PAGES[pageKey]
   if (!page || !page.path) return `/s/${slug}`
   return `/s/${slug}/${page.path}`
+}
+
+export function guestDishPath(slug, itemId) {
+  return `/s/${slug}/dish/${encodeURIComponent(itemId)}`
 }
 
 export function guestSiteUrl(slug, pageKey = 'website') {
@@ -220,6 +228,18 @@ export function cardPublicUrl(slug) {
   const path = `/c/${slug}`
   const origin = publicOrigin()
   return origin ? `${origin}${path}` : path
+}
+
+/** In-app path to the guest Business ID page (same origin). */
+export function cardGuestPath(slug) {
+  return `/c/${encodeURIComponent(slug)}`
+}
+
+/** Open live Business ID in a new tab — always same origin in the browser app. */
+export function openBusinessIdPreview(slug) {
+  if (typeof window === 'undefined') return
+  const path = cardGuestPath(slug)
+  window.open(path, '_blank', 'noopener,noreferrer')
 }
 
 export function cardDisplayHost(slug) {

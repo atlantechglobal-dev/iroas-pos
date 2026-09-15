@@ -7,6 +7,11 @@ import {
   getBusinessCopy,
 } from '../../constants/businessCopy.js'
 import OnboardingProgress from '../../components/onboarding/OnboardingProgress.jsx'
+import {
+  loadCardPreview,
+  restaurantPublicSlug,
+  saveCardPreview,
+} from '../../utils/guestLinks.js'
 import './RestaurantSetup.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -152,9 +157,34 @@ function RestaurantSetup() {
     hours,
   })
 
+  const syncBusinessCardPreview = async () => {
+    try {
+      const { restaurant } = await api.getRestaurant()
+      const slug = restaurantPublicSlug(restaurant, 'your-card')
+      const previous = loadCardPreview(slug) || {}
+      saveCardPreview(slug, {
+        ...previous,
+        restaurantName: restaurant?.name || restaurantName,
+        card: {
+          ...(previous.card || {}),
+          phone: phone || previous.card?.phone || '',
+          email: email || previous.card?.email || '',
+          website: website || previous.card?.website || '',
+          address: address || previous.card?.address || '',
+          city: city || previous.card?.city || '',
+          country: country || previous.card?.country || '',
+          tagline: previous.card?.tagline || description || '',
+        },
+      })
+    } catch {
+      /* preview sync is best-effort */
+    }
+  }
+
   const handleSave = async () => {
     try {
       await api.updateProfile(buildProfileData())
+      await syncBusinessCardPreview()
       setSaveLabel('Saved ✓')
       setTimeout(() => navigate('/dashboard'), 600)
     } catch {
@@ -171,6 +201,7 @@ function RestaurantSetup() {
 
     try {
       await api.updateProfile(buildProfileData())
+      await syncBusinessCardPreview()
       navigate('/domain')
     } catch (err) {
       alert(err.message)

@@ -8,6 +8,10 @@ export const restaurantApi = {
   updateSettings: (payload) => apiRequest('/restaurant/settings', { method: 'PUT', body: payload }),
   launch: () => apiRequest('/restaurant/launch', { method: 'POST' }),
   listReservations: () => apiRequest('/restaurant/reservations'),
+  getAvailability: ({ date, guests }) =>
+    apiRequest(
+      `/restaurant/availability?date=${encodeURIComponent(date)}&guests=${encodeURIComponent(guests)}`,
+    ),
   createReservation: (payload) =>
     apiRequest('/restaurant/reservations', { method: 'POST', body: payload }),
   updateReservation: (id, payload) =>

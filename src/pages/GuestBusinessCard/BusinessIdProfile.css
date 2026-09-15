@@ -1,16 +1,698 @@
-.guest-card-page .legacy-business-card, .guest-card-page .guest-card-footer { display: none; }
-.business-id-profile { width: min(390px, 100%); min-height: 720px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--business-id-primary) 25%, #ece8df); border-radius: 28px; background: #fff; box-shadow: 0 18px 40px rgba(30,25,15,.12); color: color-mix(in srgb, var(--business-id-accent) 72%, #17171a); }
-.business-id-cover { height: 205px; background: linear-gradient(135deg, color-mix(in srgb, var(--business-id-secondary) 55%, #fff), var(--business-id-primary) 55%, color-mix(in srgb, var(--business-id-primary) 55%, #111)); background-position: center; background-size: cover; }
-.business-id-logo { width: 120px; height: 120px; margin: -60px auto 0; border: 6px solid #fff; border-radius: 50%; overflow: hidden; background: color-mix(in srgb, var(--business-id-secondary) 28%, #fff); box-shadow: 0 8px 20px rgba(20,20,20,.16); display: grid; place-items: center; color: var(--business-id-primary); font-size: 26px; font-weight: 800; }
-.business-id-logo img { width: 100%; height: 100%; object-fit: cover; }
-.business-id-intro { padding: 24px 24px 18px; text-align: center; }
-.business-id-intro h1 { margin: 0; color: color-mix(in srgb, var(--business-id-accent) 75%, #17171a); font-size: 24px; font-weight: 850; line-height: 1.2; }
-.business-id-intro > p { margin: 9px 0 14px; color: color-mix(in srgb, var(--business-id-accent) 72%, #51564e); font-size: 14px; line-height: 1.45; }
-.business-id-socials { min-height: 34px; display: flex; justify-content: center; gap: 9px; }
-.business-id-socials a { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--business-id-secondary) 28%, #fff); color: var(--business-id-primary); text-decoration: none; font-weight: 800; }
-.business-id-primary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
-.business-id-primary-actions button { height: 48px; border: 0; border-radius: 999px; background: var(--business-id-primary); color: #fff; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 750; }
-.business-id-contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 2px 24px 28px; }
-.business-id-contact-grid a { min-height: 92px; padding: 14px 10px; border: 1px solid color-mix(in srgb, var(--business-id-primary) 24%, #ece8df); border-radius: 15px; color: color-mix(in srgb, var(--business-id-primary) 82%, #17171a); text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 750; }
-.business-id-contact-grid a:hover { background: color-mix(in srgb, var(--business-id-secondary) 15%, #fff); border-color: var(--business-id-primary); }
-.business-id-contact-grid b { font-size: 23px; line-height: 1; }
+.guest-card-page.bid-page {
+  --bid-primary: #5c3317;
+  --bid-secondary: #f0b49e;
+  --bid-accent: #a0522d;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px 12px 36px;
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  color: #2d1b13;
+  background-color: #f3f3f3;
+  background-image: radial-gradient(
+      circle at 50% 40%,
+      rgba(90, 60, 40, 0.045) 0 1.2px,
+      transparent 1.8px
+    ),
+    radial-gradient(circle at 20% 80%, rgba(90, 60, 40, 0.03) 0 1px, transparent 1.6px);
+  background-size: 26px 26px, 34px 34px;
+}
+
+.guest-card-page.bid-page *,
+.guest-card-page.bid-page *::before,
+.guest-card-page.bid-page *::after {
+  box-sizing: border-box;
+}
+
+.bid-card {
+  --bid-hero-h: 250px;
+  --bid-logo-size: 112px;
+  width: min(430px, 100%);
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 18px 48px rgba(40, 24, 12, 0.14);
+  position: relative;
+  padding-bottom: 24px;
+}
+
+.bid-online {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+}
+
+.bid-online em {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+  font-style: normal;
+}
+
+/* Hero: brochure photo by default, QR scanner on hover / tap — Cosmo layout */
+.bid-qr-hero {
+  position: relative;
+  z-index: 2;
+  height: var(--bid-hero-h);
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border-radius: 0;
+  display: grid;
+  justify-items: center;
+  cursor: pointer;
+  outline: none;
+  overflow: visible;
+}
+
+.bid-hero-brochure,
+.bid-hero-scanner {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: var(--bid-hero-h);
+  border-radius: 0 0 26px 26px;
+  overflow: hidden;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.bid-hero-brochure {
+  position: relative;
+  opacity: 1;
+  transform: scale(1);
+  z-index: 1;
+  background: #ddd;
+  display: block;
+}
+
+.bid-hero-photo {
+  width: 100%;
+  height: 100%;
+  min-height: var(--bid-hero-h);
+  object-fit: cover;
+  object-position: center center;
+  display: block;
+}
+
+.bid-hero-scanner {
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: scale(0.985);
+  pointer-events: none;
+  z-index: 2;
+  background: var(--bid-primary);
+}
+
+.bid-qr-hero:hover .bid-hero-brochure,
+.bid-qr-hero:focus-visible .bid-hero-brochure,
+.bid-qr-hero.is-scanner .bid-hero-brochure {
+  opacity: 0;
+  transform: scale(1.03);
+  pointer-events: none;
+}
+
+.bid-qr-hero:hover .bid-hero-scanner,
+.bid-qr-hero:focus-visible .bid-hero-scanner,
+.bid-qr-hero.is-scanner .bid-hero-scanner {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.bid-qr-frame {
+  width: 176px;
+  height: 176px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.bid-qr-frame img,
+.bid-qr-frame canvas {
+  width: 152px !important;
+  height: 152px !important;
+  max-width: 100%;
+}
+
+.bid-logo {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+  width: var(--bid-logo-size);
+  height: var(--bid-logo-size);
+  border-radius: 50%;
+  border: 6px solid #fff;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  z-index: 6;
+  color: var(--bid-primary);
+  font-size: 28px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.bid-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bid-intro {
+  position: relative;
+  z-index: 1;
+  padding: calc(var(--bid-logo-size, 112px) / 2 + 18px) 22px 8px;
+  text-align: center;
+  background: #fff;
+}
+
+.bid-intro h1 {
+  margin: 0;
+  font-size: clamp(22px, 5.2vw, 28px);
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--bid-primary);
+  line-height: 1.15;
+}
+
+.bid-tagline {
+  margin: 10px 0 16px;
+  color: #1f1f1f;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.bid-socials {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.bid-social {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.bid-social.wa {
+  background: #25d366;
+}
+
+.bid-social.fb {
+  background: #1877f2;
+}
+
+.bid-social.x {
+  background: #111;
+}
+
+.bid-social.ig {
+  background: linear-gradient(135deg, #f58529, #dd2a7b 50%, #8134af);
+}
+
+.bid-primary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.bid-primary-actions button {
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bid-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--bid-primary) 35%, transparent);
+}
+
+.bid-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px 22px 20px;
+}
+
+.bid-contact-grid a,
+.bid-contact-grid .bid-contact-tile {
+  min-height: 92px;
+  border: 1px solid #ececec;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+  color: var(--bid-primary);
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 12px 10px;
+  text-align: center;
+}
+
+.bid-contact-grid a:hover {
+  border-color: color-mix(in srgb, var(--bid-primary) 35%, #ececec);
+}
+
+.bid-contact-grid .bid-contact-value {
+  display: block;
+  max-width: 100%;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b5a4e;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.bid-contact-grid .is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+  cursor: default;
+}
+
+/* Story / Tradition cards */
+.bid-stories {
+  padding: 10px 22px 4px;
+  display: grid;
+  gap: 22px;
+}
+
+.bid-story-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bid-story-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bid-primary);
+}
+
+.bid-story-head i,
+.bid-lined-head i,
+.bid-section-title i {
+  display: block;
+  height: 2px;
+  flex: 1;
+  background: var(--bid-primary);
+  opacity: 0.85;
+  font-style: normal;
+}
+
+.bid-story-sub,
+.bid-section-sub {
+  margin: 6px 0 14px;
+  color: var(--bid-accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bid-story-card {
+  background: #fff;
+  border-radius: 14px;
+  border-left: 5px solid var(--bid-primary);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  padding: 18px 18px 18px 20px;
+}
+
+.bid-story-card p {
+  margin: 0;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Brochure + gallery */
+.bid-brochure,
+.bid-gallery,
+.bid-map,
+.bid-enquiry {
+  padding: 18px 22px 6px;
+}
+
+.bid-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+
+.bid-section-title h2 {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 22px;
+  color: var(--bid-primary);
+  font-weight: 800;
+}
+
+.bid-section-title i {
+  width: 36px;
+  flex: 0 0 36px;
+}
+
+.bid-brochure .bid-section-sub,
+.bid-gallery .bid-section-sub {
+  text-align: center;
+}
+
+.bid-brochure-stage {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #f3f3f3;
+  aspect-ratio: 16 / 11;
+}
+
+.bid-brochure-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bid-brochure-nav {
+  position: absolute;
+  bottom: 12px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bid-primary);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bid-brochure-nav.prev {
+  left: 12px;
+}
+
+.bid-brochure-nav.next {
+  right: 12px;
+}
+
+.bid-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bid-gallery-item {
+  aspect-ratio: 1;
+  border: 0;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f3f3f3;
+}
+
+.bid-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bid-lined-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bid-lined-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--bid-primary);
+  white-space: nowrap;
+}
+
+.bid-map iframe {
+  width: 100%;
+  height: 240px;
+  border: 0;
+  border-radius: 14px;
+  background: #eee;
+  display: block;
+}
+
+.bid-map-address {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a3a30;
+  line-height: 1.4;
+}
+
+.bid-map-address--empty {
+  font-weight: 500;
+  color: #8a7466;
+}
+
+.bid-map-frame {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.bid-map-open {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #222;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+}
+
+/* Floating / notched form fields */
+.bid-enquiry form {
+  display: grid;
+  gap: 14px;
+}
+
+.bid-field {
+  position: relative;
+  display: block;
+}
+
+.bid-field > span {
+  position: absolute;
+  top: -8px;
+  left: 14px;
+  z-index: 1;
+  padding: 0 6px;
+  background: #fff;
+  color: #444;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bid-field input,
+.bid-field textarea {
+  width: 100%;
+  border: 1.5px solid #4a4a4a;
+  border-radius: 12px;
+  background: #fff;
+  padding: 16px 14px 12px;
+  font: inherit;
+  color: #222;
+}
+
+.bid-field textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.bid-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.bid-send {
+  height: 50px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bid-primary) 72%, #c4a484);
+  color: #fff;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bid-enquiry-ok {
+  padding: 14px;
+  border-radius: 14px;
+  background: #ecfdf5;
+  color: #166534;
+  font-weight: 700;
+}
+
+.bid-actions-bar {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr 1fr;
+  gap: 8px;
+  padding: 18px 16px 10px;
+  margin-top: 8px;
+}
+
+.bid-action {
+  min-height: 72px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px 8px;
+  box-sizing: border-box;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bid-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.bid-action svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.bid-action span {
+  line-height: 1.2;
+  max-width: 100%;
+}
+
+.bid-action.dark {
+  background: var(--bid-primary);
+}
+
+.bid-action.peach {
+  background: color-mix(in srgb, var(--bid-secondary) 82%, #fff);
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.bid-powered {
+  margin: 8px 0 12px;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+}
+
+.bid-powered strong {
+  color: var(--bid-primary);
+}
+
+@media (max-width: 480px) {
+  .guest-card-page.bid-page {
+    padding: 8px 8px 24px;
+  }
+
+  .bid-card {
+    border-radius: 22px;
+  }
+
+  .bid-primary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .bid-gallery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bid-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 900px) {
+  .guest-card-page.bid-page {
+    padding-top: 32px;
+  }
+
+  .bid-card {
+    width: min(460px, 100%);
+  }
+
+  .bid-gallery-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

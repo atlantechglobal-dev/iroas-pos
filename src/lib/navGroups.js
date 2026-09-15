@@ -12,6 +12,12 @@ export const NAV_GROUPS = [
         route: ROUTES.DIGITAL_BUSINESS_CARD,
       },
       {
+        key: 'business-id',
+        label: 'Business ID',
+        icon: '/images/share qr.svg',
+        route: ROUTES.BUSINESS_ID,
+      },
+      {
         key: 'restaurant-profile',
         label: 'Restaurant Profile',
         icon: '/images/rest.svg',
@@ -109,6 +115,9 @@ export function getActiveNavKey(pathname) {
     pathname.startsWith(`${ROUTES.DIGITAL_BUSINESS_CARD}/`)
   ) {
     return 'digital-business-card'
+  }
+  if (pathname === ROUTES.BUSINESS_ID || pathname.startsWith(`${ROUTES.BUSINESS_ID}/`)) {
+    return 'business-id'
   }
   if (pathname === ROUTES.ORDERS || pathname.startsWith(`${ROUTES.ORDERS}/`)) {
     return 'incoming-orders'

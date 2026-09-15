@@ -31,9 +31,11 @@ function Reservations() {
     phone: '',
     guests: '2',
     date: '',
-    time: '19:00',
+    time: '',
     notes: '',
   })
+  const [availSlots, setAvailSlots] = useState([])
+  const [availMeta, setAvailMeta] = useState({ closed: false, reason: '', loading: false })
 
   const load = async () => {
     setLoading(true)
@@ -51,6 +53,46 @@ function Reservations() {
     load()
   }, [])
 
+  useEffect(() => {
+    if (!modalOpen || !form.date) {
+      setAvailSlots([])
+      setAvailMeta({ closed: false, reason: '', loading: false })
+      return undefined
+    }
+
+    let cancelled = false
+    setAvailMeta((prev) => ({ ...prev, loading: true }))
+    api
+      .getReservationAvailability({ date: form.date, guests: form.guests })
+      .then((data) => {
+        if (cancelled) return
+        setAvailSlots(data.slots || [])
+        setAvailMeta({
+          closed: Boolean(data.closed),
+          reason: data.reason || '',
+          loading: false,
+        })
+        setForm((prev) => {
+          if (!prev.time) return prev
+          const stillOpen = (data.slots || []).some((s) => s.time === prev.time && !s.full)
+          return stillOpen ? prev : { ...prev, time: '' }
+        })
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setAvailSlots([])
+        setAvailMeta({
+          closed: true,
+          reason: err.message || 'Unable to load availability.',
+          loading: false,
+        })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [modalOpen, form.date, form.guests])
+
   const setStatus = async (id, status) => {
     try {
       const { reservation } = await api.updateReservation(id, { status })
@@ -63,6 +105,10 @@ function Reservations() {
 
   const createBooking = async (event) => {
     event.preventDefault()
+    if (!form.time) {
+      toast.error('Please select an available time slot.')
+      return
+    }
     try {
       const { reservation } = await api.createReservation({
         guestName: form.guestName,
@@ -75,7 +121,7 @@ function Reservations() {
       })
       setReservations((prev) => [...prev, reservation])
       setModalOpen(false)
-      setForm({ guestName: '', phone: '', guests: '2', date: '', time: '19:00', notes: '' })
+      setForm({ guestName: '', phone: '', guests: '2', date: '', time: '', notes: '' })
       toast.success('Booking created.')
     } catch (err) {
       toast.error(err.message || 'Unable to create booking.')
@@ -83,6 +129,10 @@ function Reservations() {
   }
 
   const upcoming = reservations.filter((r) => r.status !== 'cancelled')
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayCovers = upcoming
+    .filter((r) => r.date === todayIso)
+    .reduce((sum, r) => sum + (Number(r.guests) || 0), 0)
 
   return (
     <DashboardLayout pageClassName="reservations-page" activeNav="reservations">
@@ -119,7 +169,9 @@ function Reservations() {
         <div className="timeline-card">
           <div className="card-title-head">
             <h2>Booking timeline</h2>
-            <span>{upcoming.length} active</span>
+            <span>
+              {upcoming.length} active · {todayCovers} covers today
+            </span>
           </div>
           <div className="timeline-simple">
             {loading ? <p className="empty-res">Loading…</p> : null}
@@ -231,7 +283,7 @@ function Reservations() {
               Guests
               <select
                 value={form.guests}
-                onChange={(e) => setForm((f) => ({ ...f, guests: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, guests: e.target.value, time: '' }))}
               >
                 {['1', '2', '3', '4', '5', '6', '8', '10'].map((n) => (
                   <option key={n} value={n}>
@@ -246,18 +298,42 @@ function Reservations() {
                 type="date"
                 required
                 value={form.date}
-                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value, time: '' }))}
               />
             </label>
-            <label>
-              Time
-              <input
-                type="time"
-                required
-                value={form.time}
-                onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-              />
-            </label>
+            <div className="res-slot-field">
+              <span className="res-slot-label">Available times</span>
+              {!form.date ? (
+                <p className="empty-res">Pick a date to see open slots.</p>
+              ) : availMeta.loading ? (
+                <p className="empty-res">Loading availability…</p>
+              ) : availMeta.closed || availSlots.length === 0 ? (
+                <p className="empty-res">
+                  {availMeta.reason || 'No open slots for this date and party size.'}
+                </p>
+              ) : (
+                <div className="res-slot-grid" role="listbox" aria-label="Available time slots">
+                  {availSlots.map((slot) => {
+                    const selected = form.time === slot.time
+                    const disabled = Boolean(slot.full)
+                    return (
+                      <button
+                        key={slot.time}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={`res-slot${selected ? ' is-selected' : ''}${disabled ? ' is-full' : ''}`}
+                        disabled={disabled}
+                        onClick={() => setForm((f) => ({ ...f, time: slot.time }))}
+                      >
+                        <strong>{slot.time}</strong>
+                        <span>{disabled ? 'Full' : `${slot.remainingCovers} left`}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
             <label>
               Notes
               <input
@@ -269,7 +345,7 @@ function Reservations() {
               <button type="button" className="btn-manage-res" onClick={() => setModalOpen(false)}>
                 Cancel
               </button>
-              <button type="submit" className="btn-new-booking">
+              <button type="submit" className="btn-new-booking" disabled={!form.time}>
                 Save booking
               </button>
             </div>

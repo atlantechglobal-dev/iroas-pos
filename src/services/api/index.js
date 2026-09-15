@@ -20,6 +20,7 @@ export const api = {
   updateSettings: restaurantApi.updateSettings,
   launch: restaurantApi.launch,
   getReservations: restaurantApi.listReservations,
+  getReservationAvailability: restaurantApi.getAvailability,
   createReservation: restaurantApi.createReservation,
   updateReservation: restaurantApi.updateReservation,
   getReviews: restaurantApi.listReviews,
@@ -37,6 +38,7 @@ export const api = {
   getPublicMenu: menuApi.publicMenu,
 
   getPublicSite: publicApi.getSite,
+  getPublicAvailability: publicApi.getAvailability,
   createPublicReservation: publicApi.createReservation,
 
   adminStats: adminApi.stats,

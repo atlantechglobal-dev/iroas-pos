@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { isValidEmail } from '../../utils/validation.js'
@@ -9,8 +9,10 @@ import './Login.css'
 
 function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
   const toast = useToast()
+  const redirectTo = location.state?.from
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -43,7 +45,7 @@ function Login() {
     setLoading(true)
 
     try {
-      await login({ email: email.trim(), password })
+      await login({ email: email.trim(), password }, redirectTo)
       toast.success('Signed in successfully.')
     } catch (err) {
       setError(err.message)
@@ -127,6 +129,11 @@ function Login() {
           <div className="login-header">
             <h2>Welcome back</h2>
             <p>Sign in to manage your business.</p>
+            {redirectTo === ROUTES.BUSINESS_ID ? (
+              <p className="login-context-note">
+                You&apos;ll return to your Business ID editor to update your live card.
+              </p>
+            ) : null}
           </div>
 
           {flash ? (

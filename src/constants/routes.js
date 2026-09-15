@@ -16,6 +16,7 @@ export const ROUTES = {
   RESTAURANT_PROFILE: '/restaurant-profile',
   DIRECTORY_LISTINGS: '/directory-listings',
   DIGITAL_BUSINESS_CARD: '/digital-business-card',
+  BUSINESS_ID: '/business-id',
   DIGITAL_IDENTITY: '/digital-identity',
   DIGITAL_IDENTITY_FORM: '/digital-identity/form',
   MOBILE_APP: '/products/mobile-app',
@@ -46,6 +47,7 @@ export const ROUTES = {
   GUEST_BUSINESS_CARD: '/c/:slug',
   GUEST_SITE: '/s/:slug',
   GUEST_SITE_PAGE: '/s/:slug/:page',
+  GUEST_SITE_DISH: '/s/:slug/dish/:itemId',
   NOT_FOUND: '/404',
   UNAUTHORIZED: '/403',
 }

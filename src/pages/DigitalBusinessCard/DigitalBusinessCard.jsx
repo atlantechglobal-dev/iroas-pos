@@ -56,6 +56,8 @@ const EMPTY_CARD = {
   website: '',
   insta: '',
   address: '',
+  city: '',
+  country: '',
   tagline: '',
   heroDataUrl: '',
   circleDataUrl: '',
@@ -115,6 +117,7 @@ function DigitalBusinessCard() {
             '',
           email:
             saved?.card?.email ||
+            restaurant?.email ||
             prev.email ||
             (unlocked ? identity.email : '') ||
             user?.email ||
@@ -139,6 +142,8 @@ function DigitalBusinessCard() {
               ? [identity.address, identity.city, identity.country].filter(Boolean).join(', ')
               : '') ||
             prev.address,
+          city: saved?.card?.city || restaurant?.city || prev.city || '',
+          country: saved?.card?.country || restaurant?.country || prev.country || '',
           logoDataUrl:
             saved?.card?.logoDataUrl ||
             restaurant?.logoDataUrl ||
@@ -159,6 +164,26 @@ function DigitalBusinessCard() {
             prev.insta ||
             '',
         }))
+
+        // Keep guest Business ID in sync with restaurant setup contact fields
+        const syncedCard = {
+          ...(saved?.card || {}),
+          phone: saved?.card?.phone || restaurant?.phone || '',
+          email: saved?.card?.email || restaurant?.email || '',
+          website: saved?.card?.website || restaurant?.website || '',
+          address: saved?.card?.address || restaurant?.address || '',
+          city: saved?.card?.city || restaurant?.city || '',
+          country: saved?.card?.country || restaurant?.country || '',
+        }
+        if (restaurant && (syncedCard.phone || syncedCard.email || syncedCard.address)) {
+          saveCardPreview(slug, {
+            ...(saved || {}),
+            restaurantName: restaurant.name || identity?.businessName || '',
+            theme: saved?.theme || 'lime',
+            layout: saved?.layout || 'split-gold',
+            card: syncedCard,
+          })
+        }
 
         if (unlocked && !saved?.card) {
           // Mark that fields came from Digital Identity for UI hint

@@ -20,6 +20,7 @@ const Dashboard = lazy(() => import('../../pages/Dashboard/Dashboard.jsx'))
 const RestaurantProfile = lazy(() => import('../../pages/RestaurantProfile/RestaurantProfile.jsx'))
 const DirectoryListings = lazy(() => import('../../pages/DirectoryListings/DirectoryListings.jsx'))
 const DigitalBusinessCard = lazy(() => import('../../pages/DigitalBusinessCard/DigitalBusinessCard.jsx'))
+const BusinessId = lazy(() => import('../../pages/BusinessId/BusinessId.jsx'))
 const DigitalIdentity = lazy(() => import('../../pages/DigitalIdentity/DigitalIdentity.jsx'))
 const DigitalIdentityForm = lazy(() => import('../../pages/DigitalIdentity/DigitalIdentityForm.jsx'))
 const MobileApplication = lazy(() => import('../../pages/MobileApplication/MobileApplication.jsx'))
@@ -111,8 +112,9 @@ export function AppRoutes() {
         {/* Guest share pages — public, no auth redirect */}
         <Route path={ROUTES.GUEST_ONE_LINK} element={<GuestOneLink />} />
         <Route path={ROUTES.GUEST_BUSINESS_CARD} element={<GuestBusinessCard />} />
-        <Route path={ROUTES.GUEST_SITE} element={<GuestSite />} />
+        <Route path={ROUTES.GUEST_SITE_DISH} element={<GuestSite />} />
         <Route path={ROUTES.GUEST_SITE_PAGE} element={<GuestSite />} />
+        <Route path={ROUTES.GUEST_SITE} element={<GuestSite />} />
 
         <Route path={ROUTES.RESTAURANT_SETUP} element={withProtection(RestaurantSetup, WIZARD_ONLY)} />
         <Route path={ROUTES.DOMAIN} element={withProtection(Domain, WIZARD_ONLY)} />
@@ -127,6 +129,7 @@ export function AppRoutes() {
         <Route path={ROUTES.RESTAURANT_PROFILE} element={withProtection(RestaurantProfile, LIVE_ONLY)} />
         <Route path={ROUTES.DIRECTORY_LISTINGS} element={withProtection(DirectoryListings, LIVE_ONLY)} />
         <Route path={ROUTES.DIGITAL_BUSINESS_CARD} element={withProtection(DigitalBusinessCard, LIVE_ONLY)} />
+        <Route path={ROUTES.BUSINESS_ID} element={withProtection(BusinessId, LIVE_ONLY)} />
         <Route path={ROUTES.DIGITAL_IDENTITY} element={withProtection(DigitalIdentity)} />
         <Route path={ROUTES.DIGITAL_IDENTITY_FORM} element={withProtection(DigitalIdentityForm)} />
         <Route path={ROUTES.MOBILE_APP} element={withProtection(MobileApplication)} />
