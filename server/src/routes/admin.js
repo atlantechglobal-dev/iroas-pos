@@ -31,6 +31,7 @@ import {
   sendEmail,
   isEmailConfigured,
 } from '../services/emailService.js'
+import { getPublicPaymentSettings, savePaymentSettings } from '../services/paymentSettings.js'
 
 const router = Router()
 
@@ -706,6 +707,19 @@ router.post('/email-settings/test', async (req, res) => {
     })
   } catch (err) {
     res.status(502).json({ error: err.message || 'Test email failed.' })
+  }
+})
+
+router.get('/payment-settings', (_req, res) => {
+  res.json({ settings: getPublicPaymentSettings() })
+})
+
+router.put('/payment-settings', (req, res) => {
+  try {
+    const settings = savePaymentSettings(req.body || {})
+    res.json({ ok: true, settings })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to save payment settings.' })
   }
 })
 

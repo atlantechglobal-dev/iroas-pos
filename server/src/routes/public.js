@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import express, { Router } from 'express'
 import { db } from '../db.js'
 import {
   assertBookable,
@@ -16,6 +16,9 @@ import {
 } from '../services/orders.js'
 import { onOrderCreated } from '../services/orderMessaging.js'
 import { listDiningTables } from '../services/diningTables.js'
+import { verifyNotifySignature } from '../services/addpayClient.js'
+import { getPaymentSettings } from '../services/paymentSettings.js'
+import { sendOnboardingPaymentEmails } from '../services/onboardingMessaging.js'
 
 const router = Router()
 
@@ -507,5 +510,75 @@ router.get('/:slug/order-history', (req, res) => {
   const orders = listOrdersByPhone(restaurant.id, phone)
   res.json({ orders })
 })
+
+/**
+ * AddPay/PayCloud server-to-server payment notification. No session, no
+ * restaurant slug in the URL — the RSA signature (verified against AddPay's
+ * Gateway Public Key) is what makes this endpoint trustworthy, matching the
+ * IROAS LMS integration this was ported from. AddPay's webhook can post as
+ * form-urlencoded or JSON depending on config, so both are parsed here
+ * without touching the app-wide JSON-only body parser.
+ */
+router.post(
+  '/payments/addpay/webhook',
+  express.urlencoded({ extended: true }),
+  (req, res) => {
+    const payload = { ...req.query, ...(req.body || {}) }
+    delete payload.slug
+
+    const respondSuccess = () => res.type('text/plain').status(200).send('success')
+
+    if (!verifyNotifySignature(payload, getPaymentSettings())) {
+      // Don't leak *why* verification failed — just refuse quietly. AddPay
+      // will retry; a wrong response here must never look like "accepted".
+      return res.status(400).type('text/plain').send('invalid signature')
+    }
+
+    const orderRef = String(payload.merchant_order_no || '').trim()
+    const transStatus = Number(payload.trans_status)
+    const match = /^ONB-(\d+)-/.exec(orderRef)
+    if (!match) return respondSuccess()
+
+    const restaurant = db.prepare('SELECT * FROM restaurants WHERE id = ?').get(Number(match[1]))
+    if (!restaurant) return respondSuccess()
+
+    const settings = parseSettings(restaurant)
+    const pending = settings?.onboardingPayment
+    // Reference must match the one we handed out for this checkout attempt —
+    // guards against a stale/replayed webhook from an earlier retry.
+    if (!pending || pending.reference !== orderRef) return respondSuccess()
+    if (pending.paid) return respondSuccess() // already processed — idempotent
+
+    if (transStatus === 3) {
+      // Cancelled — clear the pending flag so the owner can retry.
+      const nextSettings = { ...settings, onboardingPayment: { ...pending, pending: false, cancelledAt: new Date().toISOString() } }
+      db.prepare(`UPDATE restaurants SET settings_json = ?, updated_at = datetime('now') WHERE id = ?`)
+        .run(JSON.stringify(nextSettings), restaurant.id)
+      return respondSuccess()
+    }
+
+    if (transStatus !== 2) return respondSuccess() // not a completed payment yet
+
+    const professionalEmail = settings.professionalEmail || restaurant.email || ''
+    const payment = {
+      ...pending,
+      paid: true,
+      pending: false,
+      paidAt: new Date().toISOString(),
+      addpayOrderNo: payload.order_no || null,
+    }
+    const nextSettings = { ...settings, onboardingPayment: payment }
+
+    db.prepare(
+      `UPDATE restaurants SET settings_json = ?, email = COALESCE(NULLIF(email, ''), ?),
+       updated_at = datetime('now') WHERE id = ?`,
+    ).run(JSON.stringify(nextSettings), professionalEmail || null, restaurant.id)
+
+    const updated = { ...restaurant, email: restaurant.email || professionalEmail }
+    sendOnboardingPaymentEmails({ restaurant: updated, payment }).catch(() => {})
+
+    return respondSuccess()
+  },
+)
 
 export default router

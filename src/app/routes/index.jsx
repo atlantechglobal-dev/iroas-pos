@@ -46,6 +46,7 @@ const PosIntegration = lazy(() => import('../../pages/PosIntegration/PosIntegrat
 const Notifications = lazy(() => import('../../pages/Notifications/Notifications.jsx'))
 const Settings = lazy(() => import('../../pages/Settings/Settings.jsx'))
 const EmailSettings = lazy(() => import('../../pages/Settings/EmailSettings.jsx'))
+const PaymentSettings = lazy(() => import('../../pages/Settings/PaymentSettings.jsx'))
 const SettingsUsers = lazy(() =>
   import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsUsers })),
 )
@@ -161,6 +162,7 @@ export function AppRoutes() {
         <Route path={ROUTES.NOTIFICATIONS} element={withProtection(Notifications, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS} element={withProtection(Settings, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_EMAIL} element={withProtection(EmailSettings, { adminOnly: true })} />
+        <Route path={ROUTES.SETTINGS_PAYMENT} element={withProtection(PaymentSettings, { adminOnly: true })} />
         <Route path={ROUTES.SETTINGS_USERS} element={withProtection(SettingsUsers, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_BILLING} element={withProtection(SettingsBilling, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_SECURITY} element={withProtection(SettingsSecurity, LIVE_ONLY)} />

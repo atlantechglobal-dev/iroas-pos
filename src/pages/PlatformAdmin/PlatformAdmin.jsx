@@ -176,6 +176,9 @@ function PlatformAdmin() {
               <Link className="email-settings-link" to={ROUTES.SETTINGS_EMAIL}>
                 Email settings
               </Link>
+              <Link className="email-settings-link" to={ROUTES.SETTINGS_PAYMENT}>
+                Payment settings
+              </Link>
               <button
                 className="new-tenant"
                 onClick={() => toast.info('New tenant flow is not available yet.')}
