@@ -111,7 +111,10 @@ function Menu() {
   }, [loadMenu])
 
   const visibleCategories = useMemo(
-    () => categories.filter((c) => c.status !== 'archived'),
+    () =>
+      [...categories]
+        .filter((c) => c.status !== 'archived')
+        .sort((a, b) => (a.sortOrder ?? a.id) - (b.sortOrder ?? b.id) || a.id - b.id),
     [categories],
   )
 
@@ -135,27 +138,29 @@ function Menu() {
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return items.filter((item) => {
-      if (selectedCategory && item.categoryId !== selectedCategory.id) return false
+    return items
+      .filter((item) => {
+        if (selectedCategory && item.categoryId !== selectedCategory.id) return false
 
-      if (filter === 'Archived') {
-        if (item.status !== 'archived') return false
-      } else if (item.status === 'archived' && filter !== 'All') {
-        return false
-      } else if (filter === 'Live' && item.status !== 'live') return false
-      else if (filter === 'Draft' && item.status !== 'draft') return false
-      else if (filter === 'Veg' && !item.veg) return false
-      else if (filter === 'Non-veg' && item.veg) return false
-      else if (filter === "Chef's special" && item.tag !== 'Chef') return false
-      else if (filter === 'Best seller' && item.tag !== 'Best') return false
+        if (filter === 'Archived') {
+          if (item.status !== 'archived') return false
+        } else if (item.status === 'archived' && filter !== 'All') {
+          return false
+        } else if (filter === 'Live' && item.status !== 'live') return false
+        else if (filter === 'Draft' && item.status !== 'draft') return false
+        else if (filter === 'Veg' && !item.veg) return false
+        else if (filter === 'Non-veg' && item.veg) return false
+        else if (filter === "Chef's special" && item.tag !== 'Chef') return false
+        else if (filter === 'Best seller' && item.tag !== 'Best') return false
 
-      if (!q) return true
-      return (
-        item.name.toLowerCase().includes(q) ||
-        (item.description || '').toLowerCase().includes(q) ||
-        (item.tag || '').toLowerCase().includes(q)
-      )
-    })
+        if (!q) return true
+        return (
+          item.name.toLowerCase().includes(q) ||
+          (item.description || '').toLowerCase().includes(q) ||
+          (item.tag || '').toLowerCase().includes(q)
+        )
+      })
+      .sort((a, b) => (a.sortOrder ?? a.id) - (b.sortOrder ?? b.id) || a.id - b.id)
   }, [items, selectedCategory, filter, query])
 
   const openNewCategory = () => {
@@ -349,6 +354,62 @@ function Menu() {
     }
   }
 
+  const STOCK_CYCLE = ['in_stock', 'low', 'out']
+
+  const cycleItemStock = async (item) => {
+    const current = item.stockStatus || 'in_stock'
+    const next = STOCK_CYCLE[(STOCK_CYCLE.indexOf(current) + 1) % STOCK_CYCLE.length]
+    try {
+      await api.updateMenuItem(item.id, { stockStatus: next })
+      toast.success(
+        next === 'in_stock' ? 'Marked in stock.' : next === 'low' ? 'Marked low stock.' : 'Marked out of stock.',
+      )
+      await loadMenu()
+    } catch (err) {
+      toast.error(err.message || 'Unable to update stock.')
+    }
+  }
+
+  const moveCategory = async (cat, direction) => {
+    const list = [...visibleCategories].sort(
+      (a, b) => (a.sortOrder ?? a.id) - (b.sortOrder ?? b.id) || a.id - b.id,
+    )
+    const idx = list.findIndex((c) => c.id === cat.id)
+    const swapWith = list[idx + direction]
+    if (!swapWith) return
+    try {
+      const aOrder = cat.sortOrder ?? idx
+      const bOrder = swapWith.sortOrder ?? idx + direction
+      await Promise.all([
+        api.updateMenuCategory(cat.id, { sortOrder: bOrder }),
+        api.updateMenuCategory(swapWith.id, { sortOrder: aOrder }),
+      ])
+      await loadMenu()
+    } catch (err) {
+      toast.error(err.message || 'Unable to reorder category.')
+    }
+  }
+
+  const moveItem = async (item, direction) => {
+    const list = [...categoryItems].sort(
+      (a, b) => (a.sortOrder ?? a.id) - (b.sortOrder ?? b.id) || a.id - b.id,
+    )
+    const idx = list.findIndex((i) => i.id === item.id)
+    const swapWith = list[idx + direction]
+    if (!swapWith) return
+    try {
+      const aOrder = item.sortOrder ?? idx
+      const bOrder = swapWith.sortOrder ?? idx + direction
+      await Promise.all([
+        api.updateMenuItem(item.id, { sortOrder: bOrder }),
+        api.updateMenuItem(swapWith.id, { sortOrder: aOrder }),
+      ])
+      await loadMenu()
+    } catch (err) {
+      toast.error(err.message || 'Unable to reorder dish.')
+    }
+  }
+
   const archiveItem = async (item) => {
     setItemMenuOpenId(null)
     const ok = window.confirm(`Archive “${item.name}”? It will be removed from the live menu.`)
@@ -468,6 +529,24 @@ function Menu() {
                 <strong>{cat.name}</strong>
                 <small>{cat.itemCount} items</small>
                 <div className="category-actions" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="icon-only"
+                    title="Move up"
+                    aria-label="Move category up"
+                    onClick={() => moveCategory(cat, -1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-only"
+                    title="Move down"
+                    aria-label="Move category down"
+                    onClick={() => moveCategory(cat, 1)}
+                  >
+                    ↓
+                  </button>
                   <button type="button" onClick={() => openEditCategory(cat)}>
                     Edit
                   </button>
@@ -648,15 +727,39 @@ function Menu() {
               <p>{item.description || 'No description'}</p>
               <div className="item-foot">
                 <span>⏱ {item.prepMinutes || 15} min</span>
-                <span
-                  className={`stock-pill ${
+                <button
+                  type="button"
+                  className={`stock-pill stock-toggle ${
                     item.stockStatus === 'low' || item.stockStatus === 'out' ? 'low' : 'in'
                   }`}
+                  title="Cycle stock: In stock → Low → Out"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    cycleItemStock(item)
+                  }}
                 >
                   {stockLabel(item)}
-                </span>
+                </button>
               </div>
               <div className="item-actions">
+                <button
+                  type="button"
+                  className="icon-only"
+                  title="Move up"
+                  aria-label="Move dish up"
+                  onClick={() => moveItem(item, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="icon-only"
+                  title="Move down"
+                  aria-label="Move dish down"
+                  onClick={() => moveItem(item, 1)}
+                >
+                  ↓
+                </button>
                 <button type="button" onClick={() => openEditItem(item)}>
                   Edit
                 </button>

@@ -24,6 +24,13 @@ import {
   TENANT_STATUSES,
   validateChecklist,
 } from '../services/tenantReview.js'
+import { sendApprovalEmails } from '../services/onboardingMessaging.js'
+import {
+  getPublicEmailSettings,
+  saveEmailSettings,
+  sendEmail,
+  isEmailConfigured,
+} from '../services/emailService.js'
 
 const router = Router()
 
@@ -190,7 +197,7 @@ router.patch('/tenants/:id', (req, res) => {
   res.json({ tenant: mapTenant(row), events: listTenantEvents(restaurant.id) })
 })
 
-router.post('/tenants/:id/approve', (req, res) => {
+router.post('/tenants/:id/approve', async (req, res) => {
   const restaurant = db.prepare('SELECT * FROM restaurants WHERE id = ?').get(req.params.id)
   if (!restaurant || restaurant.status === 'deleted') {
     return res.status(404).json({ error: 'Tenant not found.' })
@@ -224,16 +231,22 @@ router.post('/tenants/:id/approve', (req, res) => {
   })
 
   const updated = { ...restaurant, status: 'live' }
-  notifyOwner({
-    restaurant: updated,
+  createNotification({
+    userId: restaurant.owner_id,
+    type: 'restaurant',
     title: 'Your restaurant is approved',
     body: `${restaurant.name || 'Your restaurant'} is now live. Customers can visit your public site.`,
-    emailSubject: 'Your restaurant is live on IROAS',
-    emailBody: `Good news — ${restaurant.name || 'your restaurant'} has been approved and published for customers.\nSign in to your dashboard to manage your business.`,
+    meta: { restaurantId: restaurant.id, status: 'live' },
+  })
+
+  const adminUser = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.id)
+  const emails = await sendApprovalEmails({
+    restaurant: updated,
+    reviewedByAdminEmail: adminUser?.email || req.user.email || '',
   })
 
   const row = getTenantRow(restaurant.id)
-  res.json({ tenant: mapTenant(row), events: listTenantEvents(restaurant.id) })
+  res.json({ tenant: mapTenant(row), events: listTenantEvents(restaurant.id), emails })
 })
 
 router.post('/tenants/:id/reject', (req, res) => {
@@ -646,6 +659,54 @@ router.patch('/products/:id', (req, res) => {
     product: mapProduct(db.prepare('SELECT * FROM product_requests WHERE id = ?').get(row.id)),
     events: listProductEvents(row.id),
   })
+})
+
+router.get('/email-settings', (_req, res) => {
+  res.json({ settings: getPublicEmailSettings() })
+})
+
+router.put('/email-settings', (req, res) => {
+  try {
+    const settings = saveEmailSettings(req.body || {})
+    res.json({ ok: true, settings })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to save email settings.' })
+  }
+})
+
+router.post('/email-settings/test', async (req, res) => {
+  if (!isEmailConfigured()) {
+    return res.status(400).json({
+      error:
+        'Email is not configured. Save a ZeptoMail API token + From email, or set SMTP_USER / SMTP_PASS in server/.env.',
+    })
+  }
+  const to = String(req.body?.to || req.user?.email || process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAIL || '').trim()
+  if (!to) {
+    return res.status(400).json({ error: 'Provide a recipient email for the test.' })
+  }
+  try {
+    const result = await sendEmail({
+      to,
+      subject: 'IROAS email test',
+      body: [
+        'This is a test email from IROAS Email settings.',
+        '',
+        'If you received this (or see an Ethereal preview link in the API log), delivery is working.',
+        '',
+        '— IROAS',
+      ].join('\n'),
+      html: `<div style="font-family:sans-serif"><p><strong>IROAS email test</strong></p><p>If you received this, transactional email is working.</p></div>`,
+    })
+    res.json({
+      ok: true,
+      to,
+      provider: result?.provider || null,
+      previewUrl: result?.previewUrl || null,
+    })
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Test email failed.' })
+  }
 })
 
 export default router

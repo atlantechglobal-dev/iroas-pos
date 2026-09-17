@@ -418,6 +418,31 @@
     max-width: 640px;
   }
 
+  .platform-admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .email-settings-link {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid var(--border, #ece8df);
+    background: #fff;
+    color: var(--ink, #17171a);
+    font-size: 13.5px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .email-settings-link:hover {
+    border-color: var(--green, #8bc53f);
+  }
+
   .new-tenant {
     display: inline-flex;
     align-items: center;

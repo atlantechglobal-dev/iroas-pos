@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, setSession } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth.js'
-import { BUSINESS_CATEGORIES } from '../../constants/digitalIdentity.js'
+import { visibleBusinessCategories } from '../../constants/digitalIdentity.js'
 import { getBusinessCopy } from '../../constants/businessCopy.js'
 import {
   CALLING_CODES,
@@ -261,7 +261,7 @@ function CreateAccount() {
                     onChange={updateField('category')}
                   >
                     <option value="">Select category</option>
-                    {BUSINESS_CATEGORIES.map((cat) => (
+                    {visibleBusinessCategories().map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
                       </option>

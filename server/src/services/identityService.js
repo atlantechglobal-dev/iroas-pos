@@ -1,4 +1,5 @@
 import { db } from '../db.js'
+import { isSmtpConfigured, sendEmail } from './emailService.js'
 
 export const IDENTITY_STATUSES = [
   'draft',
@@ -200,7 +201,28 @@ export function createNotification({ userId, type, title, body, meta }) {
   ).run(userId, type || 'identity', title, body || null, meta ? JSON.stringify(meta) : null)
 }
 
-export function queueEmail({ to, subject, body, identityId, productId }) {
+function deliverOutboxEmail(outboxId, { to, subject, body, html }) {
+  if (!isSmtpConfigured()) {
+    console.log(`[email_outbox #${outboxId}] To: ${to} | ${subject} (email not configured)`)
+    return Promise.reject(new Error('Email is not configured.'))
+  }
+  return sendEmail({ to, subject, body, html })
+    .then((result) => {
+      db.prepare(`UPDATE email_outbox SET status = 'sent' WHERE id = ?`).run(outboxId)
+      const preview = result?.previewUrl ? ` preview=${result.previewUrl}` : ''
+      console.log(
+        `[email_outbox #${outboxId}] sent via ${result?.provider || 'email'} To: ${to} | ${subject}${preview}`,
+      )
+      return result
+    })
+    .catch((err) => {
+      console.error(`[email_outbox #${outboxId}] send failed:`, err.message || err)
+      db.prepare(`UPDATE email_outbox SET status = 'failed' WHERE id = ?`).run(outboxId)
+      throw err
+    })
+}
+
+export function queueEmail({ to, subject, body, html, identityId, productId }) {
   const info = db
     .prepare(
       `INSERT INTO email_outbox (to_email, subject, body, identity_id, product_id)
@@ -208,8 +230,21 @@ export function queueEmail({ to, subject, body, identityId, productId }) {
     )
     .run(to, subject, body, identityId || null, productId || null)
 
-  // Demo mode: log acknowledgement emails (no SMTP required).
-  console.log(`[email_outbox #${info.lastInsertRowid}] To: ${to} | ${subject}`)
+  // Fire-and-forget for non-critical callers; errors logged above
+  deliverOutboxEmail(info.lastInsertRowid, { to, subject, body, html }).catch(() => {})
+  return info.lastInsertRowid
+}
+
+/** Insert outbox row and wait for delivery (welcome / approval / admin notices). */
+export async function queueEmailAndWait({ to, subject, body, html, identityId, productId }) {
+  const info = db
+    .prepare(
+      `INSERT INTO email_outbox (to_email, subject, body, identity_id, product_id)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(to, subject, body, identityId || null, productId || null)
+
+  await deliverOutboxEmail(info.lastInsertRowid, { to, subject, body, html })
   return info.lastInsertRowid
 }
 

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { TenantReviewDrawer } from '../../components/admin/TenantReviewDrawer.jsx'
+import { ROUTES } from '../../constants/routes.js'
 import './PlatformAdmin.css'
 
 const INITIAL_FLAGS = [
@@ -170,13 +172,18 @@ function PlatformAdmin() {
               </p>
             </div>
 
-            <button
-              className="new-tenant"
-              onClick={() => toast.info('New tenant flow is not available yet.')}
-            >
-              <img src="/images/new.svg" alt="New tenant" />
-              <span>New tenant</span>
-            </button>
+            <div className="platform-admin-actions">
+              <Link className="email-settings-link" to={ROUTES.SETTINGS_EMAIL}>
+                Email settings
+              </Link>
+              <button
+                className="new-tenant"
+                onClick={() => toast.info('New tenant flow is not available yet.')}
+              >
+                <img src="/images/new.svg" alt="New tenant" />
+                <span>New tenant</span>
+              </button>
+            </div>
           </div>
 
           {/* STAT CARDS */}

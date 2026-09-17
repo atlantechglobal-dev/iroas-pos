@@ -42,4 +42,9 @@ export const adminApi = {
   },
   updateProduct: (id, payload) =>
     apiRequest(`/admin/products/${id}`, { method: 'PATCH', body: payload }),
+  emailSettings: () => apiRequest('/admin/email-settings'),
+  saveEmailSettings: (payload) =>
+    apiRequest('/admin/email-settings', { method: 'PUT', body: payload }),
+  testEmail: (to) =>
+    apiRequest('/admin/email-settings/test', { method: 'POST', body: to ? { to } : {} }),
 }

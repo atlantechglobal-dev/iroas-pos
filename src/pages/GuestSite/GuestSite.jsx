@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, useParams } from 'react-router-dom'
+import { Link, NavLink, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import {
-  GUEST_MENU_ITEMS,
   GUEST_SITE_PAGES,
   guestDishPath,
   guestSitePath,
@@ -29,6 +29,90 @@ const FALLBACK_PHOTOS = [
   'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=800&q=80',
 ]
 
+/** Keyword → matching dish photo (avoids random mismatched stock images). */
+const DISH_PHOTO_BY_KEYWORD = [
+  [/burrata|tomato|caprese|salad/i, 'https://images.unsplash.com/photo-1608897013039-887f21d8c804?auto=format&fit=crop&w=800&q=80'],
+  [/calamari|squid|seafood|prawn|shrimp|fish/i, 'https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80'],
+  [/broccolini|broccoli|veggie|vegetable|greens/i, 'https://images.unsplash.com/photo-1628773822503-930a7eaecf80?auto=format&fit=crop&w=800&q=80'],
+  [/risotto|mushroom|truffle|rice/i, 'https://images.unsplash.com/photo-1476124369491-e7addf5e8730?auto=format&fit=crop&w=800&q=80'],
+  [/pizza|margherita|flatbread/i, 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80'],
+  [/pasta|noodle|spaghetti|penne/i, 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=800&q=80'],
+  [/burger|sandwich/i, 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80'],
+  [/chicken|tikka|grill|tandoor/i, 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80'],
+  [/dessert|cake|ice|sweet|chocolate/i, 'https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80'],
+  [/sushi|roll|sashimi/i, 'https://images.unsplash.com/photo-1579871494447-9811cf80d66d?auto=format&fit=crop&w=800&q=80'],
+  [/naan|bread|roti/i, 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=800&q=80'],
+  [/soup|broth|stew/i, 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80'],
+]
+
+function resolveMediaUrl(src) {
+  if (!src) return ''
+  const value = String(src).trim()
+  if (!value) return ''
+  if (
+    value.startsWith('data:') ||
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('blob:')
+  ) {
+    return value
+  }
+  if (value.startsWith('/')) return value
+  return `/${value.replace(/^\.\//, '')}`
+}
+
+function matchedDishPhoto(name = '', index = 0) {
+  const label = String(name || '')
+  for (const [re, url] of DISH_PHOTO_BY_KEYWORD) {
+    if (re.test(label)) return url
+  }
+  return FALLBACK_PHOTOS[Math.abs(Number(index) || 0) % FALLBACK_PHOTOS.length]
+}
+
+function dishPhotoSrc(item, index = 0) {
+  const uploaded = resolveMediaUrl(item?.imageDataUrl)
+  if (uploaded) return uploaded
+  return matchedDishPhoto(item?.name, index)
+}
+
+function DishPhoto({ src, alt = '', className = '', placeholderLabel = '' }) {
+  const [broken, setBroken] = useState(false)
+  const resolved = resolveMediaUrl(src)
+  const showImg = Boolean(resolved) && !broken
+
+  useEffect(() => {
+    setBroken(false)
+  }, [resolved])
+
+  if (showImg) {
+    return (
+      <img
+        className={`gs-photo ${className}`.trim()}
+        src={resolved}
+        alt={alt}
+        loading="lazy"
+        onError={() => setBroken(true)}
+      />
+    )
+  }
+
+  const initial = String(placeholderLabel || alt || '?')
+    .trim()
+    .charAt(0)
+    .toUpperCase()
+
+  return (
+    <div
+      className={`gs-photo placeholder ${className}`.trim()}
+      aria-hidden={alt ? undefined : true}
+      role={alt ? 'img' : undefined}
+      aria-label={alt || undefined}
+    >
+      <span>{initial || '·'}</span>
+    </div>
+  )
+}
+
 function formatPrice(n) {
   return `₹${n}`
 }
@@ -38,11 +122,18 @@ function stars(rating) {
   return '★'.repeat(n) + '☆'.repeat(5 - n)
 }
 
-function DishPhoto({ src, alt = '', className = '' }) {
-  if (src) {
-    return <img className={`gs-photo ${className}`.trim()} src={src} alt={alt} loading="lazy" />
-  }
-  return <div className={`gs-photo placeholder ${className}`.trim()} aria-hidden="true" />
+function FooterSocialLink({ href, label, children }) {
+  return (
+    <a
+      href={href}
+      className="gs-footer-social-btn"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+    >
+      {children}
+    </a>
+  )
 }
 
 function formatHoursSummary(hours) {
@@ -92,17 +183,21 @@ function dishModifiersFor(item) {
 }
 
 function GuestSite() {
-  const { slug = 'your-link', page, itemId } = useParams()
-  const activePage = itemId ? 'dish' : page || 'home'
+  const { slug = 'your-link', page, itemId, tableCode } = useParams()
+  const navigate = useNavigate()
+  const toast = useToast()
+  const activePage = itemId ? 'dish' : tableCode ? 'menu' : page || 'home'
   const localCtx = useMemo(() => resolveGuestSiteContext(slug), [slug])
 
   const [site, setSite] = useState(null)
-  const [menuFromApi, setMenuFromApi] = useState(null)
   const [loadError, setLoadError] = useState(false)
   const [cart, setCart] = useState([])
+  const [tableSession, setTableSession] = useState(null)
+  const [diningTables, setDiningTables] = useState([])
   const [booking, setBooking] = useState({
     name: '',
     phone: '',
+    email: '',
     guests: '2',
     date: '',
     time: '',
@@ -120,7 +215,7 @@ function GuestSite() {
   const [dishQty, setDishQty] = useState(1)
   const [dishMods, setDishMods] = useState(() => new Set())
   const [wishlist, setWishlist] = useState(() => new Set())
-  const [serviceMode, setServiceMode] = useState('delivery')
+  const [serviceMode, setServiceMode] = useState('pickup')
   const [coupon, setCoupon] = useState('')
   const [lastOrder, setLastOrder] = useState(null)
   const [checkout, setCheckout] = useState({
@@ -132,7 +227,8 @@ function GuestSite() {
     pincode: '',
     eta: 'ASAP',
     instructions: '',
-    payment: 'upi',
+    payment: 'cash',
+    billPay: 'upi',
     upiId: '',
   })
 
@@ -150,34 +246,57 @@ function GuestSite() {
   useEffect(() => {
     let cancelled = false
     setLoadError(false)
-    Promise.allSettled([api.getPublicSite(slug), api.getPublicMenu(slug)]).then(([siteRes, menuRes]) => {
-      if (cancelled) return
-      if (siteRes.status === 'fulfilled') setSite(siteRes.value)
-      else {
+    api
+      .getPublicSite(slug)
+      .then((data) => {
+        if (cancelled) return
+        setSite(data)
+        const rest = data?.restaurant || {}
+        // Soft-prefill delivery city only; phone/email stay as placeholders for the guest.
+        setCheckout((prev) => ({
+          ...prev,
+          city: prev.city || rest.city || '',
+        }))
+      })
+      .catch(() => {
+        if (cancelled) return
         setSite(null)
         setLoadError(true)
-      }
-      if (menuRes.status === 'fulfilled') {
-        const groups = (menuRes.value.categories || [])
-          .filter((c) => (c.items || []).length > 0)
-          .map((c) => ({
-            category: c.name,
-            categoryImage: c.imageDataUrl || '',
-            items: (c.items || []).map((item) => ({
-              id: item.id,
-              name: item.name,
-              price: item.price,
-              desc: item.desc || item.description || '',
-              veg: item.veg,
-              tag: item.tag || '',
-              imageDataUrl: item.imageDataUrl || '',
-              prepMinutes: item.prepMinutes,
-              stockStatus: item.stockStatus || 'in_stock',
-            })),
-          }))
-        setMenuFromApi(groups.length ? groups : null)
-      } else setMenuFromApi(null)
-    })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
+
+  useEffect(() => {
+    if (!tableCode) return undefined
+    let cancelled = false
+    api
+      .getPublicTable(slug, tableCode)
+      .then(({ table }) => {
+        if (cancelled || !table) return
+        setTableSession({ ...table, fromQr: true })
+        setServiceMode('dinein')
+        navigate(guestSitePath(slug, 'menu'), { replace: true })
+      })
+      .catch(() => {
+        if (!cancelled) setTableSession(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug, tableCode, navigate])
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getPublicTables(slug)
+      .then(({ tables }) => {
+        if (!cancelled) setDiningTables(tables || [])
+      })
+      .catch(() => {
+        if (!cancelled) setDiningTables([])
+      })
     return () => {
       cancelled = true
     }
@@ -224,31 +343,35 @@ function GuestSite() {
   }, [slug, activePage, booking.date, booking.guests])
 
   const restaurantName =
-    site?.restaurant?.name || localCtx.restaurantName || slug.replace(/-/g, ' ')
+    site?.restaurant?.name || (!site ? localCtx.restaurantName : '') || slug.replace(/-/g, ' ')
+  const hasSite = Boolean(site?.restaurant)
   const brand = {
-    primaryColor: site?.brand?.primaryColor || localCtx.brand.primaryColor || '#F97316',
-    secondaryColor: site?.brand?.secondaryColor || localCtx.brand.secondaryColor || '#FED7AA',
-    accentColor: site?.brand?.accentColor || localCtx.brand.accentColor || '#111827',
-    logoDataUrl: site?.brand?.logoDataUrl || localCtx.brand.logoDataUrl || '',
-    coverDataUrl: site?.brand?.coverDataUrl || localCtx.brand.coverDataUrl || '',
-    cuisine: site?.restaurant?.cuisine || localCtx.brand.cuisine || '',
-    description: site?.restaurant?.description || localCtx.brand.description || '',
-    phone: site?.restaurant?.phone || localCtx.brand.phone || '',
-    email: site?.restaurant?.email || localCtx.brand.email || '',
-    website: site?.restaurant?.website || localCtx.brand.website || '',
-    address: site?.restaurant?.address || localCtx.brand.address || '',
+    primaryColor: site?.brand?.primaryColor || (!hasSite ? localCtx.brand.primaryColor : '') || '#F97316',
+    secondaryColor:
+      site?.brand?.secondaryColor || (!hasSite ? localCtx.brand.secondaryColor : '') || '#FED7AA',
+    accentColor: site?.brand?.accentColor || (!hasSite ? localCtx.brand.accentColor : '') || '#111827',
+    logoDataUrl: site?.brand?.logoDataUrl || (!hasSite ? localCtx.brand.logoDataUrl : '') || '',
+    coverDataUrl: site?.brand?.coverDataUrl || (!hasSite ? localCtx.brand.coverDataUrl : '') || '',
+    cuisine: site?.restaurant?.cuisine || (!hasSite ? localCtx.brand.cuisine : '') || '',
+    description:
+      site?.restaurant?.description || (!hasSite ? localCtx.brand.description : '') || '',
+    phone: hasSite ? site.restaurant.phone || '' : localCtx.brand.phone || '',
+    email: hasSite ? site.restaurant.email || '' : localCtx.brand.email || '',
+    website: hasSite ? site.restaurant.website || '' : localCtx.brand.website || '',
+    address: hasSite ? site.restaurant.address || '' : localCtx.brand.address || '',
     city: site?.restaurant?.city || '',
     country: site?.restaurant?.country || '',
     displayFont: site?.brand?.displayFont || 'Fraunces',
     bodyFont: site?.brand?.bodyFont || 'DM Sans',
     surfaceColor: site?.brand?.surfaceColor || localCtx.brand.surfaceColor || '',
   }
+  const socials = site?.restaurant?.socials || {}
   const operatingHours = Array.isArray(site?.restaurant?.hours) ? site.restaurant.hours : []
   const yearEst = site?.restaurant?.yearEstablished || ''
   const tagline =
     site?.oneLink?.subheadline ||
     site?.restaurant?.tagline ||
-    localCtx.subheadline ||
+    (!hasSite ? localCtx.subheadline : '') ||
     brand.description ||
     'Thoughtful plates, warm service, and evenings worth lingering over.'
   const heroHeadline = (() => {
@@ -259,7 +382,6 @@ function GuestSite() {
   })()
   const reviews = site?.reviews || []
   const menuGroups = useMemo(() => {
-    if (menuFromApi?.length) return menuFromApi
     if (site?.menu?.length) {
       return site.menu.map((c) => ({
         category: c.name,
@@ -270,11 +392,8 @@ function GuestSite() {
         })),
       }))
     }
-    if (loadError || !site) {
-      return GUEST_MENU_ITEMS.map((g) => ({ ...g, categoryImage: '' }))
-    }
     return []
-  }, [site, menuFromApi, loadError])
+  }, [site])
 
   const liveKeys = useMemo(() => {
     const fromApi = site?.oneLink?.destinations
@@ -331,12 +450,11 @@ function GuestSite() {
 
   const dishPhoto = useMemo(() => {
     if (!selectedDish) return ''
-    if (selectedDish.imageDataUrl) return selectedDish.imageDataUrl
     const idx = Math.max(
       0,
       flatMenuItems.findIndex((i) => (i.id || i.name) === (selectedDish.id || selectedDish.name)),
     )
-    return FALLBACK_PHOTOS[(idx + 1) % FALLBACK_PHOTOS.length]
+    return dishPhotoSrc(selectedDish, idx)
   }, [selectedDish, flatMenuItems])
 
   const dishAddOns = useMemo(
@@ -418,7 +536,33 @@ function GuestSite() {
   const fullAddress = [brand.address, brand.city, brand.country].filter(Boolean).join(', ')
   const hoursSummary = formatHoursSummary(operatingHours)
   const openBadge = todayHoursLabel(operatingHours)
-  const reviewHref = orderedDestinations.find((d) => d.key === 'review' && d.href)?.href
+  const googleReviewHref = socials.googleReview
+    ? /^https?:/i.test(socials.googleReview)
+      ? socials.googleReview
+      : `https://${socials.googleReview}`
+    : ''
+  const reviewHref =
+    googleReviewHref ||
+    orderedDestinations.find((d) => d.key === 'review' && d.href)?.href ||
+    ''
+  const websiteHref = brand.website
+    ? /^https?:/i.test(brand.website)
+      ? brand.website
+      : `https://${brand.website}`
+    : ''
+  const mapsHref = fullAddress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
+    : ''
+  const instagramHref = socials.instagram
+    ? /^https?:/i.test(socials.instagram)
+      ? socials.instagram
+      : `https://instagram.com/${String(socials.instagram).replace(/^@/, '')}`
+    : ''
+  const facebookHref = socials.facebook
+    ? /^https?:/i.test(socials.facebook)
+      ? socials.facebook
+      : `https://facebook.com/${socials.facebook}`
+    : ''
 
   const cssVars = {
     '--gs-primary': brand.primaryColor,
@@ -438,6 +582,8 @@ function GuestSite() {
     { to: guestSitePath(slug, 'website'), label: 'Home', end: true },
     liveKeys.has('menu') && { to: guestSitePath(slug, 'menu'), label: 'Menu' },
     liveKeys.has('book') && { to: guestSitePath(slug, 'book'), label: 'Book a table' },
+    { to: guestSitePath(slug, 'order'), label: 'Order' },
+    { to: guestSitePath(slug, 'tracking'), label: 'Track' },
     { to: guestSitePath(slug, 'account'), label: 'Account' },
   ].filter(Boolean)
 
@@ -475,6 +621,8 @@ function GuestSite() {
         },
       ]
     })
+    const qtyLabel = qty > 1 ? `${qty}× ` : ''
+    toast.success(`${qtyLabel}${item.name || 'Item'} added to cart`)
   }
 
   const toggleDishMod = (modId) => {
@@ -504,6 +652,7 @@ function GuestSite() {
       const { reservation } = await api.createPublicReservation(slug, {
         name: booking.name,
         phone: booking.phone,
+        email: booking.email,
         guests: booking.guests,
         date: booking.date,
         time: booking.time,
@@ -622,7 +771,11 @@ function GuestSite() {
                 </div>
                 <div className="gs-cat-grid">
                   {menuGroups.slice(0, 6).map((group, index) => {
-                    const img = group.categoryImage || group.items.find((i) => i.imageDataUrl)?.imageDataUrl || photoPool[index % photoPool.length]
+                    const img =
+                      resolveMediaUrl(group.categoryImage) ||
+                      resolveMediaUrl(group.items.find((i) => i.imageDataUrl)?.imageDataUrl) ||
+                      dishPhotoSrc(group.items[0], index) ||
+                      photoPool[index % photoPool.length]
                     return (
                       <Link
                         key={group.category}
@@ -654,8 +807,9 @@ function GuestSite() {
                         to={guestDishPath(slug, item.id || item.name)}
                       >
                         <DishPhoto
-                          src={item.imageDataUrl || photoPool[(index + 2) % photoPool.length]}
+                          src={dishPhotoSrc(item, index)}
                           alt={item.name}
+                          placeholderLabel={item.name}
                         />
                         {item.tag || index === 0 ? (
                           <span className="gs-badge">{item.tag || 'Must try'}</span>
@@ -759,7 +913,15 @@ function GuestSite() {
                     <span className="gs-ico pin" aria-hidden="true" />
                     <div>
                       <strong>Location</strong>
-                      <p>{fullAddress}</p>
+                      <p>
+                        {mapsHref ? (
+                          <a href={mapsHref} target="_blank" rel="noopener noreferrer">
+                            {fullAddress}
+                          </a>
+                        ) : (
+                          fullAddress
+                        )}
+                      </p>
                     </div>
                   </li>
                 ) : null}
@@ -794,6 +956,44 @@ function GuestSite() {
                     </div>
                   </li>
                 ) : null}
+                {websiteHref ? (
+                  <li>
+                    <span className="gs-ico web" aria-hidden="true" />
+                    <div>
+                      <strong>Website</strong>
+                      <p>
+                        <a href={websiteHref} target="_blank" rel="noopener noreferrer">
+                          {brand.website}
+                        </a>
+                      </p>
+                    </div>
+                  </li>
+                ) : null}
+                {instagramHref || facebookHref || googleReviewHref ? (
+                  <li>
+                    <span className="gs-ico social" aria-hidden="true" />
+                    <div>
+                      <strong>Social</strong>
+                      <p className="gs-social-inline">
+                        {instagramHref ? (
+                          <a href={instagramHref} target="_blank" rel="noopener noreferrer">
+                            Instagram
+                          </a>
+                        ) : null}
+                        {facebookHref ? (
+                          <a href={facebookHref} target="_blank" rel="noopener noreferrer">
+                            Facebook
+                          </a>
+                        ) : null}
+                        {googleReviewHref ? (
+                          <a href={googleReviewHref} target="_blank" rel="noopener noreferrer">
+                            Google reviews
+                          </a>
+                        ) : null}
+                      </p>
+                    </div>
+                  </li>
+                ) : null}
               </ul>
             </section>
           </>
@@ -809,6 +1009,13 @@ function GuestSite() {
                 freshly prepared, and priced honestly.
               </p>
             </div>
+
+            {tableSession?.name ? (
+              <p className="gs-table-banner">
+                {tableSession.fromQr ? 'Scanned · ' : ''}
+                Ordering for <strong>{tableSession.name}</strong> · dine-in — add dishes, then open cart
+              </p>
+            ) : null}
 
             <div className="gs-menu-toolbar">
               <label className="gs-search">
@@ -882,7 +1089,7 @@ function GuestSite() {
               {filteredMenuItems.map((item, index) => {
                 const soldOut = item.stockStatus === 'out'
                 const badge = dishBadge(item)
-                const photo = item.imageDataUrl || photoPool[(index + 1) % photoPool.length]
+                const photo = dishPhotoSrc(item, index)
                 const dishTo = guestDishPath(slug, item.id || item.name)
                 return (
                   <article
@@ -890,9 +1097,12 @@ function GuestSite() {
                     className={`gs-dish-card${soldOut ? ' is-soldout' : ''}`}
                   >
                     <Link className="gs-dish-media" to={dishTo}>
-                      <DishPhoto src={photo} alt={item.name} />
+                      <DishPhoto src={photo} alt={item.name} placeholderLabel={item.name} />
                       {badge ? <span className={`gs-dish-badge ${badge.kind}`}>{badge.label}</span> : null}
                       {soldOut ? <span className="gs-soldout-badge">Sold out today</span> : null}
+                      {!soldOut && item.stockStatus === 'low' ? (
+                        <span className="gs-lowstock-badge">Low stock</span>
+                      ) : null}
                     </Link>
                     <div className="gs-dish-body">
                       <Link className="gs-dish-title" to={dishTo}>
@@ -943,7 +1153,7 @@ function GuestSite() {
             ) : (
               <div className="gs-dish-detail">
                 <div className="gs-dish-detail-media">
-                  <DishPhoto src={dishPhoto} alt={selectedDish.name} />
+                  <DishPhoto src={dishPhoto} alt={selectedDish.name} placeholderLabel={selectedDish.name} />
                 </div>
                 <div className="gs-dish-detail-copy">
                   <div className="gs-dish-status-row">
@@ -955,6 +1165,9 @@ function GuestSite() {
                     )}
                     {selectedDish.stockStatus === 'out' ? (
                       <span className="gs-soft-pill warn">Sold out today</span>
+                    ) : null}
+                    {selectedDish.stockStatus === 'low' ? (
+                      <span className="gs-soft-pill warn">Low stock</span>
                     ) : null}
                   </div>
 
@@ -1057,15 +1270,10 @@ function GuestSite() {
             setServiceMode={setServiceMode}
             coupon={coupon}
             setCoupon={setCoupon}
-            photoFor={(item) =>
-              item.imageDataUrl ||
-              photoPool[
-                Math.max(
-                  0,
-                  flatMenuItems.findIndex((i) => (i.id || i.name) === (item.id || item.name)),
-                ) % photoPool.length
-              ]
-            }
+            tableSession={tableSession}
+            setTableSession={setTableSession}
+            diningTables={diningTables}
+            photoFor={(item) => dishPhotoSrc(item, 0)}
           />
         ) : null}
 
@@ -1078,12 +1286,26 @@ function GuestSite() {
             checkout={checkout}
             setCheckout={setCheckout}
             onPlaced={setLastOrder}
+            payments={site?.payments || {}}
+            tableSession={tableSession}
+            restaurantContact={{
+              phone: brand.phone,
+              email: brand.email,
+              city: brand.city,
+              name: restaurantName,
+            }}
           />
         ) : null}
 
         {activePage === 'placed' ? <GuestPlacedPage slug={slug} lastOrder={lastOrder} /> : null}
 
-        {activePage === 'tracking' ? <GuestTrackingPage slug={slug} lastOrder={lastOrder} /> : null}
+        {activePage === 'tracking' ? (
+          <GuestTrackingPage
+            slug={slug}
+            lastOrder={lastOrder}
+            restaurantAddress={fullAddress}
+          />
+        ) : null}
 
         {activePage === 'book' ? (
           <GuestBookPage
@@ -1098,6 +1320,7 @@ function GuestSite() {
             availSlots={availSlots}
             availMeta={availMeta}
             submitBooking={submitBooking}
+            restaurantPhone={brand.phone}
           />
         ) : null}
 
@@ -1107,75 +1330,145 @@ function GuestSite() {
             restaurantName={restaurantName}
             checkout={checkout}
             lastOrder={lastOrder}
+            restaurantContact={{
+              phone: brand.phone,
+              email: brand.email,
+              address: fullAddress,
+            }}
             favorites={
               wishlist.size
                 ? flatMenuItems.filter((item) => wishlist.has(String(item.id || item.name)))
                 : flatMenuItems.filter((item) => /best|seller|popular|chef|special/i.test(item.tag || '')).slice(0, 3)
             }
-            photoFor={(item) =>
-              item.imageDataUrl ||
-              photoPool[
-                Math.max(
-                  0,
-                  flatMenuItems.findIndex((i) => (i.id || i.name) === (item.id || item.name)),
-                ) % photoPool.length
-              ]
-            }
+            photoFor={(item) => dishPhotoSrc(item, 0)}
           />
         ) : null}
       </main>
 
       <footer className="gs-footer">
-        <div className="gs-footer-top gs-footer-3">
+        <div className="gs-footer-grid">
           <div className="gs-footer-brand">
-            <div className="gs-brand">
+            <Link className="gs-brand gs-footer-logo" to={guestSitePath(slug, 'website')}>
               {logo}
               <div className="gs-brand-copy">
                 <strong>{restaurantName}</strong>
                 {brandMeta ? <span>{brandMeta}</span> : null}
               </div>
-            </div>
-            <p>
+            </Link>
+            <p className="gs-footer-blurb">
               {brand.description ||
                 'Good food, warm people, and evenings worth lingering over.'}
             </p>
-            <div className="gs-social">
-              {brand.phone ? (
-                <a href={`tel:${String(brand.phone).replace(/\s/g, '')}`} aria-label="Call">
-                  Call
-                </a>
-              ) : null}
-              {brand.email ? (
-                <a href={`mailto:${brand.email}`} aria-label="Email">
-                  Email
-                </a>
-              ) : null}
-              {siteActionLinks.slice(0, 2).map((d) => (
-                <a key={d.key} href={d.href} target="_blank" rel="noopener noreferrer">
-                  {d.name}
-                </a>
-              ))}
-            </div>
+            {instagramHref || facebookHref || googleReviewHref ? (
+              <div className="gs-footer-social" aria-label="Social links">
+                {instagramHref ? (
+                  <FooterSocialLink href={instagramHref} label="Instagram">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm5 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm6.5-.75a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5z" />
+                    </svg>
+                  </FooterSocialLink>
+                ) : null}
+                {facebookHref ? (
+                  <FooterSocialLink href={facebookHref} label="Facebook">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M13 10V7.5c0-.83.67-1.5 1.5-1.5H16V3h-2a4 4 0 0 0-4 4v3H8v3h2v8h3v-8h2.5l.5-3H13z" />
+                    </svg>
+                  </FooterSocialLink>
+                ) : null}
+                {googleReviewHref ? (
+                  <FooterSocialLink href={googleReviewHref} label="Google reviews">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.3L12 14.8 7.2 17l.9-5.3L4.2 7.7l5.4-.8L12 2z" />
+                    </svg>
+                  </FooterSocialLink>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-          <div className="gs-footer-col">
-            <h4>Visit</h4>
-            {fullAddress ? <p>{fullAddress}</p> : null}
-            {hoursSummary ? <p>{hoursSummary}</p> : null}
-            {brand.phone ? <p>{brand.phone}</p> : null}
-          </div>
+
           <div className="gs-footer-col">
             <h4>Explore</h4>
-            <Link to={guestSitePath(slug, 'website')}>Home</Link>
-            {liveKeys.has('menu') ? <Link to={guestSitePath(slug, 'menu')}>Menu</Link> : null}
-            {liveKeys.has('book') ? <Link to={guestSitePath(slug, 'book')}>Book a table</Link> : null}
-            <Link to={guestSitePath(slug, 'account')}>Account</Link>
-            {liveKeys.has('order') ? <Link to={guestSitePath(slug, 'order')}>Order</Link> : null}
+            <nav aria-label="Footer explore">
+              <Link to={guestSitePath(slug, 'website')}>Home</Link>
+              {liveKeys.has('menu') ? <Link to={guestSitePath(slug, 'menu')}>Menu</Link> : null}
+              {liveKeys.has('book') ? (
+                <Link to={guestSitePath(slug, 'book')}>Book a table</Link>
+              ) : null}
+              {liveKeys.has('order') ? <Link to={guestSitePath(slug, 'order')}>Order online</Link> : null}
+              <Link to={guestSitePath(slug, 'account')}>Account</Link>
+              <Link to={`${guestSitePath(slug, 'website')}#contact`}>Contact</Link>
+            </nav>
+          </div>
+
+          <div className="gs-footer-col">
+            <h4>Visit</h4>
+            {fullAddress ? (
+              <p>
+                {mapsHref ? (
+                  <a href={mapsHref} target="_blank" rel="noopener noreferrer">
+                    {fullAddress}
+                  </a>
+                ) : (
+                  fullAddress
+                )}
+              </p>
+            ) : null}
+            {brand.phone ? (
+              <p>
+                <a href={`tel:${String(brand.phone).replace(/\s/g, '')}`}>{brand.phone}</a>
+              </p>
+            ) : null}
+            {brand.email ? (
+              <p>
+                <a href={`mailto:${brand.email}`}>{brand.email}</a>
+              </p>
+            ) : null}
+            {websiteHref ? (
+              <p>
+                <a href={websiteHref} target="_blank" rel="noopener noreferrer">
+                  {brand.website}
+                </a>
+              </p>
+            ) : null}
+            {mapsHref ? (
+              <p>
+                <a href={mapsHref} target="_blank" rel="noopener noreferrer">
+                  Get directions
+                </a>
+              </p>
+            ) : null}
+            {reviewHref && !googleReviewHref ? (
+              <p>
+                <a href={reviewHref} target="_blank" rel="noopener noreferrer">
+                  Leave a review
+                </a>
+              </p>
+            ) : null}
+          </div>
+
+          <div className="gs-footer-col">
+            <h4>Hours</h4>
+            {operatingHours.length > 0 ? (
+              <ul className="gs-footer-hours">
+                {operatingHours.map((row) => (
+                  <li key={row.day || row.open}>
+                    <span>{row.day}</span>
+                    <span>{row.closed ? 'Closed' : `${row.open} – ${row.close}`}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="gs-footer-muted">{hoursSummary || 'Hours coming soon'}</p>
+            )}
           </div>
         </div>
+
         <div className="gs-footer-bottom">
           <span>
-            © {new Date().getFullYear()} {restaurantName} · Powered by{' '}
-            <em className="gs-powered">IROAS</em>
+            © {new Date().getFullYear()} {restaurantName}. All rights reserved.
+          </span>
+          <span className="gs-footer-powered">
+            Powered by <em className="gs-powered">IROAS</em>
           </span>
         </div>
       </footer>

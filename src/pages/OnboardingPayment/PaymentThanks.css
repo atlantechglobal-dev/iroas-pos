@@ -1,0 +1,153 @@
+.pay-thanks-page {
+  --ink: #17171a;
+  --muted: #6b6b73;
+  --line: #e8e4dc;
+  --green: #6fae2e;
+  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(900px 420px at 50% -120px, #eef8d8 0%, transparent 70%),
+    linear-gradient(180deg, #f8f6f2 0%, #efe8dc 100%);
+}
+
+.pay-thanks-shell {
+  width: min(520px, 100%);
+  margin: 0 auto;
+  padding: 36px 20px 48px;
+}
+
+.pay-thanks-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.pay-thanks-brand img {
+  height: 28px;
+}
+
+.pay-thanks-panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 36px 28px 28px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(40, 24, 8, 0.08);
+}
+
+.pay-thanks-ico {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #eef6da;
+  color: var(--green);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.pay-thanks-badge {
+  display: inline-flex;
+  margin: 0 0 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eef6da;
+  color: #3f6b12;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pay-thanks-panel h1 {
+  margin: 0 0 10px;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+
+.pay-thanks-sub {
+  margin: 0 auto 22px;
+  max-width: 400px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.pay-thanks-creds {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #faf8f4;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.pay-thanks-creds > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.pay-thanks-creds span {
+  color: var(--muted);
+}
+
+.pay-thanks-creds strong {
+  text-align: right;
+  word-break: break-all;
+}
+
+.pay-thanks-timer {
+  margin-bottom: 18px;
+}
+
+.pay-thanks-timer-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #efeae2;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.pay-thanks-timer-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--green);
+  transform-origin: left center;
+  animation-name: pay-thanks-shrink;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes pay-thanks-shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.pay-thanks-timer p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pay-thanks-btn {
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: 999px;
+  background: #17171a;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}

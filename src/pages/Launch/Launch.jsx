@@ -11,10 +11,13 @@ import {
   getBusinessCopy,
   locationPreviewLine,
 } from '../../constants/businessCopy.js'
+import { isRestaurantLive } from '../../constants/restaurantStatus.js'
+import { useAuth } from '../../hooks/useAuth.js'
 import './Launch.css'
 
 function Launch() {
   const navigate = useNavigate()
+  const { setRestaurantStatus: setAuthRestaurantStatus } = useAuth()
   const [continuing, setContinuing] = useState(false)
 
   const [toast, setToast] = useState('')
@@ -58,6 +61,8 @@ function Launch() {
   const previewInitial = restaurantName.trim()
     ? restaurantName.trim().charAt(0).toUpperCase()
     : 'R'
+  const qrUnlocked = isRestaurantLive(restaurantStatus)
+  const qrBlurMessage = 'Unlocks after admin approval'
 
   const hasDomain = Boolean(domain)
   const hostname = domain || 'yourbusiness.iroas.com'
@@ -107,6 +112,10 @@ function Launch() {
   }
 
   const handleDownloadQR = async (qrUrl = LIVE_LINK, fileName = `${hostname.split('.')[0]}-QR.png`) => {
+    if (!qrUnlocked) {
+      showMessage('QR unlocks after admin approval')
+      return
+    }
     if (!qrUrl) {
       showMessage('Add the required details first')
       return
@@ -128,6 +137,10 @@ function Launch() {
     })[char])
 
   const handlePrintQR = async (qrUrl = LIVE_LINK, label = displayName, linkLabel = hostname) => {
+    if (!qrUnlocked) {
+      showMessage('QR unlocks after admin approval')
+      return
+    }
     if (!qrUrl) {
       showMessage('Add the required details first')
       return
@@ -188,6 +201,10 @@ function Launch() {
   }
 
   const handleShareQR = async (qrUrl = LIVE_LINK, label = displayName) => {
+    if (!qrUnlocked) {
+      showMessage('QR unlocks after admin approval')
+      return
+    }
     if (!qrUrl) {
       showMessage('Add the required details first')
       return
@@ -236,8 +253,12 @@ function Launch() {
     if (continuing) return
     setContinuing(true)
     try {
-      await api.launch()
-      navigate(ROUTES.SETUP_REVIEW, { replace: true })
+      const result = await api.launch()
+      const nextStatus = result?.status || 'pending_approval'
+      setRestaurantStatus(nextStatus)
+      // Navigate first so Launch's wizard guard does not bounce to dashboard
+      navigate(ROUTES.ONBOARDING_PAYMENT, { replace: true })
+      setAuthRestaurantStatus(nextStatus)
     } catch (err) {
       showMessage(err.message)
       setContinuing(false)
@@ -357,7 +378,13 @@ function Launch() {
           <div className="real-life-grid">
             <div className="real-card">
               <div className="real-image">
-                <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
+                <QrCodePreview
+                  value={LIVE_LINK}
+                  size={120}
+                  alt={`${displayName} QR code`}
+                  blurred={!qrUnlocked}
+                  blurMessage={qrBlurMessage}
+                />
                 <span>{displayName}</span>
               </div>
               <div className="real-label">Table tent</div>
@@ -365,7 +392,13 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image">
-                <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
+                <QrCodePreview
+                  value={LIVE_LINK}
+                  size={120}
+                  alt={`${displayName} QR code`}
+                  blurred={!qrUnlocked}
+                  blurMessage={qrBlurMessage}
+                />
                 <span>{displayName}</span>
               </div>
               <div className="real-label">Sticker</div>
@@ -373,7 +406,13 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image">
-                <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
+                <QrCodePreview
+                  value={LIVE_LINK}
+                  size={120}
+                  alt={`${displayName} QR code`}
+                  blurred={!qrUnlocked}
+                  blurMessage={qrBlurMessage}
+                />
                 <span>{displayName}</span>
               </div>
               <div className="real-label">Business card</div>
@@ -381,7 +420,13 @@ function Launch() {
 
             <div className="real-card">
               <div className="real-image poster">
-                <QrCodePreview value={LIVE_LINK} size={120} alt={`${displayName} QR code`} />
+                <QrCodePreview
+                  value={LIVE_LINK}
+                  size={120}
+                  alt={`${displayName} QR code`}
+                  blurred={!qrUnlocked}
+                  blurMessage={qrBlurMessage}
+                />
                 <span>{displayName}</span>
               </div>
               <div className="real-label">Poster</div>
@@ -399,12 +444,18 @@ function Launch() {
                   <strong>{displayName}</strong>
                 </div>
               </div>
-              <QrCodePreview value={businessCardLink} size={164} alt={`${displayName} business ID QR code`} />
+              <QrCodePreview
+                value={businessCardLink}
+                size={164}
+                alt={`${displayName} business ID QR code`}
+                blurred={!qrUnlocked}
+                blurMessage={qrBlurMessage}
+              />
               <p>Scan to open the digital business card.</p>
               <div className="qr-icon-actions" aria-label="Business ID QR actions">
-                <button type="button" onClick={() => handleDownloadQR(businessCardLink, `${displayName}-business-id-QR.png`)} aria-label="Download business ID QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
-                <button type="button" onClick={() => handleShareQR(businessCardLink, `${displayName} business ID`)} aria-label="Share business ID QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
-                <button type="button" onClick={() => handlePrintQR(businessCardLink, `${displayName} business ID`, businessCardLink)} aria-label="Print business ID QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
+                <button type="button" disabled={!qrUnlocked} onClick={() => handleDownloadQR(businessCardLink, `${displayName}-business-id-QR.png`)} aria-label="Download business ID QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
+                <button type="button" disabled={!qrUnlocked} onClick={() => handleShareQR(businessCardLink, `${displayName} business ID`)} aria-label="Share business ID QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
+                <button type="button" disabled={!qrUnlocked} onClick={() => handlePrintQR(businessCardLink, `${displayName} business ID`, businessCardLink)} aria-label="Print business ID QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
               </div>
             </article>
 
@@ -420,12 +471,19 @@ function Launch() {
                 </div>
               </div>
               {mapEmbedLink ? <iframe className="location-map" src={mapEmbedLink} title={`${displayName} location map`} loading="lazy" /> : null}
-              <QrCodePreview value={locationLink} size={110} alt={`${displayName} location QR code`} emptyMessage="Add an address in Profile to create a location QR." />
+              <QrCodePreview
+                value={locationLink}
+                size={110}
+                alt={`${displayName} location QR code`}
+                emptyMessage="Add an address in Profile to create a location QR."
+                blurred={Boolean(locationLink) && !qrUnlocked}
+                blurMessage={qrBlurMessage}
+              />
               {locationLink ? <a href={locationLink} target="_blank" rel="noreferrer">Open in Google Maps</a> : null}
               <div className="qr-icon-actions" aria-label="Business location QR actions">
-                <button type="button" disabled={!locationLink} onClick={() => handleDownloadQR(locationLink, `${displayName}-location-QR.png`)} aria-label="Download business location QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
-                <button type="button" disabled={!locationLink} onClick={() => handleShareQR(locationLink, `${displayName} location`)} aria-label="Share business location QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
-                <button type="button" disabled={!locationLink} onClick={() => handlePrintQR(locationLink, `${displayName} location`, mapQuery)} aria-label="Print business location QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
+                <button type="button" disabled={!locationLink || !qrUnlocked} onClick={() => handleDownloadQR(locationLink, `${displayName}-location-QR.png`)} aria-label="Download business location QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
+                <button type="button" disabled={!locationLink || !qrUnlocked} onClick={() => handleShareQR(locationLink, `${displayName} location`)} aria-label="Share business location QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
+                <button type="button" disabled={!locationLink || !qrUnlocked} onClick={() => handlePrintQR(locationLink, `${displayName} location`, mapQuery)} aria-label="Print business location QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
               </div>
             </article>
 
@@ -440,11 +498,17 @@ function Launch() {
                   <strong>{hostname}</strong>
                 </div>
               </div>
-              <QrCodePreview value={LIVE_LINK} size={164} alt={`${displayName} website QR code`} />
+              <QrCodePreview
+                value={LIVE_LINK}
+                size={164}
+                alt={`${displayName} website QR code`}
+                blurred={!qrUnlocked}
+                blurMessage={qrBlurMessage}
+              />
               <div className="qr-icon-actions" aria-label="Website QR actions">
-                <button type="button" onClick={() => handleDownloadQR(LIVE_LINK)} aria-label="Download website QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
-                <button type="button" onClick={() => handleShareQR(LIVE_LINK, `${displayName} website`)} aria-label="Share website QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
-                <button type="button" onClick={() => handlePrintQR(LIVE_LINK, `${displayName} website`, hostname)} aria-label="Print website QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
+                <button type="button" disabled={!qrUnlocked} onClick={() => handleDownloadQR(LIVE_LINK)} aria-label="Download website QR" title="Download QR"><img src="/images/download qr.svg" alt="" /></button>
+                <button type="button" disabled={!qrUnlocked} onClick={() => handleShareQR(LIVE_LINK, `${displayName} website`)} aria-label="Share website QR" title="Share QR"><img src="/images/share qr.svg" alt="" /></button>
+                <button type="button" disabled={!qrUnlocked} onClick={() => handlePrintQR(LIVE_LINK, `${displayName} website`, hostname)} aria-label="Print website QR" title="Print QR"><img src="/images/print qr.svg" alt="" /></button>
               </div>
             </article>
           </section>
@@ -473,12 +537,20 @@ function Launch() {
               </p>
 
               <div className="phone-qr">
-                <QrCodePreview value={LIVE_LINK} size={180} alt={`${displayName} QR code`} />
+                <QrCodePreview
+                  value={LIVE_LINK}
+                  size={180}
+                  alt={`${displayName} QR code`}
+                  blurred={!qrUnlocked}
+                  blurMessage={qrBlurMessage}
+                />
               </div>
 
               <div className="qr-bottom-content">
                 <div className="qr-link">{hostname}</div>
-                <p className="preview-note">Preview · goes live after approval</p>
+                <p className="preview-note">
+                  {qrUnlocked ? 'Live · QR ready to share' : 'Preview · QR unlocks after admin approval'}
+                </p>
               </div>
             </div>
           </div>

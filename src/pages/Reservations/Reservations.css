@@ -168,6 +168,26 @@
   width: 80px;
 }
 
+.reservations-page .timeline-table.table-grid {
+  min-width: 980px;
+}
+
+.reservations-page .timeline-table.table-grid th.col-label,
+.reservations-page .timeline-table.table-grid td.table-row-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 110px;
+  width: 110px;
+  text-align: left;
+  padding-left: 12px;
+  box-shadow: 4px 0 8px rgba(15, 23, 42, 0.04);
+}
+
+.reservations-page .timeline-table.table-grid th {
+  min-width: 88px;
+}
+
 .reservations-page .timeline-table td {
   height: 48px;
   padding: 4px;
@@ -188,21 +208,186 @@
   background: #fafafa;
 }
 
+.reservations-page .table-row-label strong {
+  display: block;
+}
+
+.reservations-page .table-row-label small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .reservations-page .booking-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   height: 28px;
   padding: 0 12px;
+  border: none;
   border-radius: 8px;
   font-size: 11.5px;
   font-weight: 700;
   white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .reservations-page .booking-pill.green {
   background: var(--green-soft);
   color: var(--green-text);
+}
+
+.reservations-page .booking-pill.amber {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.reservations-page .booking-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  min-height: 32px;
+}
+
+.reservations-page .calendar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.reservations-page .calendar-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.reservations-page .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reservations-page .legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.reservations-page .legend-swatch.green {
+  background: var(--green-soft);
+  border: 1px solid var(--green-text);
+}
+
+.reservations-page .legend-swatch.amber {
+  background: #fff7ed;
+  border: 1px solid #c2410c;
+}
+
+.reservations-page .calendar-closed-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+}
+
+.reservations-page .calendar-closed-banner strong {
+  font-weight: 800;
+}
+
+.reservations-page .slot-cell {
+  min-width: 72px;
+}
+
+.reservations-page .slot-empty-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px dashed #d0d5dd;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0.55;
+}
+
+.reservations-page .slot-empty-btn:hover {
+  opacity: 1;
+  border-color: var(--green);
+  color: var(--green-text);
+  background: var(--green-soft);
+}
+
+.reservations-page .res-modal-error {
+  margin: 0 0 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.reservations-page .calendar-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.reservations-page .calendar-toolbar input[type='date'] {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+}
+
+.reservations-page .table-add-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 88px minmax(0, 1fr) auto;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.reservations-page .table-add-form input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  .reservations-page .table-add-form {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .reservations-page .upcoming-list {

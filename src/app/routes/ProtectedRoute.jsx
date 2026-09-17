@@ -25,10 +25,15 @@ export function ProtectedRoute({
     return <Navigate to={ROUTES.RESTAURANT_SETUP} replace />
   }
 
+  // Wizard-only routes: once submitted, send pending owners to payment (not dashboard)
   if (onboardingOnly && !adminOnly && restaurantStatus && canUseDashboard(restaurantStatus)) {
-    if (!(allowPending && isPendingApproval(restaurantStatus))) {
-      return <Navigate to={ROUTES.DASHBOARD} replace />
+    if (allowPending && isPendingApproval(restaurantStatus)) {
+      return children
     }
+    if (isPendingApproval(restaurantStatus)) {
+      return <Navigate to={ROUTES.ONBOARDING_PAYMENT} replace />
+    }
+    return <Navigate to={ROUTES.DASHBOARD} replace />
   }
 
   return children

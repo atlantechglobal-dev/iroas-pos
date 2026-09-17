@@ -12,6 +12,13 @@ import publicRoutes from './routes/public.js'
 import identityRoutes from './routes/identity.js'
 import productRoutes from './routes/products.js'
 import notificationRoutes from './routes/notifications.js'
+import { startMessageJobWorker } from './services/reservationMessaging.js'
+import {
+  ensureEmailSettingsBootstrapped,
+  getPublicEmailSettings,
+  isEmailConfigured,
+  verifyEmailConnection,
+} from './services/emailService.js'
 
 if (!process.env.JWT_SECRET) {
   console.error('JWT_SECRET is not set. Copy server/.env.example to server/.env and set it.')
@@ -70,6 +77,34 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 4000
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`IROAS API listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`)
+  const boot = ensureEmailSettingsBootstrapped()
+  if (isEmailConfigured()) {
+    const check = await verifyEmailConnection()
+    const provider = check.provider || boot.provider || 'email'
+    if (check.ok) {
+      if (provider === 'ethereal') {
+        console.log(
+          'Email ready via Ethereal (dev catcher). Preview URLs are logged after each send. Add ZeptoMail token or Gmail App Password for real delivery.',
+        )
+      } else if (provider === 'smtp') {
+        console.log('Email ready via SMTP.')
+      } else {
+        console.log('Email ready via ZeptoMail (HTTPS).')
+      }
+    } else {
+      console.warn(`Email configured but verify failed (${provider}): ${check.reason}`)
+    }
+  } else {
+    console.log(
+      'Email not configured — set ZeptoMail in Admin Email settings, or SMTP_USER/SMTP_PASS in server/.env.',
+    )
+  }
+  const pub = getPublicEmailSettings()
+  console.log(
+    `Email settings: provider=${pub.provider} configured=${pub.configured} from=${pub.fromEmail || '(none)'}`,
+  )
 })
+
+startMessageJobWorker({ intervalMs: 60_000 })

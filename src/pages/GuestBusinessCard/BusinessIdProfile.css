@@ -98,8 +98,50 @@
   opacity: 1;
   transform: scale(1);
   z-index: 1;
-  background: #ddd;
+  background: #ececec;
   display: block;
+}
+
+.bid-photo-empty {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  text-align: center;
+  background:
+    linear-gradient(135deg, #f3f3f3 25%, transparent 25%) -8px 0 / 16px 16px,
+    linear-gradient(225deg, #f3f3f3 25%, transparent 25%) -8px 0 / 16px 16px,
+    linear-gradient(45deg, #f3f3f3 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(315deg, #f3f3f3 25%, #ebebeb 25%) 0 0 / 16px 16px;
+  color: #8b8b8f;
+}
+
+.bid-photo-empty span {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #5c5c63;
+}
+
+.bid-photo-empty small {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.bid-photo-empty--hero {
+  min-height: var(--bid-hero-h);
+}
+
+.bid-photo-empty--stage {
+  min-height: 220px;
+  border-radius: inherit;
+}
+
+.bid-gallery-item--empty .bid-photo-empty {
+  min-height: 100%;
+  background: transparent;
 }
 
 .bid-hero-photo {
@@ -309,9 +351,47 @@
 }
 
 .bid-contact-grid .is-disabled {
+  opacity: 0.72;
+  cursor: pointer;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.bid-contact-grid .bid-contact-hint {
+  color: #9a8f86;
+  font-style: italic;
+}
+
+.bid-social {
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.bid-social.is-empty {
   opacity: 0.55;
-  pointer-events: none;
-  cursor: default;
+}
+
+.bid-brochure-empty-btn {
+  display: block;
+  width: 100%;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.bid-gallery-item--empty {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px dashed #d5d5d8;
+  background: #f7f7f8;
+  font: inherit;
+  color: inherit;
+  padding: 0;
 }
 
 /* Story / Tradition cards */

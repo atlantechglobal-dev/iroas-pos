@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { QrCodePreview } from '../../components/QrCodePreview.jsx'
+import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
 import { ROUTES } from '../../constants/routes.js'
 import {
@@ -11,14 +12,16 @@ import {
 import './GuestBusinessCard.css'
 import './BusinessIdProfile.css'
 
-const FALLBACK_PHOTOS = [
-  'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=800&q=80',
-]
+const FILL_MESSAGE = 'Please fill in the image and details.'
+
+function EmptyPhoto({ variant = '' }) {
+  return (
+    <div className={`bid-photo-empty${variant ? ` ${variant}` : ''}`}>
+      <span>Fill image and details</span>
+      <small>Add photos and contact info in Business ID</small>
+    </div>
+  )
+}
 
 function IconUserPlus() {
   return (
@@ -183,6 +186,7 @@ function Field({ label, children }) {
 function GuestBusinessCard() {
   const { slug = 'your-card' } = useParams()
   const location = useLocation()
+  const toast = useToast()
   const saved = loadCardPreview(slug)
   const [remote, setRemote] = useState(null)
   const [brochureIndex, setBrochureIndex] = useState(0)
@@ -245,18 +249,16 @@ function GuestBusinessCard() {
   }, [remote, saved, brand])
 
   const media = useMemo(() => {
-    const fromGallery = (remote?.gallery || [])
+    // Only owner-uploaded Business ID gallery photos — no stock / menu fillers
+    return (remote?.gallery || [])
       .map((g) => g?.dataUrl || g?.url || '')
       .filter(Boolean)
-    const fromMenu = (remote?.menu || [])
-      .flatMap((c) => c.items || [])
-      .map((i) => i.imageDataUrl)
-      .filter(Boolean)
-    const list = [...fromGallery, ...fromMenu]
-    return list.length ? list.slice(0, 12) : FALLBACK_PHOTOS
+      .slice(0, 12)
   }, [remote])
 
-  const heroImage = card.coverDataUrl || media[0] || FALLBACK_PHOTOS[0]
+  const heroImage = card.coverDataUrl || ''
+  const hasHero = Boolean(heroImage)
+  const hasMedia = media.length > 0
 
   const storyBlocks = useMemo(() => {
     const remoteStories = remote?.restaurant?.stories
@@ -353,13 +355,15 @@ function GuestBusinessCard() {
   }
 
   const socials = [
-    card.phone && {
+    {
       key: 'whatsapp',
-      href: (() => {
-        let digits = String(card.phone).replace(/\D/g, '')
-        if (digits.length === 10) digits = `91${digits}`
-        return `https://wa.me/${digits}`
-      })(),
+      href: card.phone
+        ? (() => {
+            let digits = String(card.phone).replace(/\D/g, '')
+            if (digits.length === 10) digits = `91${digits}`
+            return `https://wa.me/${digits}`
+          })()
+        : '',
       label: 'WhatsApp',
       className: 'wa',
     },
@@ -369,7 +373,7 @@ function GuestBusinessCard() {
         ? /^https?:/i.test(card.facebook)
           ? card.facebook
           : `https://facebook.com/${card.facebook}`
-        : websiteHref,
+        : '',
       label: 'Facebook',
       className: 'fb',
     },
@@ -379,7 +383,7 @@ function GuestBusinessCard() {
         ? /^https?:/i.test(card.twitter)
           ? card.twitter
           : `https://x.com/${card.twitter}`
-        : websiteHref,
+        : '',
       label: 'X',
       className: 'x',
     },
@@ -387,13 +391,22 @@ function GuestBusinessCard() {
       key: 'instagram',
       href: card.insta
         ? `https://instagram.com/${String(card.insta).replace(/^@/, '')}`
-        : websiteHref,
+        : '',
       label: 'Instagram',
       className: 'ig',
     },
-  ].filter(Boolean)
+  ]
+
+  const promptFill = (event) => {
+    event?.preventDefault?.()
+    toast.info(FILL_MESSAGE)
+  }
 
   const handleSaveContact = () => {
+    if (!card.phone && !card.email && !card.website && !locationQuery) {
+      toast.info(FILL_MESSAGE)
+      return
+    }
     const vCard = [
       'BEGIN:VCARD',
       'VERSION:3.0',
@@ -436,7 +449,7 @@ function GuestBusinessCard() {
     .map((w) => w[0]?.toUpperCase())
     .join('')
 
-  const brochurePhoto = media[brochureIndex % media.length]
+  const brochurePhoto = hasMedia ? media[brochureIndex % media.length] : ''
 
   return (
     <div className="guest-card-page bid-page" style={profileStyle}>
@@ -459,7 +472,9 @@ function GuestBusinessCard() {
           aria-label={
             showScanner
               ? 'Business ID QR code. Click or hover away to show brochure.'
-              : 'Brochure photo. Hover or click to show QR scanner.'
+              : hasHero
+                ? 'Brochure photo. Hover or click to show QR scanner.'
+                : 'Add a cover photo from Business ID in your dashboard. Hover or click for QR.'
           }
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -469,11 +484,11 @@ function GuestBusinessCard() {
           }}
         >
           <div className="bid-hero-brochure" aria-hidden={showScanner}>
-            <img
-              className="bid-hero-photo"
-              src={heroImage}
-              alt=""
-            />
+            {hasHero ? (
+              <img className="bid-hero-photo" src={heroImage} alt="" />
+            ) : (
+              <EmptyPhoto variant="bid-photo-empty--hero" />
+            )}
           </div>
 
           <div className="bid-hero-scanner" aria-hidden={!showScanner}>
@@ -502,18 +517,30 @@ function GuestBusinessCard() {
           </p>
 
           <div className="bid-socials" aria-label="Social profiles">
-            {socials.map((s) => (
-              <a
-                key={s.key}
-                className={`bid-social ${s.className}`}
-                href={s.href}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={s.label}
-              >
-                <SocialIcon type={s.key === 'instagram' ? 'instagram' : s.key} />
-              </a>
-            ))}
+            {socials.map((s) =>
+              s.href ? (
+                <a
+                  key={s.key}
+                  className={`bid-social ${s.className}`}
+                  href={s.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={s.label}
+                >
+                  <SocialIcon type={s.key === 'instagram' ? 'instagram' : s.key} />
+                </a>
+              ) : (
+                <button
+                  key={s.key}
+                  type="button"
+                  className={`bid-social ${s.className} is-empty`}
+                  aria-label={`${s.label} — ${FILL_MESSAGE}`}
+                  onClick={promptFill}
+                >
+                  <SocialIcon type={s.key === 'instagram' ? 'instagram' : s.key} />
+                </button>
+              ),
+            )}
           </div>
 
           <div className="bid-primary-actions">
@@ -536,10 +563,11 @@ function GuestBusinessCard() {
               <span className="bid-contact-value">{card.phone}</span>
             </a>
           ) : (
-            <div className="bid-contact-tile is-disabled" aria-disabled="true">
+            <button type="button" className="bid-contact-tile is-disabled" onClick={promptFill}>
               <IconPhone />
               <span>Call</span>
-            </div>
+              <span className="bid-contact-value bid-contact-hint">Fill details</span>
+            </button>
           )}
           {card.email ? (
             <a href={`mailto:${card.email}`}>
@@ -548,18 +576,25 @@ function GuestBusinessCard() {
               <span className="bid-contact-value">{card.email}</span>
             </a>
           ) : (
-            <div className="bid-contact-tile is-disabled" aria-disabled="true">
+            <button type="button" className="bid-contact-tile is-disabled" onClick={promptFill}>
               <IconMail />
               <span>Email</span>
-            </div>
+              <span className="bid-contact-value bid-contact-hint">Fill details</span>
+            </button>
           )}
-          <a href={websiteHref} target="_blank" rel="noreferrer">
-            <IconWeb />
-            <span>Website</span>
-            {card.website ? (
+          {card.website ? (
+            <a href={websiteHref} target="_blank" rel="noreferrer">
+              <IconWeb />
+              <span>Website</span>
               <span className="bid-contact-value">{card.website}</span>
-            ) : null}
-          </a>
+            </a>
+          ) : (
+            <button type="button" className="bid-contact-tile is-disabled" onClick={promptFill}>
+              <IconWeb />
+              <span>Website</span>
+              <span className="bid-contact-value bid-contact-hint">Fill details</span>
+            </button>
+          )}
           {locationHref ? (
             <a href={locationHref} target="_blank" rel="noreferrer">
               <IconPin />
@@ -569,10 +604,11 @@ function GuestBusinessCard() {
               ) : null}
             </a>
           ) : (
-            <div className="bid-contact-tile is-disabled" aria-disabled="true">
+            <button type="button" className="bid-contact-tile is-disabled" onClick={promptFill}>
               <IconPin />
               <span>Location</span>
-            </div>
+              <span className="bid-contact-value bid-contact-hint">Fill details</span>
+            </button>
           )}
         </section>
 
@@ -599,25 +635,37 @@ function GuestBusinessCard() {
           </div>
           <p className="bid-section-sub">Flip and see our work.</p>
           <div className="bid-brochure-stage">
-            <img src={brochurePhoto} alt={`${restaurant} brochure`} />
-            <button
-              type="button"
-              className="bid-brochure-nav prev"
-              aria-label="Previous"
-              onClick={() =>
-                setBrochureIndex((i) => (i - 1 + media.length) % media.length)
-              }
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              className="bid-brochure-nav next"
-              aria-label="Next"
-              onClick={() => setBrochureIndex((i) => (i + 1) % media.length)}
-            >
-              ›
-            </button>
+            {hasMedia ? (
+              <>
+                <img src={brochurePhoto} alt={`${restaurant} brochure`} />
+                {media.length > 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="bid-brochure-nav prev"
+                      aria-label="Previous"
+                      onClick={() =>
+                        setBrochureIndex((i) => (i - 1 + media.length) % media.length)
+                      }
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      className="bid-brochure-nav next"
+                      aria-label="Next"
+                      onClick={() => setBrochureIndex((i) => (i + 1) % media.length)}
+                    >
+                      ›
+                    </button>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <button type="button" className="bid-brochure-empty-btn" onClick={promptFill}>
+                <EmptyPhoto variant="bid-photo-empty--stage" />
+              </button>
+            )}
           </div>
         </section>
 
@@ -629,16 +677,27 @@ function GuestBusinessCard() {
           </div>
           <p className="bid-section-sub">Our Pictures & Videos</p>
           <div className="bid-gallery-grid">
-            {media.slice(0, 9).map((src, index) => (
-              <button
-                key={`${src}-${index}`}
-                type="button"
-                className="bid-gallery-item"
-                onClick={() => setBrochureIndex(index)}
-              >
-                <img src={src} alt="" loading="lazy" />
-              </button>
-            ))}
+            {hasMedia
+              ? media.slice(0, 9).map((src, index) => (
+                  <button
+                    key={`${src}-${index}`}
+                    type="button"
+                    className="bid-gallery-item"
+                    onClick={() => setBrochureIndex(index)}
+                  >
+                    <img src={src} alt="" loading="lazy" />
+                  </button>
+                ))
+              : Array.from({ length: 3 }, (_, index) => (
+                  <button
+                    key={`empty-${index}`}
+                    type="button"
+                    className="bid-gallery-item bid-gallery-item--empty"
+                    onClick={promptFill}
+                  >
+                    <EmptyPhoto />
+                  </button>
+                ))}
           </div>
         </section>
 
@@ -652,7 +711,7 @@ function GuestBusinessCard() {
             <p className="bid-map-address">{locationQuery}</p>
           ) : (
             <p className="bid-map-address bid-map-address--empty">
-              Add your full address, city, and country in restaurant setup to show the map.
+              Please fill in the image and details.
             </p>
           )}
           {mapEmbed ? (

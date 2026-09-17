@@ -15,6 +15,8 @@ const Domain = lazy(() => import('../../pages/Domain/Domain.jsx'))
 const Brand = lazy(() => import('../../pages/Brand/Brand.jsx'))
 const Launch = lazy(() => import('../../pages/Launch/Launch.jsx'))
 const SetupReview = lazy(() => import('../../pages/SetupReview/SetupReview.jsx'))
+const OnboardingPayment = lazy(() => import('../../pages/OnboardingPayment/OnboardingPayment.jsx'))
+const PaymentThanks = lazy(() => import('../../pages/OnboardingPayment/PaymentThanks.jsx'))
 const GoLive = lazy(() => import('../../pages/GoLive/GoLive.jsx'))
 const Dashboard = lazy(() => import('../../pages/Dashboard/Dashboard.jsx'))
 const RestaurantProfile = lazy(() => import('../../pages/RestaurantProfile/RestaurantProfile.jsx'))
@@ -43,6 +45,7 @@ const Reviews = lazy(() => import('../../pages/Reviews/Reviews.jsx'))
 const PosIntegration = lazy(() => import('../../pages/PosIntegration/PosIntegration.jsx'))
 const Notifications = lazy(() => import('../../pages/Notifications/Notifications.jsx'))
 const Settings = lazy(() => import('../../pages/Settings/Settings.jsx'))
+const EmailSettings = lazy(() => import('../../pages/Settings/EmailSettings.jsx'))
 const SettingsUsers = lazy(() =>
   import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsUsers })),
 )
@@ -113,6 +116,7 @@ export function AppRoutes() {
         <Route path={ROUTES.GUEST_ONE_LINK} element={<GuestOneLink />} />
         <Route path={ROUTES.GUEST_BUSINESS_CARD} element={<GuestBusinessCard />} />
         <Route path={ROUTES.GUEST_SITE_DISH} element={<GuestSite />} />
+        <Route path={ROUTES.GUEST_SITE_TABLE} element={<GuestSite />} />
         <Route path={ROUTES.GUEST_SITE_PAGE} element={<GuestSite />} />
         <Route path={ROUTES.GUEST_SITE} element={<GuestSite />} />
 
@@ -120,6 +124,14 @@ export function AppRoutes() {
         <Route path={ROUTES.DOMAIN} element={withProtection(Domain, WIZARD_ONLY)} />
         <Route path={ROUTES.BRAND} element={withProtection(Brand)} />
         <Route path={ROUTES.LAUNCH} element={withProtection(Launch, WIZARD_ONLY)} />
+        <Route
+          path={ROUTES.ONBOARDING_PAYMENT}
+          element={withProtection(OnboardingPayment, { onboardingOnly: true, allowPending: true })}
+        />
+        <Route
+          path={ROUTES.PAYMENT_THANKS}
+          element={withProtection(PaymentThanks, { onboardingOnly: true, allowPending: true })}
+        />
         <Route
           path={ROUTES.SETUP_REVIEW}
           element={withProtection(SetupReview, { onboardingOnly: true, allowPending: true })}
@@ -148,6 +160,7 @@ export function AppRoutes() {
         <Route path={ROUTES.POS_INTEGRATION} element={withProtection(PosIntegration, LIVE_ONLY)} />
         <Route path={ROUTES.NOTIFICATIONS} element={withProtection(Notifications, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS} element={withProtection(Settings, LIVE_ONLY)} />
+        <Route path={ROUTES.SETTINGS_EMAIL} element={withProtection(EmailSettings, { adminOnly: true })} />
         <Route path={ROUTES.SETTINGS_USERS} element={withProtection(SettingsUsers, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_BILLING} element={withProtection(SettingsBilling, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_SECURITY} element={withProtection(SettingsSecurity, LIVE_ONLY)} />

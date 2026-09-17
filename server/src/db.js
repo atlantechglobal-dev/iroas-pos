@@ -387,4 +387,139 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
 `)
 
+// Reservation messaging + guest email + dining tables (M2-T04/T06)
+const reservationColumns = db.prepare('PRAGMA table_info(reservations)').all()
+if (!reservationColumns.some((col) => col.name === 'guest_email')) {
+  db.exec('ALTER TABLE reservations ADD COLUMN guest_email TEXT')
+}
+if (!reservationColumns.some((col) => col.name === 'table_id')) {
+  db.exec('ALTER TABLE reservations ADD COLUMN table_id INTEGER')
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS message_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    reservation_id INTEGER REFERENCES reservations(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    channel TEXT NOT NULL DEFAULT 'email',
+    to_address TEXT,
+    subject TEXT,
+    body TEXT NOT NULL,
+    send_at TEXT NOT NULL DEFAULT (datetime('now')),
+    status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'sent', 'cancelled', 'failed')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    sent_at TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_message_jobs_due
+    ON message_jobs(status, send_at);
+
+  CREATE TABLE IF NOT EXISTS dining_tables (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    seats INTEGER NOT NULL DEFAULT 2,
+    zone TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    public_code TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_dining_tables_restaurant
+    ON dining_tables(restaurant_id, sort_order);
+
+  CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    public_code TEXT NOT NULL,
+    service_mode TEXT NOT NULL DEFAULT 'pickup'
+      CHECK (service_mode IN ('dinein', 'pickup', 'delivery')),
+    dining_table_id INTEGER REFERENCES dining_tables(id) ON DELETE SET NULL,
+    guest_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT,
+    address_json TEXT,
+    status TEXT NOT NULL DEFAULT 'new'
+      CHECK (status IN ('new', 'accepted', 'preparing', 'ready', 'completed', 'cancelled')),
+    payment_method TEXT NOT NULL DEFAULT 'cash'
+      CHECK (payment_method IN ('upi', 'cash', 'cod')),
+    payment_status TEXT NOT NULL DEFAULT 'payment_pending'
+      CHECK (payment_status IN ('payment_pending', 'paid', 'failed', 'refunded')),
+    payment_timing TEXT NOT NULL DEFAULT 'bill_now',
+    subtotal REAL NOT NULL DEFAULT 0,
+    tax REAL NOT NULL DEFAULT 0,
+    fees REAL NOT NULL DEFAULT 0,
+    total REAL NOT NULL DEFAULT 0,
+    notes TEXT,
+    eta_minutes INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    paid_at TEXT
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_public_code
+    ON orders(restaurant_id, public_code);
+  CREATE INDEX IF NOT EXISTS idx_orders_restaurant_status
+    ON orders(restaurant_id, status, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    menu_item_id INTEGER,
+    name TEXT NOT NULL,
+    unit_price REAL NOT NULL DEFAULT 0,
+    qty INTEGER NOT NULL DEFAULT 1,
+    extras_json TEXT
+  );
+`)
+
+// Migration: dining_tables.public_code for table QR ordering
+{
+  const cols = db.prepare('PRAGMA table_info(dining_tables)').all()
+  if (!cols.some((c) => c.name === 'public_code')) {
+    db.exec('ALTER TABLE dining_tables ADD COLUMN public_code TEXT')
+  }
+  const missing = db
+    .prepare(
+      `SELECT id FROM dining_tables WHERE public_code IS NULL OR TRIM(public_code) = ''`,
+    )
+    .all()
+  const update = db.prepare('UPDATE dining_tables SET public_code = ? WHERE id = ?')
+  for (const row of missing) {
+    update.run(`t${row.id}${Math.random().toString(36).slice(2, 6)}`, row.id)
+  }
+  db.exec(
+    `  CREATE INDEX IF NOT EXISTS idx_dining_tables_public_code
+     ON dining_tables(restaurant_id, public_code)`,
+  )
+}
+
+// Migration: message_jobs.order_id for order confirmations
+{
+  const cols = db.prepare('PRAGMA table_info(message_jobs)').all()
+  if (!cols.some((c) => c.name === 'order_id')) {
+    db.exec('ALTER TABLE message_jobs ADD COLUMN order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE')
+  }
+}
+
+// Migration: orders.payment_timing (bill_now | pay_later)
+{
+  const cols = db.prepare('PRAGMA table_info(orders)').all()
+  if (cols.length && !cols.some((c) => c.name === 'payment_timing')) {
+    db.exec(
+      `ALTER TABLE orders ADD COLUMN payment_timing TEXT NOT NULL DEFAULT 'bill_now'`,
+    )
+  }
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS platform_settings (
+    key TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+
 export default db

@@ -163,8 +163,32 @@ function BusinessId() {
     setGallery((prev) => prev.filter((g) => g.id !== id))
   }
 
+  const hasPhoto = Boolean(coverDataUrl || logoDataUrl || gallery.length > 0)
+  const hasDetails =
+    Boolean(String(form.restaurantName || '').trim()) &&
+    (Boolean(String(form.phone || '').trim()) || Boolean(String(form.email || '').trim())) &&
+    Boolean(String(form.address || '').trim())
+
+  const isIncomplete = () => !hasPhoto || !hasDetails
+
+  const promptFill = () => {
+    if (!hasPhoto && !hasDetails) {
+      toast.info('Please add a photo and fill in the details first.')
+      return
+    }
+    if (!hasPhoto) {
+      toast.info('Please add a photo first (logo, cover, or gallery).')
+      return
+    }
+    toast.info('Please fill in the business details first (name, phone or email, and address).')
+  }
+
   const handleSave = async () => {
     if (!hydrated) return
+    if (isIncomplete()) {
+      promptFill()
+      return
+    }
     setSaving(true)
     try {
       await api.updateProfile({
@@ -221,10 +245,18 @@ function BusinessId() {
   }
 
   const openLive = () => {
+    if (isIncomplete()) {
+      promptFill()
+      return
+    }
     openBusinessIdPreview(slug)
   }
 
   const downloadQr = async () => {
+    if (isIncomplete()) {
+      promptFill()
+      return
+    }
     try {
       await downloadQrPng(publicUrl, `${slug}-business-id-QR.png`, { width: 512 })
       toast.success('QR downloaded.')
@@ -260,6 +292,13 @@ function BusinessId() {
             </button>
           </div>
         </header>
+
+        {hydrated && isIncomplete() ? (
+          <p className="bid-admin-banner" role="status">
+            Add a photo and fill in name, phone or email, and address before you can <strong>Save</strong> or
+            open the <strong>live</strong> card.
+          </p>
+        ) : null}
 
         <div className="bid-admin-grid">
           <div className="bid-admin-main">
@@ -405,7 +444,7 @@ function BusinessId() {
                     {coverDataUrl ? (
                       <img src={coverDataUrl} alt="" />
                     ) : (
-                      <em>Upload a wide food photo</em>
+                      <em>Fill image and details</em>
                     )}
                   </div>
                   <div className="bid-photo-btns">
@@ -448,7 +487,13 @@ function BusinessId() {
                     </div>
                   ))}
                   {gallery.length === 0 ? (
-                    <p className="bid-empty">No gallery photos yet.</p>
+                    <div className="bid-gallery-empty-slots">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="bid-gallery-slot">
+                          <em>Fill image and details</em>
+                        </div>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
               </div>

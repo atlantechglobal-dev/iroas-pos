@@ -14,6 +14,27 @@ export const BUSINESS_CATEGORIES = [
   'Other',
 ]
 
+/** Categories shown in signup / identity UI. Others stay in BUSINESS_CATEGORIES but are hidden. */
+export const HIDDEN_BUSINESS_CATEGORIES = [
+  'Retail Store',
+  'Salon',
+  'Clinic',
+  'Consultancy',
+  'Freelancer',
+  'Professional Services',
+  'Real Estate',
+  'Education',
+  'Fitness/Gym',
+  'Local Business',
+  'E-commerce Business',
+  'Other',
+]
+
+export function visibleBusinessCategories() {
+  const hidden = new Set(HIDDEN_BUSINESS_CATEGORIES)
+  return BUSINESS_CATEGORIES.filter((cat) => !hidden.has(cat))
+}
+
 export const IDENTITY_STATUS_LABELS = {
   not_started: 'Not Started',
   draft: 'Draft',

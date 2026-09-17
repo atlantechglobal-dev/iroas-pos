@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useAuth } from '../../hooks/useAuth.js'
@@ -6,6 +6,8 @@ import { useRestaurant } from '../../hooks/useRestaurant.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { HorizontalDragScroll } from '../../components/HorizontalDragScroll.jsx'
 import { ROUTES } from '../../constants/routes.js'
+import { api } from '../../lib/api'
+import { todayIso } from '../../utils/localDate.js'
 import './Dashboard.css'
 
 function generateSeries(n, base, amplitude) {
@@ -34,13 +36,6 @@ const RECENT_ORDERS = [
   { id: '#10426', status: 'New', meta: 'Table 04 · Walk-in · 6 items', amount: '₹4,120', time: '8 min ago' },
   { id: '#10425', status: 'Completed', meta: 'Table 09 · Meera K. · 3 items', amount: '₹1,540', time: '14 min ago' },
   { id: '#10424', status: 'Accepted', meta: 'Delivery · Zomato · 5 items', amount: '₹2,180', time: '18 min ago' },
-]
-
-const RESERVATIONS = [
-  { name: 'Aditi & Rohan', meta: 'T-08 · Anniversary', time: '7:30 PM', party: 2 },
-  { name: 'Khanna family', meta: 'T-15 · High chair', time: '8:00 PM', party: 6 },
-  { name: 'Vikram P.', meta: 'T-03 · Window seat', time: '8:45 PM', party: 4 },
-  { name: 'Sara L.', meta: 'T-11 · —', time: '9:15 PM', party: 2 },
 ]
 
 const POPULAR_ITEMS = [
@@ -100,6 +95,63 @@ function Dashboard() {
   const toast = useToast()
   const navigate = useNavigate()
   const [range, setRange] = useState('7d')
+  const [tonightReservations, setTonightReservations] = useState([])
+  const [activeReservationCount, setActiveReservationCount] = useState(null)
+  const [arrivingSoonCount, setArrivingSoonCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getReservations()
+      .then(({ reservations }) => {
+        if (cancelled) return
+        const today = todayIso()
+        const now = new Date()
+        const active = (reservations || []).filter(
+          (r) => r.status !== 'cancelled' && String(r.date) >= today,
+        )
+        setActiveReservationCount(active.length)
+
+        const todayActive = active.filter((r) => r.date === today)
+        const soon = todayActive.filter((r) => {
+          const [h, m] = String(r.time || '').split(':').map(Number)
+          if (Number.isNaN(h)) return false
+          const slot = new Date(now)
+          slot.setHours(h, Number.isNaN(m) ? 0 : m, 0, 0)
+          const diffMin = (slot.getTime() - now.getTime()) / 60000
+          return diffMin >= 0 && diffMin <= 60
+        })
+        setArrivingSoonCount(soon.length)
+
+        const rows = todayActive
+          .sort((a, b) => String(a.time).localeCompare(String(b.time)))
+          .slice(0, 6)
+          .map((r) => {
+            const [h, m] = String(r.time || '').split(':')
+            const hour = Number(h)
+            const ampm = hour >= 12 ? 'PM' : 'AM'
+            const h12 = Number.isNaN(hour) ? r.time : `${((hour + 11) % 12) + 1}:${m || '00'} ${ampm}`
+            return {
+              name: r.guestName,
+              meta: r.notes || r.phone || '—',
+              time: h12,
+              party: r.guests,
+              status: r.status,
+            }
+          })
+        setTonightReservations(rows)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTonightReservations([])
+          setActiveReservationCount(0)
+          setArrivingSoonCount(0)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const firstName = (user?.name || 'there').split(' ')[0]
 
@@ -182,11 +234,15 @@ function Dashboard() {
               <div className="stat-card">
                 <div className="stat-top">
                   <span className="stat-ico">👥</span>
-                  <span className="trend up">↗ +3</span>
+                  <span className="trend up">Live</span>
                 </div>
-                <div className="stat-number">27</div>
+                <div className="stat-number">
+                  {activeReservationCount == null ? '—' : activeReservationCount}
+                </div>
                 <p className="stat-sub">Active reservations</p>
-                <p className="stat-foot">9 arriving in next hour</p>
+                <p className="stat-foot">
+                  {arrivingSoonCount} arriving in next hour
+                </p>
               </div>
 
               <div className="stat-card">
@@ -310,8 +366,12 @@ function Dashboard() {
               <section className="card">
                 <div className="card-head">
                   <div>
-                    <h2>Tonight's reservations</h2>
-                    <span>4 of {RESERVATIONS.length + 5} arriving next hour</span>
+                    <h2>Tonight&apos;s reservations</h2>
+                    <span>
+                      {tonightReservations.length
+                        ? `${tonightReservations.length} active today`
+                        : 'No bookings for today yet'}
+                    </span>
                   </div>
                   <button className="link-btn" type="button" onClick={() => navigate(ROUTES.RESERVATIONS)}>
                     Calendar
@@ -319,8 +379,16 @@ function Dashboard() {
                 </div>
 
                 <ul className="reservation-list">
-                  {RESERVATIONS.map((r) => (
-                    <li key={r.name}>
+                  {tonightReservations.length === 0 ? (
+                    <li>
+                      <div className="reservation-main">
+                        <strong>No reservations tonight</strong>
+                        <p>Guest website bookings will show here.</p>
+                      </div>
+                    </li>
+                  ) : null}
+                  {tonightReservations.map((r) => (
+                    <li key={`${r.name}-${r.time}`}>
                       <span className="party-count">{r.party}</span>
                       <div className="reservation-main">
                         <strong>{r.name}</strong>
@@ -328,7 +396,7 @@ function Dashboard() {
                       </div>
                       <div className="reservation-side">
                         <strong>{r.time}</strong>
-                        <small>CONFIRMED</small>
+                        <small>{(r.status || 'pending').toUpperCase()}</small>
                       </div>
                     </li>
                   ))}

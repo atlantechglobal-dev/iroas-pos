@@ -15,6 +15,7 @@ export function pitchDoneCountForPath(pathname) {
   if (pathname === ROUTES.DOMAIN) return 2
   if (pathname === ROUTES.BRAND) return 3
   if (pathname === ROUTES.LAUNCH || pathname === ROUTES.SETUP_REVIEW) return 4
+  if (pathname === ROUTES.ONBOARDING_PAYMENT || pathname === ROUTES.PAYMENT_THANKS) return 4
   return 0
 }
 

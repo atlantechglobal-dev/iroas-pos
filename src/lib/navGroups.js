@@ -43,7 +43,7 @@ export const NAV_GROUPS = [
         icon: '/images/breserve.svg',
         route: ROUTES.RESERVATIONS,
       },
-      { key: 'tables', label: 'Tables', icon: '/images/tabs.svg', route: ROUTES.TABLES },
+      { key: 'tables', label: 'Table QR', icon: '/images/tabs.svg', route: ROUTES.TABLES },
       { key: 'staff', label: 'Staff', icon: '/images/stafb.svg', route: ROUTES.STAFF },
       { key: 'customers', label: 'Customers', icon: '/images/cust.svg', route: ROUTES.CUSTOMERS },
       {

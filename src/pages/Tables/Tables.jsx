@@ -1,112 +1,258 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
-import { MESSAGES } from '../../constants/messages.js'
+import { QrCodePreview, downloadQrPng } from '../../components/QrCodePreview.jsx'
+import { api } from '../../lib/api'
+import { guestTableUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
 import './Tables.css'
-
-const INITIAL_TABLES = [
-  { id: 'T-01', seats: 2, status: 'available' },
-  { id: 'T-02', seats: 2, status: 'available', note: '32m' },
-  { id: 'T-03', seats: 4, status: 'reserved', note: '8:45' },
-  { id: 'T-04', seats: 6, status: 'available', note: '1h 12m' },
-  { id: 'T-05', seats: 4, status: 'available', note: '18m' },
-  { id: 'T-06', seats: 2, status: 'occupied' },
-  { id: 'T-07', seats: 2, status: 'available' },
-  { id: 'T-08', seats: 2, status: 'reserved', note: '7:30' },
-  { id: 'T-09', seats: 4, status: 'available', note: '44m' },
-  { id: 'T-10', seats: 4, status: 'out' },
-  { id: 'T-11', seats: 2, status: 'reserved', note: '9:15' },
-  { id: 'T-12', seats: 8, status: 'available', note: '2h 04m' },
-  { id: 'T-13', seats: 4, status: 'available' },
-  { id: 'T-14', seats: 2, status: 'available' },
-  { id: 'T-15', seats: 6, status: 'reserved', note: '8:00' },
-]
-
-const STATUS_LABEL = { available: 'Available', occupied: 'Occupied', reserved: 'Reserved', out: 'Out of service' }
 
 function Tables() {
   const toast = useToast()
-  const comingSoon = (label) => toast.info(MESSAGES.COMING_SOON(label))
+  const [tables, setTables] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [siteSlug, setSiteSlug] = useState('')
+  const [restaurantName, setRestaurantName] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
+  const [form, setForm] = useState({ name: '', seats: '4', zone: '' })
 
-  const [tables, setTables] = useState(INITIAL_TABLES)
-  const [selected, setSelected] = useState([])
-
-  const counts = tables.reduce((acc, t) => {
-    acc[t.status] = (acc[t.status] || 0) + 1
-    return acc
-  }, {})
-
-  const totalSeats = tables.reduce((sum, t) => sum + t.seats, 0)
-
-  const toggleSelect = (id) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [tablesRes, restRes] = await Promise.all([
+        api.getDiningTables(),
+        api.getRestaurant(),
+      ])
+      const rows = (tablesRes?.tables || []).filter((t) => t.active !== 0 && t.active !== false)
+      setTables(rows)
+      const restaurant = restRes?.restaurant
+      if (restaurant) {
+        setSiteSlug(restaurantPublicSlug(restaurant, 'your-restaurant'))
+        setRestaurantName(restaurant.name || '')
+      }
+      if (!selectedId && rows[0]) setSelectedId(rows[0].id)
+      if (selectedId && !rows.some((t) => t.id === selectedId) && rows[0]) {
+        setSelectedId(rows[0].id)
+      }
+    } catch (err) {
+      toast.error(err.message || 'Unable to load tables.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const cycleStatus = (id) => {
-    const order = ['available', 'occupied', 'reserved', 'cleaning', 'out']
-    setTables((prev) => prev.map((t) => {
-      if (t.id !== id) return t
-      const idx = order.indexOf(t.status)
-      const next = order[(idx + 1) % order.length]
-      return { ...t, status: next }
-    }))
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const selected = useMemo(
+    () => tables.find((t) => Number(t.id) === Number(selectedId)) || null,
+    [tables, selectedId],
+  )
+
+  const orderUrl = selected?.publicCode && siteSlug
+    ? guestTableUrl(siteSlug, selected.publicCode)
+    : ''
+
+  const addTable = async (event) => {
+    event.preventDefault()
+    try {
+      const { table } = await api.createDiningTable({
+        name: form.name,
+        seats: form.seats,
+        zone: form.zone,
+      })
+      setTables((prev) => [...prev, table])
+      setSelectedId(table.id)
+      setForm({ name: '', seats: '4', zone: '' })
+      toast.success(`${table.name} added — QR ready to print.`)
+    } catch (err) {
+      toast.error(err.message || 'Unable to add table.')
+    }
   }
 
-  const handleMerge = () => {
-    if (selected.length < 2) { alert('Select 2 or more tables to merge.'); return }
-    alert(`Merged ${selected.join(', ')} — demo only.`)
-    setSelected([])
+  const archiveTable = async (id) => {
+    try {
+      await api.deleteDiningTable(id)
+      setTables((prev) => prev.filter((t) => t.id !== id))
+      if (Number(selectedId) === Number(id)) setSelectedId(null)
+      toast.success('Table archived.')
+    } catch (err) {
+      toast.error(err.message || 'Unable to archive table.')
+    }
   }
 
+  const copyLink = async () => {
+    if (!orderUrl) return
+    try {
+      await navigator.clipboard.writeText(orderUrl)
+      toast.success('Order link copied.')
+    } catch {
+      toast.info(orderUrl)
+    }
+  }
 
-  
+  const downloadQr = async (table = selected) => {
+    if (!table?.publicCode || !siteSlug) {
+      toast.error('QR is not ready yet.')
+      return
+    }
+    try {
+      const url = guestTableUrl(siteSlug, table.publicCode)
+      await downloadQrPng(url, `table-${table.name || table.publicCode}-qr.png`, { width: 640 })
+      toast.success(`Downloaded QR for ${table.name}`)
+    } catch (err) {
+      toast.error(err.message || 'Unable to download QR.')
+    }
+  }
+
+  const printSelected = () => {
+    if (!selected || !orderUrl) {
+      toast.error('Select a table with a QR first.')
+      return
+    }
+    window.print()
+  }
+
   return (
-    <DashboardLayout pageClassName="tables-page" activeNav="tables">
-<div className="page-head">
-              <div>
-                <p className="eyebrow">Floor plan</p>
-                <h1>Tables</h1>
-                <p className="page-desc">Live view of your floor. Click a table to cycle status, select multiple to merge.</p>
-              </div>
-              <div className="head-actions">
-                <button className="btn btn-outline" type="button" onClick={handleMerge}>⤴ Merge{selected.length > 0 ? ` (${selected.length})` : ''}</button>
-                <button className="btn btn-outline" type="button" onClick={() => comingSoon('Split')}>⤳ Split</button>
-                <button className="btn btn-primary" type="button" onClick={() => comingSoon('Add table')}>+ Add table</button>
-              </div>
-            </div>
+    <DashboardLayout pageClassName="tables-page table-qr-page" activeNav="tables">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">Dine-in ordering</p>
+          <h1>Table QR codes</h1>
+          <p className="page-desc">
+            Print one QR per table. Guests scan → open the menu → add to cart → order for that table.
+          </p>
+        </div>
+        <div className="head-actions">
+          <button className="btn btn-outline" type="button" onClick={printSelected}>
+            Print selected
+          </button>
+          <button className="btn btn-primary" type="button" onClick={() => downloadQr()}>
+            Download QR
+          </button>
+        </div>
+      </div>
 
-            <div className="status-cards">
-              <div className="status-card"><span className="dot available" /> Available<strong>{counts.available || 0}</strong></div>
-              <div className="status-card"><span className="dot occupied" /> Occupied<strong>{counts.occupied || 0}</strong></div>
-              <div className="status-card"><span className="dot reserved" /> Reserved<strong>{counts.reserved || 0}</strong></div>
-              <div className="status-card"><span className="dot cleaning" /> Cleaning<strong>{counts.cleaning || 0}</strong></div>
-              <div className="status-card"><span className="dot out" /> Out of service<strong>{counts.out || 0}</strong></div>
-            </div>
+      <div className="table-qr-layout">
+        <section className="table-qr-list-card">
+          <div className="card-title-head">
+            <h2>Dining tables</h2>
+            <span>{tables.length} active</span>
+          </div>
 
-            <div className="card floor-card">
-              <div className="floor-head">
-                <div>
-                  <h2>Main hall</h2>
-                  <span className="muted-note">{totalSeats} seats · Live occupancy · click to cycle status, shift-click to select</span>
-                </div>
-                <button className="btn btn-outline btn-sm" type="button" onClick={() => comingSoon('Auto-seat')}>⚡ Auto-seat</button>
-              </div>
+          <form className="table-qr-add" onSubmit={addTable}>
+            <input
+              required
+              placeholder="Table name (e.g. T-08)"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+            <input
+              type="number"
+              min={1}
+              max={40}
+              required
+              value={form.seats}
+              onChange={(e) => setForm((f) => ({ ...f, seats: e.target.value }))}
+              aria-label="Seats"
+            />
+            <input
+              placeholder="Zone (optional)"
+              value={form.zone}
+              onChange={(e) => setForm((f) => ({ ...f, zone: e.target.value }))}
+            />
+            <button type="submit" className="btn btn-primary">
+              + Add table
+            </button>
+          </form>
 
-              <div className="floor-plan">
-                {tables.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`table-cell ${t.status} ${selected.includes(t.id) ? 'selected' : ''}`}
-                    onClick={(e) => (e.shiftKey ? toggleSelect(t.id) : cycleStatus(t.id))}
-                    title={`${STATUS_LABEL[t.status]} — click to change, shift+click to select`}
-                  >
-                    <strong>{t.id}</strong>
+          {loading ? <p className="empty-tables">Loading…</p> : null}
+          {!loading && tables.length === 0 ? (
+            <p className="empty-tables">
+              No tables yet. Add your first table to generate a dine-in QR.
+            </p>
+          ) : null}
+
+          <div className="table-qr-grid">
+            {tables.map((t) => {
+              const url = siteSlug && t.publicCode ? guestTableUrl(siteSlug, t.publicCode) : ''
+              const active = Number(selectedId) === Number(t.id)
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`table-qr-tile${active ? ' is-active' : ''}`}
+                  onClick={() => setSelectedId(t.id)}
+                >
+                  <div className="table-qr-tile-top">
+                    <strong>{t.name}</strong>
                     <span>{t.seats} seats</span>
-                    {t.note && <small>{t.note}</small>}
                   </div>
-                ))}
+                  <div className="table-qr-mini">
+                    <QrCodePreview
+                      value={url}
+                      size={88}
+                      alt={`QR for ${t.name}`}
+                      emptyMessage="—"
+                    />
+                  </div>
+                  <small>{t.zone || 'No zone'} · {t.publicCode || 'pending code'}</small>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
+        <aside className="table-qr-detail-card">
+          {selected ? (
+            <>
+              <div className="print-sheet" id="table-qr-print">
+                <p className="print-brand">{restaurantName || 'Restaurant'}</p>
+                <h2>{selected.name}</h2>
+                <p className="print-sub">Scan to view the menu and order to this table</p>
+                <div className="table-qr-preview">
+                  <QrCodePreview
+                    value={orderUrl}
+                    size={220}
+                    alt={`QR for ${selected.name}`}
+                    emptyMessage="Set your public site slug to generate QR."
+                  />
+                </div>
+                <p className="print-url">{orderUrl || 'Link unavailable'}</p>
               </div>
-            </div>
+
+              <div className="table-qr-actions no-print">
+                <button type="button" className="btn btn-primary" onClick={() => downloadQr(selected)}>
+                  Download PNG
+                </button>
+                <button type="button" className="btn btn-outline" onClick={copyLink}>
+                  Copy order link
+                </button>
+                <button type="button" className="btn btn-outline" onClick={printSelected}>
+                  Print tent card
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline danger"
+                  onClick={() => archiveTable(selected.id)}
+                >
+                  Archive table
+                </button>
+              </div>
+
+              <ol className="table-qr-steps no-print">
+                <li>Print or place the QR on {selected.name}.</li>
+                <li>Guest scans → menu opens locked to this table.</li>
+                <li>They add dishes to cart and checkout (bill now or pay later).</li>
+                <li>Order appears in Incoming Orders as dine-in.</li>
+              </ol>
+            </>
+          ) : (
+            <p className="empty-tables">Select a table to preview its QR.</p>
+          )}
+        </aside>
+      </div>
     </DashboardLayout>
   )
 }

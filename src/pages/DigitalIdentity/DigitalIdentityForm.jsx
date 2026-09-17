@@ -12,6 +12,7 @@ import {
   getCategoryFieldConfig,
   identityToForm,
   isIdentityEditable,
+  visibleBusinessCategories,
 } from '../../constants/digitalIdentity.js'
 import './DigitalIdentity.css'
 
@@ -163,11 +164,17 @@ function DigitalIdentityForm() {
               Business category *
               <select value={form.category} onChange={setField('category')}>
                 <option value="">Select category</option>
-                {BUSINESS_CATEGORIES.map((c) => (
+                {visibleBusinessCategories().map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
+                {/* Keep a previously saved hidden category selectable so existing records don't break */}
+                {form.category &&
+                BUSINESS_CATEGORIES.includes(form.category) &&
+                !visibleBusinessCategories().includes(form.category) ? (
+                  <option value={form.category}>{form.category}</option>
+                ) : null}
               </select>
             </label>
             {showOther ? (

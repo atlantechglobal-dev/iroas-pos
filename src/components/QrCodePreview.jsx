@@ -33,6 +33,7 @@ export async function downloadQrPng(value, filename = 'qr-code.png', options) {
 /**
  * Renders a client-generated QR image for `value`.
  * Shows emptyMessage when value is missing.
+ * When `blurred`, the code is visually obscured until unlocked (e.g. after admin approval).
  */
 export function QrCodePreview({
   value,
@@ -41,6 +42,8 @@ export function QrCodePreview({
   className = '',
   emptyMessage = 'Set your web address to preview the QR code.',
   style,
+  blurred = false,
+  blurMessage = 'Unlocks after approval',
 }) {
   const [src, setSrc] = useState('')
   const [error, setError] = useState('')
@@ -124,13 +127,55 @@ export function QrCodePreview({
   }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      width={size}
-      height={size}
-      className={className}
-      style={{ display: 'block', width: size, height: size, ...style }}
-    />
+    <div
+      className={`qr-preview-wrap${blurred ? ' is-blurred' : ''} ${className}`.trim()}
+      style={{
+        position: 'relative',
+        width: size,
+        height: size,
+        borderRadius: 8,
+        overflow: 'hidden',
+        ...style,
+      }}
+    >
+      <img
+        src={src}
+        alt={blurred ? `${alt} (locked until approval)` : alt}
+        width={size}
+        height={size}
+        style={{
+          display: 'block',
+          width: size,
+          height: size,
+          filter: blurred ? 'blur(7px)' : undefined,
+          transform: blurred ? 'scale(1.08)' : undefined,
+          userSelect: 'none',
+          pointerEvents: blurred ? 'none' : undefined,
+        }}
+        draggable={!blurred}
+      />
+      {blurred ? (
+        <div
+          className="qr-preview-lock"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 10,
+            textAlign: 'center',
+            background: 'rgba(255,255,255,0.42)',
+            fontSize: Math.max(10, Math.round(size * 0.075)),
+            fontWeight: 700,
+            lineHeight: 1.25,
+            color: '#3f3f46',
+            letterSpacing: '0.01em',
+          }}
+          aria-hidden="true"
+        >
+          {blurMessage}
+        </div>
+      ) : null}
+    </div>
   )
 }

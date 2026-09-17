@@ -134,6 +134,9 @@ function RestaurantProfile() {
   const [lastOrderCutoff, setLastOrderCutoff] = useState('22:45')
   const [pauseOrders, setPauseOrders] = useState(false)
   const [honorHolidays, setHonorHolidays] = useState(true)
+  const [reservationMaxCovers, setReservationMaxCovers] = useState('40')
+  const [upiId, setUpiId] = useState('')
+  const [upiDisplayName, setUpiDisplayName] = useState('')
   const [city, setCity] = useState('Mumbai')
   const [country, setCountry] = useState('India')
   const [gstin, setGstin] = useState('27ABCDE1234F1Z5')
@@ -235,6 +238,11 @@ function RestaurantProfile() {
         if (settings.lastOrderCutoff) setLastOrderCutoff(settings.lastOrderCutoff)
         if (settings.pauseOrders !== undefined) setPauseOrders(settings.pauseOrders)
         if (settings.honorHolidays !== undefined) setHonorHolidays(settings.honorHolidays)
+        if (settings.reservationMaxCovers != null && settings.reservationMaxCovers !== '') {
+          setReservationMaxCovers(String(settings.reservationMaxCovers))
+        }
+        if (settings.upiId) setUpiId(settings.upiId)
+        if (settings.upiDisplayName) setUpiDisplayName(settings.upiDisplayName)
         if (settings.deliveryRadius) setDeliveryRadius(settings.deliveryRadius)
         if (settings.deliveryMinOrder) setDeliveryMinOrder(settings.deliveryMinOrder)
         if (settings.deliveryBaseFee) setDeliveryBaseFee(settings.deliveryBaseFee)
@@ -320,6 +328,9 @@ function RestaurantProfile() {
     lastOrderCutoff,
     pauseOrders,
     honorHolidays,
+    reservationMaxCovers: Math.max(1, Math.min(500, Number(reservationMaxCovers) || 40)),
+    upiId: String(upiId || '').trim(),
+    upiDisplayName: String(upiDisplayName || '').trim(),
     deliveryRadius,
     deliveryMinOrder,
     deliveryBaseFee,
@@ -727,14 +738,14 @@ function RestaurantProfile() {
                         <div className="hours-inputs">
                           <input
                             type="text"
-                            placeholder="Open"
+                            placeholder="11:00"
                             value={row.open}
                             disabled={row.closed}
                             onChange={(e) => updateHour(index, 'open', e.target.value)}
                           />
                           <input
                             type="text"
-                            placeholder="Close"
+                            placeholder="22:00"
                             value={row.close}
                             disabled={row.closed}
                             onChange={(e) => updateHour(index, 'close', e.target.value)}
@@ -778,6 +789,44 @@ function RestaurantProfile() {
                       onChange={(e) => setLastOrderCutoff(e.target.value)}
                     />
                     <small className="hint">Online orders close 45 mins before closing</small>
+                  </div>
+
+                  <div className="field" style={{ marginBottom: '16px' }}>
+                    <label>MAX COVERS (RESERVATIONS)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={reservationMaxCovers}
+                      onChange={(e) => setReservationMaxCovers(e.target.value)}
+                    />
+                    <small className="hint">
+                      How many guests can be seated across overlapping reservation windows (default 40).
+                    </small>
+                  </div>
+
+                  <div className="field" style={{ marginBottom: '16px' }}>
+                    <label>UPI ID (GUEST CHECKOUT)</label>
+                    <input
+                      type="text"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      placeholder="restaurant@okhdfc"
+                    />
+                    <small className="hint">
+                      Shown on the guest site for manual UPI payments. No payment gateway — staff
+                      marks Paid in Orders.
+                    </small>
+                  </div>
+
+                  <div className="field" style={{ marginBottom: '16px' }}>
+                    <label>UPI DISPLAY NAME</label>
+                    <input
+                      type="text"
+                      value={upiDisplayName}
+                      onChange={(e) => setUpiDisplayName(e.target.value)}
+                      placeholder={name || 'Restaurant'}
+                    />
                   </div>
 
                   <div className="toggle-row">

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { QrCodePreview, downloadQrPng } from '../../components/QrCodePreview.jsx'
+import { QrCodePreview } from '../../components/QrCodePreview.jsx'
 import { restaurantHostname } from '../../utils/restaurantUrl.js'
 import { guestSiteUrl, restaurantPublicSlug } from '../../utils/guestLinks.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { RESTAURANT_STATUS } from '../../constants/restaurantStatus.js'
+import { ROUTES } from '../../constants/routes.js'
 import {
   businessCategoryFromRestaurant,
   getBusinessCopy,
@@ -16,16 +18,26 @@ const CHECKLIST = [
   'Domain connected',
   'Branding applied',
   'QR generated',
+  'Payment received',
 ]
 
-const SIGN_IN_DELAY_MS = 6000
+const SIGN_IN_DELAY_MS = 5000
 
 function SetupReview() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const paymentState = location.state || {}
   const { logout, setRestaurantStatus } = useAuth()
-  const [restaurantName, setRestaurantName] = useState('')
+  const [restaurantName, setRestaurantName] = useState(
+    paymentState.restaurantName || '',
+  )
   const [liveLink, setLiveLink] = useState('')
   const [hostname, setHostname] = useState('')
   const [category, setCategory] = useState('')
+  const [userId, setUserId] = useState(paymentState.userId || '')
+  const [professionalEmail, setProfessionalEmail] = useState(
+    paymentState.professionalEmail || '',
+  )
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(SIGN_IN_DELAY_MS / 1000))
 
   useEffect(() => {
@@ -43,6 +55,14 @@ function SetupReview() {
         }
       })
       .catch(() => {})
+
+    api
+      .getOnboardingPayment()
+      .then((data) => {
+        if (data.userId) setUserId(data.userId)
+        if (data.professionalEmail) setProfessionalEmail(data.professionalEmail)
+      })
+      .catch(() => {})
   }, [setRestaurantStatus])
 
   useEffect(() => {
@@ -56,24 +76,25 @@ function SetupReview() {
     }, 200)
     const timer = window.setTimeout(() => {
       logout()
+      navigate(ROUTES.LOGIN, { replace: true })
     }, SIGN_IN_DELAY_MS)
     return () => {
       window.clearInterval(tick)
       window.clearTimeout(timer)
     }
-  }, [logout])
+  }, [logout, navigate])
 
   const copy = getBusinessCopy(category)
   const displayName = restaurantName.trim() || copy.fallbackName
+  const fromPayment = Boolean(paymentState.fromPayment || paymentState.alreadyPaid)
 
   const handlePreview = () => {
     if (liveLink) window.open(liveLink, '_blank')
   }
 
-  const handleDownloadQR = async () => {
-    if (!liveLink) return
-    const slug = (hostname || displayName).split('.')[0] || 'business'
-    await downloadQrPng(liveLink, `${slug}-QR.png`)
+  const goSignIn = () => {
+    logout()
+    navigate(ROUTES.LOGIN, { replace: true })
   }
 
   return (
@@ -84,12 +105,32 @@ function SetupReview() {
         </header>
 
         <div className="setup-review-panel">
-          <p className="setup-review-badge">Awaiting approval</p>
+          <p className="setup-review-badge">
+            {fromPayment ? 'Payment successful · Awaiting approval' : 'Awaiting approval'}
+          </p>
           <h1 className="setup-review-title">{displayName} is in review</h1>
           <p className="setup-review-subtitle">
-            Your digital identity is submitted. An admin will review it, then
-            your site publishes automatically.
+            {fromPayment
+              ? 'Thanks for your payment. Your store is submitted for admin review. A welcome email with your User ID is on the way.'
+              : 'Your digital identity is submitted. An admin will review it, then your site publishes automatically.'}
           </p>
+
+          {userId || professionalEmail ? (
+            <div className="setup-review-creds">
+              {userId ? (
+                <div>
+                  <span>User ID</span>
+                  <strong>{userId}</strong>
+                </div>
+              ) : null}
+              {professionalEmail ? (
+                <div>
+                  <span>Professional email</span>
+                  <strong>{professionalEmail}</strong>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <div
             className="setup-review-timer"
@@ -135,6 +176,8 @@ function SetupReview() {
               size={168}
               alt={`${displayName} QR code`}
               emptyMessage="Set your web address to preview the QR code."
+              blurred
+              blurMessage="Unlocks after admin approval"
             />
             {hostname ? <p className="setup-review-host">{hostname}</p> : null}
           </section>
@@ -148,13 +191,8 @@ function SetupReview() {
             >
               Preview website
             </button>
-            <button
-              className="setup-review-ghost"
-              type="button"
-              onClick={handleDownloadQR}
-              disabled={!liveLink}
-            >
-              Download QR
+            <button className="setup-review-ghost" type="button" onClick={goSignIn}>
+              Go to sign in
             </button>
           </div>
         </div>

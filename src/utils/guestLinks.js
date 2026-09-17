@@ -77,6 +77,16 @@ export function guestSitePath(slug, pageKey = 'website') {
   return `/s/${slug}/${page.path}`
 }
 
+/** Table QR deep link → dine-in ordering for a specific table. */
+export function guestTablePath(slug, tableCode) {
+  return `/s/${slug}/t/${encodeURIComponent(tableCode)}`
+}
+
+export function guestTableUrl(slug, tableCode) {
+  if (typeof window === 'undefined') return guestTablePath(slug, tableCode)
+  return `${window.location.origin}${guestTablePath(slug, tableCode)}`
+}
+
 export function guestDishPath(slug, itemId) {
   return `/s/${slug}/dish/${encodeURIComponent(itemId)}`
 }

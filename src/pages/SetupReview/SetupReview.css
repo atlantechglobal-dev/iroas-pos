@@ -79,6 +79,34 @@
   line-height: 1.55;
 }
 
+.setup-review-creds {
+  display: grid;
+  gap: 8px;
+  margin: 0 auto 20px;
+  max-width: 380px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #faf8f4;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.setup-review-creds > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.setup-review-creds span {
+  color: var(--muted);
+}
+
+.setup-review-creds strong {
+  text-align: right;
+  word-break: break-all;
+}
+
 .setup-review-timer {
   margin: 0 auto 26px;
   width: 100%;

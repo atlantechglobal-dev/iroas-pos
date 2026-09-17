@@ -136,40 +136,45 @@ function findRestaurantBySlug(slug) {
   const clean = slugify(slug)
   if (!clean) return null
   const bySub = db.prepare('SELECT * FROM restaurants WHERE subdomain = ?').get(clean)
-  if (bySub) return bySub.status === 'live' ? bySub : null
-  const rows = db.prepare("SELECT * FROM restaurants WHERE name IS NOT NULL AND status = 'live'").all()
-  return rows.find((r) => slugify(r.name) === clean) || null
+  if (bySub) {
+    if (bySub.status === 'deleted') return null
+    return bySub
+  }
+  const rows = db
+    .prepare("SELECT * FROM restaurants WHERE name IS NOT NULL AND status != 'deleted'")
+    .all()
+  return rows.find((r) => slugify(r.subdomain || '') === clean || slugify(r.name) === clean) || null
 }
 
-/** Public guest menu — live categories & items only */
+/** Public guest menu — live categories & items only (no seed on read) */
 router.get('/public/:slug', (req, res) => {
   const restaurant = findRestaurantBySlug(req.params.slug)
   if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
-
-  seedDefaultMenu(restaurant.id)
 
   const slug = restaurant.subdomain || slugify(restaurant.name)
   const categories = listCategories(restaurant.id, { includeArchived: false })
   const items = listItems(restaurant.id, { liveOnly: true })
 
-  const grouped = categories.map((cat) => ({
-    id: cat.id,
-    name: cat.name,
-    imageDataUrl: cat.imageDataUrl ? mediaPath(slug, 'category', cat.id) : '',
-    items: items
-      .filter((item) => item.categoryId === cat.id)
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        desc: item.description,
-        veg: item.veg,
-        tag: item.tag,
-        imageDataUrl: item.imageDataUrl ? mediaPath(slug, 'menu', item.id) : '',
-        prepMinutes: item.prepMinutes,
-        stockStatus: item.stockStatus || 'in_stock',
-      })),
-  }))
+  const grouped = categories
+    .map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      imageDataUrl: cat.imageDataUrl ? mediaPath(slug, 'category', cat.id) : '',
+      items: items
+        .filter((item) => item.categoryId === cat.id)
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          desc: item.description,
+          veg: item.veg,
+          tag: item.tag,
+          imageDataUrl: item.imageDataUrl ? mediaPath(slug, 'menu', item.id) : '',
+          prepMinutes: item.prepMinutes,
+          stockStatus: item.stockStatus || 'in_stock',
+        })),
+    }))
+    .filter((c) => c.items.length > 0)
 
   res.json({
     restaurant: {

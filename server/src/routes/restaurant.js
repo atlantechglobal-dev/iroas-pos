@@ -5,8 +5,31 @@ import {
   assertBookable,
   listSlots,
   maxCoversFromSettings,
+  normalizeOperatingHours,
   parseHoursJson,
 } from '../services/reservationAvailability.js'
+import {
+  onReservationCreated,
+  onReservationStatusChange,
+} from '../services/reservationMessaging.js'
+import {
+  assignTableForParty,
+  assertTableAvailable,
+  listDiningTables,
+  upsertDiningTable,
+} from '../services/diningTables.js'
+import {
+  getOrderById,
+  listOrders,
+  markOrderPaid,
+  updateOrderStatus,
+} from '../services/orders.js'
+import {
+  formatUserId,
+  onboardingPlanAmount,
+  professionalEmailForRestaurant,
+  sendOnboardingPaymentEmails,
+} from '../services/onboardingMessaging.js'
 
 const router = Router()
 
@@ -69,7 +92,9 @@ router.put('/profile', (req, res) => {
     country ?? restaurant.country,
     timezone ?? restaurant.timezone,
     address ?? restaurant.address,
-    hours ? JSON.stringify(hours) : restaurant.operating_hours,
+    hours
+      ? JSON.stringify(normalizeOperatingHours(hours))
+      : restaurant.operating_hours,
     restaurant.id,
   )
 
@@ -176,7 +201,110 @@ router.post('/launch', (req, res) => {
      updated_at = datetime('now') WHERE id = ?`,
   ).run(restaurant.id)
 
-  res.json({ ok: true, status: 'pending_approval' })
+  const settings = parseSettings(restaurant)
+  const professionalEmail = professionalEmailForRestaurant(restaurant)
+  if (professionalEmail && !restaurant.email) {
+    db.prepare(`UPDATE restaurants SET email = ? WHERE id = ?`).run(professionalEmail, restaurant.id)
+  }
+
+  res.json({
+    ok: true,
+    status: 'pending_approval',
+    userId: formatUserId(req.user.id),
+    professionalEmail,
+    paymentRequired: !settings?.onboardingPayment?.paid,
+    amount: onboardingPlanAmount(restaurant.plan),
+  })
+})
+
+router.get('/onboarding-payment', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  if (restaurant.status === 'deleted') {
+    return res.status(403).json({ error: 'This account has been closed.' })
+  }
+
+  const settings = parseSettings(restaurant)
+  const paid = Boolean(settings?.onboardingPayment?.paid)
+  const professionalEmail =
+    professionalEmailForRestaurant(restaurant) || String(restaurant.email || '').trim()
+
+  res.json({
+    restaurantName: restaurant.name,
+    plan: restaurant.plan || 'starter',
+    status: restaurant.status,
+    amount: onboardingPlanAmount(restaurant.plan),
+    currency: 'ZAR',
+    userId: formatUserId(req.user.id),
+    professionalEmail,
+    ownerEmail: req.user.email || '',
+    paid,
+    payment: settings?.onboardingPayment || null,
+  })
+})
+
+router.post('/onboarding-payment', async (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  if (restaurant.status === 'deleted') {
+    return res.status(403).json({ error: 'This account has been closed.' })
+  }
+  if (restaurant.status === 'onboarding') {
+    return res.status(400).json({ error: 'Submit your store from Launch before paying.' })
+  }
+
+  const settings = parseSettings(restaurant)
+  if (settings?.onboardingPayment?.paid) {
+    const professionalEmail =
+      professionalEmailForRestaurant(restaurant) || String(restaurant.email || '').trim()
+    return res.json({
+      ok: true,
+      alreadyPaid: true,
+      userId: formatUserId(req.user.id),
+      professionalEmail,
+      payment: settings.onboardingPayment,
+    })
+  }
+
+  const methodRaw = String(req.body?.method || 'upi').toLowerCase()
+  const method = ['upi', 'card', 'netbanking'].includes(methodRaw) ? methodRaw : 'upi'
+  const amount = onboardingPlanAmount(restaurant.plan)
+  const reference = `PAY-${Date.now().toString(36).toUpperCase()}-${restaurant.id}`
+  const professionalEmail = professionalEmailForRestaurant(restaurant)
+
+  const payment = {
+    paid: true,
+    paidAt: new Date().toISOString(),
+    method,
+    amount,
+    currency: 'ZAR',
+    reference,
+    gateway: 'iroas_demo',
+  }
+
+  const nextSettings = {
+    ...settings,
+    onboardingPayment: payment,
+    professionalEmail,
+  }
+
+  db.prepare(
+    `UPDATE restaurants SET settings_json = ?, email = COALESCE(NULLIF(email, ''), ?),
+     updated_at = datetime('now') WHERE id = ?`,
+  ).run(JSON.stringify(nextSettings), professionalEmail || null, restaurant.id)
+
+  const updated = { ...restaurant, email: restaurant.email || professionalEmail }
+  const emails = await sendOnboardingPaymentEmails({ restaurant: updated, payment })
+
+  res.status(201).json({
+    ok: true,
+    userId: formatUserId(req.user.id),
+    professionalEmail,
+    ownerEmail: req.user.email || '',
+    restaurantName: restaurant.name,
+    payment,
+    emails,
+  })
 })
 
 function mapReservation(row) {
@@ -184,11 +312,13 @@ function mapReservation(row) {
     id: row.id,
     guestName: row.guest_name,
     phone: row.phone,
+    email: row.guest_email || '',
     guests: row.guests,
     date: row.date,
     time: row.time,
     notes: row.notes || '',
     status: row.status,
+    tableId: row.table_id || null,
     createdAt: row.created_at,
   }
 }
@@ -231,10 +361,13 @@ router.get('/availability', (req, res) => {
   const hours = parseHoursJson(restaurant.operating_hours)
   const existing = db
     .prepare(
-      `SELECT date, time, guests, status FROM reservations
+      `SELECT id, date, time, guests, status FROM reservations
        WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
     )
     .all(restaurant.id, date)
+
+  const includePast =
+    String(req.query.includePast || '') === '1' || String(req.query.includePast || '') === 'true'
 
   const result = listSlots({
     hours,
@@ -242,6 +375,7 @@ router.get('/availability', (req, res) => {
     guests,
     existingRows: existing,
     maxCovers: maxCoversFromSettings(settings),
+    includePast,
   })
 
   res.json({
@@ -258,52 +392,97 @@ router.post('/reservations', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
 
-  const { guestName, name, phone, guests, date, time, notes, status } = req.body || {}
+  const { guestName, name, phone, email, guests, date, time, notes, status, tableId } =
+    req.body || {}
   const guest = String(guestName || name || '').trim()
   if (!guest || !String(phone || '').trim() || !date || !time) {
     return res.status(400).json({ error: 'Guest name, phone, date and time are required.' })
   }
 
   const guestCount = Math.max(1, Math.min(20, Number(guests) || 2))
+  const guestEmail = String(email || '').trim() || null
   const settings = parseSettings(restaurant)
   const hours = parseHoursJson(restaurant.operating_hours)
-  const existing = db
-    .prepare(
-      `SELECT date, time, guests, status FROM reservations
-       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
-    )
-    .all(restaurant.id, String(date))
+  const desiredStatus = ['pending', 'confirmed', 'cancelled'].includes(status)
+    ? status
+    : 'confirmed'
 
-  const check = assertBookable({
-    hours,
-    date: String(date),
-    time: String(time),
-    guests: guestCount,
-    existingRows: existing,
-    maxCovers: maxCoversFromSettings(settings),
-  })
-  if (!check.ok) {
-    return res.status(check.status).json({ error: check.error })
+  let insertedId = null
+  try {
+    const run = db.transaction(() => {
+      const existing = db
+        .prepare(
+          `SELECT id, date, time, guests, status FROM reservations
+           WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+        )
+        .all(restaurant.id, String(date))
+
+      const check = assertBookable({
+        hours,
+        date: String(date),
+        time: String(time),
+        guests: guestCount,
+        existingRows: existing,
+        maxCovers: maxCoversFromSettings(settings),
+      })
+      if (!check.ok) {
+        const err = new Error(check.error)
+        err.status = check.status
+        throw err
+      }
+
+      let assignedTable =
+        tableId != null && tableId !== ''
+          ? Number(tableId)
+          : assignTableForParty({
+              restaurantId: restaurant.id,
+              date: String(date),
+              time: String(time),
+              guests: guestCount,
+            })
+
+      if (tableId != null && tableId !== '') {
+        const tableCheck = assertTableAvailable({
+          restaurantId: restaurant.id,
+          tableId: assignedTable,
+          date: String(date),
+          time: String(time),
+          guests: guestCount,
+        })
+        if (!tableCheck.ok) {
+          const err = new Error(tableCheck.error)
+          err.status = tableCheck.status
+          throw err
+        }
+      }
+
+      const result = db
+        .prepare(
+          `INSERT INTO reservations
+            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          restaurant.id,
+          guest,
+          String(phone).trim(),
+          guestEmail,
+          guestCount,
+          String(date),
+          String(time),
+          String(notes || '').trim() || null,
+          desiredStatus,
+          assignedTable || null,
+        )
+      insertedId = result.lastInsertRowid
+    })
+    run.immediate()
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message || 'Unable to create booking.' })
   }
 
-  const result = db
-    .prepare(
-      `INSERT INTO reservations
-        (restaurant_id, guest_name, phone, guests, date, time, notes, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      restaurant.id,
-      guest,
-      String(phone).trim(),
-      guestCount,
-      String(date),
-      String(time),
-      String(notes || '').trim() || null,
-      ['pending', 'confirmed', 'cancelled'].includes(status) ? status : 'confirmed',
-    )
-
-  const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(result.lastInsertRowid)
+  const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(insertedId)
+  onReservationCreated(restaurant, row, { source: 'staff' })
   res.status(201).json({ reservation: mapReservation(row) })
 })
 
@@ -316,27 +495,192 @@ router.patch('/reservations/:id', (req, res) => {
     .get(req.params.id, restaurant.id)
   if (!row) return res.status(404).json({ error: 'Reservation not found.' })
 
-  const { status, guestName, phone, guests, date, time, notes } = req.body || {}
+  const { status, guestName, phone, email, guests, date, time, notes, tableId } = req.body || {}
   const nextStatus =
     status && ['pending', 'confirmed', 'cancelled'].includes(status) ? status : row.status
+  const nextGuests =
+    guests != null ? Math.max(1, Math.min(20, Number(guests) || 2)) : row.guests
+  const nextDate = date != null ? String(date) : row.date
+  const nextTime = time != null ? String(time) : row.time
+  const nextName = guestName != null ? String(guestName).trim() : row.guest_name
+  const nextPhone = phone != null ? String(phone).trim() : row.phone
+  const nextEmail =
+    email !== undefined ? String(email || '').trim() || null : row.guest_email
+  const nextNotes =
+    notes !== undefined ? String(notes || '').trim() || null : row.notes
 
-  db.prepare(
-    `UPDATE reservations
-     SET guest_name = ?, phone = ?, guests = ?, date = ?, time = ?, notes = ?, status = ?
-     WHERE id = ?`,
-  ).run(
-    guestName != null ? String(guestName).trim() : row.guest_name,
-    phone != null ? String(phone).trim() : row.phone,
-    guests != null ? Math.max(1, Math.min(20, Number(guests) || 2)) : row.guests,
-    date != null ? String(date) : row.date,
-    time != null ? String(time) : row.time,
-    notes !== undefined ? String(notes || '').trim() || null : row.notes,
-    nextStatus,
-    row.id,
-  )
+  const needsCapacityCheck =
+    nextStatus !== 'cancelled' &&
+    (nextStatus === 'confirmed' ||
+      nextDate !== row.date ||
+      nextTime !== row.time ||
+      nextGuests !== row.guests ||
+      (row.status === 'cancelled' && nextStatus !== 'cancelled'))
+
+  try {
+    const run = db.transaction(() => {
+      if (needsCapacityCheck) {
+        const settings = parseSettings(restaurant)
+        const hours = parseHoursJson(restaurant.operating_hours)
+        const existing = db
+          .prepare(
+            `SELECT id, date, time, guests, status FROM reservations
+             WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+          )
+          .all(restaurant.id, nextDate)
+
+        const check = assertBookable({
+          hours,
+          date: nextDate,
+          time: nextTime,
+          guests: nextGuests,
+          existingRows: existing,
+          maxCovers: maxCoversFromSettings(settings),
+          excludeReservationId: row.id,
+        })
+        if (!check.ok) {
+          const err = new Error(check.error)
+          err.status = check.status
+          throw err
+        }
+      }
+
+      let nextTableId =
+        tableId !== undefined
+          ? tableId === null || tableId === ''
+            ? null
+            : Number(tableId)
+          : row.table_id
+
+      if (
+        nextTableId == null &&
+        nextStatus !== 'cancelled' &&
+        (nextDate !== row.date || nextTime !== row.time || nextGuests !== row.guests)
+      ) {
+        nextTableId = assignTableForParty({
+          restaurantId: restaurant.id,
+          date: nextDate,
+          time: nextTime,
+          guests: nextGuests,
+          excludeReservationId: row.id,
+        })
+      }
+
+      if (nextTableId != null && nextStatus !== 'cancelled') {
+        const tableCheck = assertTableAvailable({
+          restaurantId: restaurant.id,
+          tableId: nextTableId,
+          date: nextDate,
+          time: nextTime,
+          guests: nextGuests,
+          excludeReservationId: row.id,
+        })
+        if (!tableCheck.ok) {
+          const err = new Error(tableCheck.error)
+          err.status = tableCheck.status
+          throw err
+        }
+      }
+
+      db.prepare(
+        `UPDATE reservations
+         SET guest_name = ?, phone = ?, guest_email = ?, guests = ?, date = ?, time = ?,
+             notes = ?, status = ?, table_id = ?
+         WHERE id = ?`,
+      ).run(
+        nextName,
+        nextPhone,
+        nextEmail,
+        nextGuests,
+        nextDate,
+        nextTime,
+        nextNotes,
+        nextStatus,
+        nextTableId,
+        row.id,
+      )
+    })
+    run.immediate()
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message || 'Unable to update booking.' })
+  }
 
   const updated = db.prepare('SELECT * FROM reservations WHERE id = ?').get(row.id)
+  onReservationStatusChange(restaurant, row, updated)
   res.json({ reservation: mapReservation(updated) })
+})
+
+router.get('/tables', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  res.json({ tables: listDiningTables(restaurant.id) })
+})
+
+router.post('/tables', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const result = upsertDiningTable(restaurant.id, req.body || {})
+  if (!result.ok) return res.status(result.status).json({ error: result.error })
+  res.status(201).json({ table: result.table })
+})
+
+router.patch('/tables/:id', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const result = upsertDiningTable(restaurant.id, { ...(req.body || {}), id: Number(req.params.id) })
+  if (!result.ok) return res.status(result.status).json({ error: result.error })
+  res.json({ table: result.table })
+})
+
+router.delete('/tables/:id', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const existing = db
+    .prepare('SELECT id FROM dining_tables WHERE id = ? AND restaurant_id = ?')
+    .get(req.params.id, restaurant.id)
+  if (!existing) return res.status(404).json({ error: 'Table not found.' })
+  db.prepare('UPDATE dining_tables SET active = 0 WHERE id = ?').run(existing.id)
+  db.prepare('UPDATE reservations SET table_id = NULL WHERE table_id = ?').run(existing.id)
+  res.json({ ok: true })
+})
+
+router.get('/orders', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const orders = listOrders(restaurant.id, {
+    status: req.query.status,
+    paymentStatus: req.query.paymentStatus,
+    serviceMode: req.query.serviceMode,
+  })
+  res.json({ orders })
+})
+
+router.get('/orders/:id', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const order = getOrderById(restaurant.id, Number(req.params.id))
+  if (!order) return res.status(404).json({ error: 'Order not found.' })
+  res.json({ order })
+})
+
+router.patch('/orders/:id', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const { status } = req.body || {}
+  if (!status) return res.status(400).json({ error: 'status is required.' })
+  const result = updateOrderStatus(restaurant.id, Number(req.params.id), status)
+  if (!result.ok) return res.status(result.status).json({ error: result.error })
+  res.json({ order: result.order })
+})
+
+router.post('/orders/:id/mark-paid', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const result = markOrderPaid(restaurant.id, Number(req.params.id), {
+    paymentMethod: req.body?.paymentMethod,
+  })
+  if (!result.ok) return res.status(result.status).json({ error: result.error })
+  res.json({ order: result.order })
 })
 
 router.get('/reviews', (req, res) => {

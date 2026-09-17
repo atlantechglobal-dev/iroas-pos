@@ -6,6 +6,16 @@ import {
   maxCoversFromSettings,
   parseHoursJson,
 } from '../services/reservationAvailability.js'
+import { onReservationCreated } from '../services/reservationMessaging.js'
+import { assignTableForParty } from '../services/diningTables.js'
+import {
+  createGuestOrder,
+  findTableByPublicCode,
+  getOrderByPublicCode,
+  listOrdersByPhone,
+} from '../services/orders.js'
+import { onOrderCreated } from '../services/orderMessaging.js'
+import { listDiningTables } from '../services/diningTables.js'
 
 const router = Router()
 
@@ -252,7 +262,8 @@ router.get('/:slug', (req, res) => {
       socials: {
         instagram: settings.instagram || settings.socialInstagram || '',
         facebook: settings.facebook || '',
-        googleReview: settings.googleReviewUrl || settings.reviewUrl || '',
+        googleReview:
+          settings.googleBusiness || settings.googleReviewUrl || settings.reviewUrl || '',
       },
       yearEstablished: settings.yearEstablished || '',
       stories: settings.businessIdStories || null,
@@ -274,6 +285,12 @@ router.get('/:slug', (req, res) => {
     gallery,
     reviews,
     menu,
+    payments: {
+      upiId: settings.upiId || '',
+      upiDisplayName: settings.upiDisplayName || restaurant.name || '',
+      methods: ['upi', 'cash'],
+      pauseOrders: Boolean(settings.pauseOrders),
+    },
     oneLink: {
       headline: settings.oneLinkHeadline || settings.tagline || restaurant.name || '',
       subheadline: settings.oneLinkSubheadline || settings.tagline || '',
@@ -291,14 +308,14 @@ router.get('/:slug/availability', (req, res) => {
   if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
 
   const date = String(req.query.date || '').trim()
-  const guests = Math.max(1, Math.min(20, Number(req.query.guests) || 2))
+  const guests = Math.max(1, Math.min(12, Number(req.query.guests) || 2))
   if (!date) return res.status(400).json({ error: 'date query parameter is required.' })
 
   const settings = parseSettings(restaurant)
   const hours = parseHoursJson(restaurant.operating_hours)
   const existing = db
     .prepare(
-      `SELECT date, time, guests, status FROM reservations
+      `SELECT id, date, time, guests, status FROM reservations
        WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
     )
     .all(restaurant.id, date)
@@ -326,7 +343,7 @@ router.post('/:slug/reservations', (req, res) => {
   const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
   if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
 
-  const { name, phone, guests, date, time, notes } = req.body || {}
+  const { name, phone, email, guests, date, time, notes } = req.body || {}
   if (!String(name || '').trim() || !String(phone || '').trim()) {
     return res.status(400).json({ error: 'Name and phone are required.' })
   }
@@ -334,59 +351,161 @@ router.post('/:slug/reservations', (req, res) => {
     return res.status(400).json({ error: 'Date and time are required.' })
   }
 
-  const guestCount = Math.max(1, Math.min(20, Number(guests) || 2))
+  const guestCount = Math.max(1, Math.min(12, Number(guests) || 2))
+  if (Number(guests) > 12) {
+    return res.status(400).json({
+      error: 'Online bookings are limited to 12 guests. Please call the restaurant for larger parties.',
+    })
+  }
+  const guestEmail = String(email || '').trim() || null
   const settings = parseSettings(restaurant)
   const hours = parseHoursJson(restaurant.operating_hours)
-  const existing = db
-    .prepare(
-      `SELECT date, time, guests, status FROM reservations
-       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
-    )
-    .all(restaurant.id, String(date))
 
-  const check = assertBookable({
-    hours,
-    date: String(date),
-    time: String(time),
-    guests: guestCount,
-    existingRows: existing,
-    maxCovers: maxCoversFromSettings(settings),
-  })
-  if (!check.ok) {
-    return res.status(check.status).json({ error: check.error })
+  let insertedId = null
+  try {
+    const run = db.transaction(() => {
+      const existing = db
+        .prepare(
+          `SELECT id, date, time, guests, status FROM reservations
+           WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+        )
+        .all(restaurant.id, String(date))
+
+      const check = assertBookable({
+        hours,
+        date: String(date),
+        time: String(time),
+        guests: guestCount,
+        existingRows: existing,
+        maxCovers: maxCoversFromSettings(settings),
+      })
+      if (!check.ok) {
+        const err = new Error(check.error)
+        err.status = check.status
+        throw err
+      }
+
+      const tableId = assignTableForParty({
+        restaurantId: restaurant.id,
+        date: String(date),
+        time: String(time),
+        guests: guestCount,
+      })
+
+      const result = db
+        .prepare(
+          `INSERT INTO reservations
+            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+        )
+        .run(
+          restaurant.id,
+          String(name).trim(),
+          String(phone).trim(),
+          guestEmail,
+          guestCount,
+          String(date),
+          String(time),
+          String(notes || '').trim() || null,
+          tableId || null,
+        )
+      insertedId = result.lastInsertRowid
+    })
+    run.immediate()
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message || 'Unable to create booking.' })
   }
 
-  const result = db
-    .prepare(
-      `INSERT INTO reservations
-        (restaurant_id, guest_name, phone, guests, date, time, notes, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
-    )
-    .run(
-      restaurant.id,
-      String(name).trim(),
-      String(phone).trim(),
-      guestCount,
-      String(date),
-      String(time),
-      String(notes || '').trim() || null,
-    )
-
-  const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(result.lastInsertRowid)
+  const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(insertedId)
+  onReservationCreated(restaurant, row, { source: 'public' })
 
   res.status(201).json({
     reservation: {
       id: row.id,
       guestName: row.guest_name,
       phone: row.phone,
+      email: row.guest_email || '',
       guests: row.guests,
       date: row.date,
       time: row.time,
       notes: row.notes || '',
       status: row.status,
+      tableId: row.table_id || null,
       createdAt: row.created_at,
     },
   })
+})
+
+/** Public list of active dining tables (for guest table picker) */
+router.get('/:slug/tables', (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+  const tables = listDiningTables(restaurant.id)
+    .filter((t) => t.active !== 0 && t.active !== false)
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      seats: t.seats,
+      zone: t.zone,
+      publicCode: t.publicCode,
+    }))
+  res.json({ tables })
+})
+
+/** Resolve a dining table from QR public code */
+router.get('/:slug/table/:code', (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+  const table = findTableByPublicCode(restaurant.id, req.params.code)
+  if (!table) return res.status(404).json({ error: 'Table not found.' })
+  res.json({
+    table: {
+      id: table.id,
+      name: table.name,
+      seats: table.seats,
+      zone: table.zone,
+      publicCode: table.publicCode,
+    },
+  })
+})
+
+/** Guest places an order (manual Cash / UPI — payment_pending until staff marks paid) */
+router.post('/:slug/orders', async (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+
+  const result = createGuestOrder(restaurant, req.body || {})
+  if (!result.ok) return res.status(result.status).json({ error: result.error })
+
+  try {
+    await onOrderCreated(restaurant, result.order)
+  } catch (err) {
+    console.warn('Order messaging failed:', err?.message || err)
+  }
+
+  res.status(201).json({ order: result.order })
+})
+
+/** Guest tracks an order by public code (optional phone check) */
+router.get('/:slug/orders/:code', (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+
+  const order = getOrderByPublicCode(restaurant.id, req.params.code, {
+    phone: req.query.phone,
+  })
+  if (!order) return res.status(404).json({ error: 'Order not found.' })
+  res.json({ order })
+})
+
+/** Guest order history by phone */
+router.get('/:slug/order-history', (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+  const phone = String(req.query.phone || '').trim()
+  if (!phone) return res.status(400).json({ error: 'phone query parameter is required.' })
+  const orders = listOrdersByPhone(restaurant.id, phone)
+  res.json({ orders })
 })
 
 export default router
