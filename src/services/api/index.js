@@ -73,6 +73,8 @@ export const api = {
   adminEmailSettings: adminApi.emailSettings,
   adminSaveEmailSettings: adminApi.saveEmailSettings,
   adminTestEmail: adminApi.testEmail,
+  adminPaymentSettings: adminApi.paymentSettings,
+  adminSavePaymentSettings: adminApi.savePaymentSettings,
 
   getIdentity: identityApi.get,
   saveIdentity: identityApi.save,

@@ -30,6 +30,8 @@ import {
   professionalEmailForRestaurant,
   sendOnboardingPaymentEmails,
 } from '../services/onboardingMessaging.js'
+import { addpayRequest } from '../services/addpayClient.js'
+import { getPaymentSettings } from '../services/paymentSettings.js'
 
 const router = Router()
 
@@ -243,6 +245,18 @@ router.get('/onboarding-payment', (req, res) => {
   })
 })
 
+function appBaseUrl() {
+  return String(process.env.PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:5173')
+    .trim()
+    .replace(/\/$/, '')
+}
+
+/**
+ * Start a hosted AddPay checkout. We never collect card/UPI details
+ * ourselves — the browser is redirected to AddPay's own page, and the
+ * actual "paid" flag only ever gets set by the signed webhook below, never
+ * by this request completing.
+ */
 router.post('/onboarding-payment', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
@@ -266,45 +280,64 @@ router.post('/onboarding-payment', async (req, res) => {
     })
   }
 
-  const methodRaw = String(req.body?.method || 'upi').toLowerCase()
-  const method = ['upi', 'card', 'netbanking'].includes(methodRaw) ? methodRaw : 'upi'
   const amount = onboardingPlanAmount(restaurant.plan)
-  const reference = `PAY-${Date.now().toString(36).toUpperCase()}-${restaurant.id}`
+  const reference = `ONB-${restaurant.id}-${Date.now().toString(36).toUpperCase()}`
   const professionalEmail = professionalEmailForRestaurant(restaurant)
+  const appBase = appBaseUrl()
 
-  const payment = {
-    paid: true,
-    paidAt: new Date().toISOString(),
-    method,
-    amount,
-    currency: 'ZAR',
-    reference,
-    gateway: 'iroas_demo',
+  let checkout
+  try {
+    checkout = await addpayRequest(
+      '/api/entry',
+      {
+        method: 'pay.checkout',
+        merchant_order_no: reference,
+        order_amount: amount,
+        price_currency: 'ZAR',
+        notify_url: `${appBase}/api/public/payments/addpay/webhook`,
+        return_url: `${appBase}/onboarding/payment?paid=return`,
+        description: `IROAS launch — ${restaurant.name || 'your business'}`,
+        expires: 1800,
+        term_ip: req.ip,
+      },
+      getPaymentSettings(),
+    )
+  } catch (err) {
+    return res.status(err.status || 502).json({ error: err.message || 'Unable to start payment.' })
+  }
+
+  let data = checkout.data
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data)
+    } catch {
+      data = null
+    }
+  }
+  const payUrl = data?.pay_url
+  if (!payUrl) {
+    return res.status(502).json({ error: 'AddPay did not return a payment URL.' })
   }
 
   const nextSettings = {
     ...settings,
-    onboardingPayment: payment,
+    onboardingPayment: {
+      paid: false,
+      pending: true,
+      reference,
+      amount,
+      currency: 'ZAR',
+      gateway: 'addpay',
+      createdAt: new Date().toISOString(),
+    },
     professionalEmail,
   }
 
   db.prepare(
-    `UPDATE restaurants SET settings_json = ?, email = COALESCE(NULLIF(email, ''), ?),
-     updated_at = datetime('now') WHERE id = ?`,
-  ).run(JSON.stringify(nextSettings), professionalEmail || null, restaurant.id)
+    `UPDATE restaurants SET settings_json = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(JSON.stringify(nextSettings), restaurant.id)
 
-  const updated = { ...restaurant, email: restaurant.email || professionalEmail }
-  const emails = await sendOnboardingPaymentEmails({ restaurant: updated, payment })
-
-  res.status(201).json({
-    ok: true,
-    userId: formatUserId(req.user.id),
-    professionalEmail,
-    ownerEmail: req.user.email || '',
-    restaurantName: restaurant.name,
-    payment,
-    emails,
-  })
+  res.json({ ok: true, payUrl, reference, amount, currency: 'ZAR' })
 })
 
 function mapReservation(row) {

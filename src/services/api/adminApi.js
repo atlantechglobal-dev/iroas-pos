@@ -47,4 +47,7 @@ export const adminApi = {
     apiRequest('/admin/email-settings', { method: 'PUT', body: payload }),
   testEmail: (to) =>
     apiRequest('/admin/email-settings/test', { method: 'POST', body: to ? { to } : {} }),
+  paymentSettings: () => apiRequest('/admin/payment-settings'),
+  savePaymentSettings: (payload) =>
+    apiRequest('/admin/payment-settings', { method: 'PUT', body: payload }),
 }
