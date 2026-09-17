@@ -116,7 +116,7 @@ function PaymentSettings() {
       {loading ? (
         <p className="es-muted">Loading payment settings…</p>
       ) : (
-        <form id="payment-settings-form" className="es-layout" onSubmit={save}>
+        <form id="payment-settings-form" className="es-layout is-single" onSubmit={save}>
           <section className="es-panel">
             <header className="es-panel-head">
               <div>

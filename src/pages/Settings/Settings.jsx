@@ -31,6 +31,12 @@ function Settings() {
                 desc: 'ZeptoMail API · welcome, approve & detail emails',
                 route: ROUTES.SETTINGS_EMAIL,
               },
+              {
+                icon: '💰',
+                title: 'Payment settings',
+                desc: 'AddPay credentials for onboarding launch payment',
+                route: ROUTES.SETTINGS_PAYMENT,
+              },
             ]
           : []),
         { icon: '🔌', title: 'Integrations', desc: 'Zomato, Swiggy, accounting, KOT printers', route: '/pos-integration' },

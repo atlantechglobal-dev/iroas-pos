@@ -123,6 +123,13 @@
   width: 100%;
 }
 
+/* Pages with a single panel (e.g. Payment settings) — center it instead of
+   leaving it pinned to the left with empty space beside it. */
+.email-settings-page .es-layout.is-single {
+  grid-template-columns: minmax(0, min(760px, 100%));
+  justify-content: center;
+}
+
 .email-settings-page .es-panel {
   background: var(--panel);
   border: 1px solid var(--line);
