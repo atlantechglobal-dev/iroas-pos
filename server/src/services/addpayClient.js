@@ -127,6 +127,15 @@ export async function addpayRequest(endpoint, data, settings) {
   const body = { ...cleaned, ...common, sign: signature }
   const url = baseUrl(settings) + endpoint
 
+  if (process.env.ADDPAY_DEBUG === 'true') {
+    const keyFingerprint = crypto.createHash('sha256').update(settings.privateKey).digest('hex').slice(0, 16)
+    console.log('[addpay debug] url=', url)
+    console.log('[addpay debug] privateKeyFingerprint=', keyFingerprint, 'privateKeyLength=', settings.privateKey.length)
+    console.log('[addpay debug] signString=', signString)
+    console.log('[addpay debug] signature=', signature)
+    console.log('[addpay debug] body=', JSON.stringify(body))
+  }
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -135,6 +144,9 @@ export async function addpayRequest(endpoint, data, settings) {
   })
 
   const raw = await res.text()
+  if (process.env.ADDPAY_DEBUG === 'true') {
+    console.log('[addpay debug] response status=', res.status, 'body=', raw)
+  }
   let result
   try {
     result = raw ? JSON.parse(raw) : {}
