@@ -57,11 +57,6 @@ export function onboardingPlanAmount(plan) {
   return 999
 }
 
-export function formatMoney(amount) {
-  const n = Math.round(Number(amount) || 0)
-  return `R${n.toLocaleString('en-ZA')}`
-}
-
 function ownerRow(ownerId) {
   return db.prepare('SELECT id, name, email, phone FROM users WHERE id = ?').get(ownerId)
 }
@@ -95,7 +90,7 @@ function detailsHtmlBlock({ userId, owner, professionalEmail, links, restaurant,
 
   if (payment) {
     rows.push(
-      ['Amount paid', formatMoney(payment.amount)],
+      ['Amount paid', `₹${payment.amount}`],
       ['Payment method', String(payment.method || '').toUpperCase()],
       ['Payment reference', payment.reference || '—'],
     )
@@ -179,7 +174,7 @@ export async function sendOnboardingPaymentEmails({ restaurant, payment }) {
       links.siteUrl ? `• Public site: ${links.siteUrl}` : null,
       links.cardUrl ? `• Business card: ${links.cardUrl}` : null,
       `• Plan: ${restaurant.plan || 'starter'}`,
-      `• Amount paid: ${formatMoney(amount)} (${String(method).toUpperCase()})`,
+      `• Amount paid: ₹${amount} (${String(method).toUpperCase()})`,
       `• Payment reference: ${reference}`,
       '',
       'What happens next',
@@ -232,7 +227,7 @@ export async function sendOnboardingPaymentEmails({ restaurant, payment }) {
           `• User ID: ${userId}`,
           `• Owner: ${owner.name || '—'} <${owner.email}>`,
           `• Phone: ${owner.phone || '—'}`,
-          `• Amount: ${formatMoney(amount)} / ${String(method).toUpperCase()} / ${reference}`,
+          `• Amount: ₹${amount} / ${String(method).toUpperCase()} / ${reference}`,
           '',
           'Action: Platform Admin → Review tenant → verify checklist → Approve or Reject.',
           '',

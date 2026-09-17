@@ -234,7 +234,7 @@ router.get('/onboarding-payment', (req, res) => {
     plan: restaurant.plan || 'starter',
     status: restaurant.status,
     amount: onboardingPlanAmount(restaurant.plan),
-    currency: 'ZAR',
+    currency: 'INR',
     userId: formatUserId(req.user.id),
     professionalEmail,
     ownerEmail: req.user.email || '',
@@ -277,7 +277,7 @@ router.post('/onboarding-payment', async (req, res) => {
     paidAt: new Date().toISOString(),
     method,
     amount,
-    currency: 'ZAR',
+    currency: 'INR',
     reference,
     gateway: 'iroas_demo',
   }

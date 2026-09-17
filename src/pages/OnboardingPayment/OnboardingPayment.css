@@ -1,21 +1,17 @@
 .ob-pay-page {
-  /* Match IROAS app theme greens */
   --ink: #17171a;
   --muted: #6b6b73;
-  --line: #e4e7de;
+  --line: #e8e4dc;
   --panel: #ffffff;
-  --surface: #f4f7ec;
-  --green: #a5d526;
-  --green-dark: #8fbd18;
-  --green-text: #5c8a1a;
-  --green-soft: #eef6da;
+  --accent: #f97316;
+  --green: #6fae2e;
   box-sizing: border-box;
   font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
   min-height: 100vh;
   color: var(--ink);
-  position: relative;
-  isolation: isolate;
-  background: #f3f5ef;
+  background:
+    radial-gradient(900px 420px at 50% -120px, #fff1e0 0%, transparent 70%),
+    linear-gradient(180deg, #f8f6f2 0%, #efe8dc 100%);
 }
 
 .ob-pay-page *,
@@ -24,321 +20,164 @@
   box-sizing: border-box;
 }
 
-.ob-pay-bg {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 80% 50% at 12% -8%, rgba(165, 213, 38, 0.22), transparent 55%),
-    radial-gradient(ellipse 55% 40% at 92% 0%, rgba(143, 189, 24, 0.12), transparent 50%),
-    linear-gradient(165deg, #f7f8f4 0%, #eef2e6 55%, #e8ede0 100%);
-}
-
 .ob-pay-shell {
-  width: min(980px, 100%);
+  width: min(520px, 100%);
   margin: 0 auto;
-  padding: 28px 20px 56px;
+  padding: 32px 16px 48px;
 }
 
 .ob-pay-brand {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 28px;
+  justify-content: center;
+  margin-bottom: 20px;
 }
 
 .ob-pay-brand img {
-  height: 30px;
-}
-
-.ob-pay-brand span {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.ob-pay-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
-  gap: 20px;
-  align-items: stretch;
-}
-
-.ob-pay-order {
-  background: linear-gradient(165deg, #1a1f14 0%, #243018 60%, #1d2b0c 100%);
-  color: #f4f6f0;
-  border-radius: 22px;
-  padding: 28px 26px;
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  box-shadow: 0 24px 48px rgba(29, 43, 12, 0.2);
-}
-
-.ob-pay-kicker {
-  margin: 0 0 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(244, 246, 240, 0.5);
-}
-
-.ob-pay-store {
-  margin: 0 0 10px;
-  font-size: clamp(26px, 3.2vw, 34px);
-  line-height: 1.15;
-  letter-spacing: -0.035em;
-  font-weight: 800;
-}
-
-.ob-pay-order-sub {
-  margin: 0 0 28px;
-  font-size: 14px;
-  line-height: 1.55;
-  color: rgba(244, 246, 240, 0.68);
-  max-width: 34ch;
-}
-
-.ob-pay-price {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 24px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid rgba(165, 213, 38, 0.2);
-}
-
-.ob-pay-price > span {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(244, 246, 240, 0.5);
-}
-
-.ob-pay-price strong {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: clamp(40px, 5vw, 48px);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: var(--green);
-  line-height: 1;
-}
-
-.ob-pay-price small {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: rgba(244, 246, 240, 0.45);
-}
-
-.ob-pay-meta {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 14px;
-  flex: 1;
-}
-
-.ob-pay-meta li {
-  display: grid;
-  gap: 4px;
-}
-
-.ob-pay-meta span {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: rgba(244, 246, 240, 0.45);
-}
-
-.ob-pay-meta strong {
-  font-size: 14px;
-  font-weight: 700;
-  word-break: break-word;
-}
-
-.ob-pay-email {
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  color: rgba(244, 246, 240, 0.92);
-}
-
-.ob-pay-trust {
-  margin-top: 28px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 18px;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(244, 246, 240, 0.55);
-}
-
-.ob-pay-trust span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  height: 28px;
 }
 
 .ob-pay-panel {
   background: var(--panel);
-  border: 1px solid rgba(228, 231, 222, 0.95);
-  border-radius: 22px;
-  padding: 28px 26px;
-  box-shadow: 0 18px 40px rgba(29, 43, 12, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 28px 22px;
+  box-shadow: 0 20px 50px rgba(40, 24, 8, 0.08);
+  overflow: hidden;
+}
+
+.ob-pay-badge {
+  display: inline-flex;
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff4e6;
+  color: #c05612;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ob-pay-panel h1 {
+  margin: 0 0 8px;
+  font-size: clamp(22px, 5vw, 28px);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.ob-pay-sub {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ob-pay-summary {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #faf8f4;
+  border: 1px solid var(--line);
+}
+
+.ob-pay-summary > div {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.ob-pay-summary span {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.ob-pay-summary strong {
+  text-align: right;
+  word-break: break-word;
   min-width: 0;
 }
 
-.ob-pay-panel-head {
-  margin-bottom: 20px;
-}
-
-.ob-pay-panel-head h2 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  letter-spacing: -0.03em;
-  font-weight: 800;
-}
-
-.ob-pay-panel-head p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.45;
+.ob-pay-amount strong {
+  color: var(--green);
+  font-size: 18px;
 }
 
 .ob-pay-form {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+  display: grid;
+  gap: 0;
   min-width: 0;
+}
+
+.ob-pay-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .ob-pay-methods {
   display: grid;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .ob-pay-method {
-  display: grid;
-  grid-template-columns: 40px 1fr 18px;
-  align-items: center;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   width: 100%;
-  padding: 14px;
+  padding: 12px 14px;
   border-radius: 14px;
-  border: 1.5px solid var(--line);
+  border: 1px solid var(--line);
   background: #fff;
   cursor: pointer;
   font: inherit;
   text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.ob-pay-method:hover {
-  border-color: #c9d4a8;
-}
-
-.ob-pay-method-ico {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
-  display: grid;
-  place-items: center;
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.ob-pay-method-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.ob-pay-method-copy strong {
+.ob-pay-method strong {
   font-size: 14px;
-  font-weight: 800;
 }
 
-.ob-pay-method-copy em {
-  font-style: normal;
+.ob-pay-method span {
   font-size: 12px;
   color: var(--muted);
 }
 
-.ob-pay-method-check {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1.5px solid #c8ceda;
-  background: #fff;
-  position: relative;
-}
-
 .ob-pay-method.is-selected {
-  border-color: var(--green-dark);
-  background: var(--green-soft);
-}
-
-.ob-pay-method.is-selected .ob-pay-method-ico {
-  background: #fff;
-  color: var(--green-text);
-}
-
-.ob-pay-method.is-selected .ob-pay-method-check {
-  border-color: var(--green-dark);
-  background: var(--green);
-}
-
-.ob-pay-method.is-selected .ob-pay-method-check::after {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: #1d2b0c;
-}
-
-.ob-pay-fields {
-  margin-bottom: 8px;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+  background: #fffaf6;
 }
 
 .ob-pay-field {
   display: grid;
-  gap: 7px;
-  margin-bottom: 14px;
-  min-width: 0;
-}
-
-.ob-pay-field > span {
+  gap: 6px;
+  margin-bottom: 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
+  min-width: 0;
 }
 
 .ob-pay-field input,
 .ob-pay-field select {
   width: 100%;
   max-width: 100%;
-  height: 48px;
-  padding: 0 14px;
-  border: 1.5px solid var(--line);
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
   border-radius: 12px;
   font: inherit;
   font-weight: 600;
-  font-size: 14px;
   color: var(--ink);
   background: #fff;
   outline: none;
@@ -346,12 +185,14 @@
 
 .ob-pay-field input:focus,
 .ob-pay-field select:focus {
-  border-color: var(--green-dark);
-  box-shadow: 0 0 0 3px rgba(165, 213, 38, 0.28);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
 }
 
 .ob-pay-card-fields {
   display: grid;
+  gap: 0;
+  margin-bottom: 4px;
   min-width: 0;
 }
 
@@ -362,10 +203,14 @@
   min-width: 0;
 }
 
+.ob-pay-card-row .ob-pay-field {
+  margin-bottom: 12px;
+}
+
 .ob-pay-error {
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  border-radius: 12px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
   background: #fef2f2;
   border: 1px solid #fecaca;
   color: #b91c1c;
@@ -374,107 +219,48 @@
 }
 
 .ob-pay-submit {
-  margin-top: auto;
   width: 100%;
-  min-height: 52px;
+  height: 48px;
+  margin-top: 4px;
   border: none;
-  border-radius: 14px;
-  background: var(--green);
-  color: #1d2b0c;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
   font: inherit;
-  font-size: 15px;
   font-weight: 800;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  box-shadow: 0 10px 24px rgba(143, 189, 24, 0.35);
-  transition: transform 0.15s ease, background 0.15s ease;
 }
 
 .ob-pay-submit:hover:not(:disabled) {
-  background: var(--green-dark);
-  transform: translateY(-1px);
+  filter: brightness(0.97);
 }
 
 .ob-pay-submit:disabled {
-  opacity: 0.7;
+  opacity: 0.65;
   cursor: wait;
-  box-shadow: none;
-}
-
-.ob-pay-btn-spin {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid rgba(29, 43, 12, 0.25);
-  border-top-color: #1d2b0c;
-  animation: ob-pay-spin 0.7s linear infinite;
 }
 
 .ob-pay-fine {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.45;
   text-align: center;
 }
 
-.ob-pay-loading-wrap {
-  min-height: 100vh;
-  display: grid;
-  place-content: center;
-  gap: 14px;
+.ob-pay-loading {
+  padding: 80px 24px;
   text-align: center;
   color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
 }
 
-.ob-pay-spinner {
-  width: 28px;
-  height: 28px;
-  margin: 0 auto;
-  border-radius: 50%;
-  border: 2.5px solid #dce3c8;
-  border-top-color: var(--green-dark);
-  animation: ob-pay-spin 0.7s linear infinite;
-}
-
-@keyframes ob-pay-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 820px) {
-  .ob-pay-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .ob-pay-brand {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .ob-pay-order {
-    min-height: 0;
-  }
-
-  .ob-pay-order-sub {
-    max-width: none;
-  }
-}
-
-@media (max-width: 480px) {
-  .ob-pay-shell {
-    padding: 20px 14px 40px;
-  }
-
-  .ob-pay-order,
+@media (max-width: 420px) {
   .ob-pay-panel {
-    padding: 22px 18px;
-    border-radius: 18px;
+    padding: 22px 16px;
+  }
+
+  .ob-pay-card-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 }
