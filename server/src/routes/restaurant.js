@@ -297,11 +297,6 @@ router.post('/onboarding-payment', async (req, res) => {
         notify_url: `${appBase}/api/public/payments/addpay/webhook`,
         return_url: `${appBase}/onboarding/payment?paid=return`,
         description: `IROAS launch — ${restaurant.name || 'your business'}`,
-        // Matches the proven-working IROAS LMS integration exactly: expires
-        // in seconds, and term_ip as a fixed placeholder — this is a
-        // server-initiated checkout, not a real terminal, and req.ip is
-        // unreliable here anyway (no trust proxy set, so behind Nginx it
-        // resolves to the loopback address, not a real IP).
         expires: 300,
         term_ip: '127.0.0.1',
       },
