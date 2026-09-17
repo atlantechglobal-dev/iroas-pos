@@ -167,20 +167,20 @@ function requireRestaurant(req, res, { liveOnly = false } = {}) {
 }
 
 router.get('/:slug/media/logo', (req, res) => {
-  const restaurant = requireRestaurant(req, res)
+  const restaurant = requireRestaurant(req, res, { liveOnly: true })
   if (!restaurant) return
   return sendDataUrl(res, restaurant.logo_data_url)
 })
 
 router.get('/:slug/media/cover', (req, res) => {
-  const restaurant = requireRestaurant(req, res)
+  const restaurant = requireRestaurant(req, res, { liveOnly: true })
   if (!restaurant) return
   const settings = parseSettings(restaurant)
   return sendDataUrl(res, settings.coverDataUrl || settings.coverPhoto || '')
 })
 
 router.get('/:slug/media/gallery/:index', (req, res) => {
-  const restaurant = requireRestaurant(req, res)
+  const restaurant = requireRestaurant(req, res, { liveOnly: true })
   if (!restaurant) return
   const settings = parseSettings(restaurant)
   const gallery = Array.isArray(settings.gallery) ? settings.gallery : []
@@ -189,7 +189,7 @@ router.get('/:slug/media/gallery/:index', (req, res) => {
 })
 
 router.get('/:slug/media/menu/:itemId', (req, res) => {
-  const restaurant = requireRestaurant(req, res)
+  const restaurant = requireRestaurant(req, res, { liveOnly: true })
   if (!restaurant) return
   const item = db
     .prepare(
@@ -201,7 +201,7 @@ router.get('/:slug/media/menu/:itemId', (req, res) => {
 })
 
 router.get('/:slug/media/category/:catId', (req, res) => {
-  const restaurant = requireRestaurant(req, res)
+  const restaurant = requireRestaurant(req, res, { liveOnly: true })
   if (!restaurant) return
   const cat = db
     .prepare(
@@ -214,7 +214,7 @@ router.get('/:slug/media/category/:catId', (req, res) => {
 
 /** Public restaurant site payload (images as URLs, not base64) */
 router.get('/:slug', (req, res) => {
-  const restaurant = findRestaurantBySlug(req.params.slug)
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
   if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
 
   const settings = parseSettings(restaurant)
