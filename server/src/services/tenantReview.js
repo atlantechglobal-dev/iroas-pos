@@ -14,9 +14,12 @@ const CHECKLIST_KEYS = ['profile', 'domain', 'brand', 'preview']
 export function getTenantRow(id) {
   return db
     .prepare(
-      `SELECT r.*, u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+      `SELECT r.*,
+              u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone,
+              reviewer.name AS reviewer_name, reviewer.email AS reviewer_email
        FROM restaurants r
        JOIN users u ON u.id = r.owner_id
+       LEFT JOIN users reviewer ON reviewer.id = r.reviewed_by
        WHERE r.id = ?`,
     )
     .get(id)
@@ -75,6 +78,13 @@ export function mapTenant(row) {
     rejectionReason: row.rejection_reason,
     rejectedAt: row.rejected_at,
     reviewedAt: row.reviewed_at,
+    reviewedBy: row.reviewed_by
+      ? {
+          id: row.reviewed_by,
+          name: row.reviewer_name || '',
+          email: row.reviewer_email || '',
+        }
+      : null,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

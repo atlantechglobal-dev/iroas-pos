@@ -4,6 +4,7 @@ import { MESSAGES } from '../../constants/messages.js'
 export function Topbar({
   user,
   roleLabel,
+  searchPlaceholder = 'Search orders, menu items, customers...',
   profileOpen,
   onProfileToggle,
   onProfileClose,
@@ -33,7 +34,7 @@ export function Topbar({
             <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
             <path d="M20 20L16.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          <input type="search" placeholder="Search orders, menu items, customers..." aria-label="Search" />
+          <input type="search" placeholder={searchPlaceholder} aria-label="Search" />
           <span className="kbd" aria-hidden="true">
             ⌘ K
           </span>

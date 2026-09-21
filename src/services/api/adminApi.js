@@ -50,4 +50,14 @@ export const adminApi = {
   paymentSettings: () => apiRequest('/admin/payment-settings'),
   savePaymentSettings: (payload) =>
     apiRequest('/admin/payment-settings', { method: 'PUT', body: payload }),
+  plans: () => apiRequest('/admin/plans'),
+  savePlan: (id, payload) => apiRequest(`/admin/plans/${id}`, { method: 'PUT', body: payload }),
+  featureFlags: () => apiRequest('/admin/feature-flags'),
+  saveFeatureFlags: (flags) =>
+    apiRequest('/admin/feature-flags', { method: 'PUT', body: { flags } }),
+  audit: (limit = 100) => apiRequest(`/admin/audit?limit=${limit}`),
+  feed: (limit = 40) => apiRequest(`/admin/feed?limit=${limit}`),
+  health: () => apiRequest('/admin/health'),
+  staff: () => apiRequest('/admin/staff'),
+  createStaff: (payload) => apiRequest('/admin/staff', { method: 'POST', body: payload }),
 }

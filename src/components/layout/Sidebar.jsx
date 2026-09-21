@@ -10,11 +10,11 @@ export function Sidebar({
   onWorkspaceClick,
   onClose,
 }) {
-  const resolvedActive = activeNav || getActiveNavKey(pathname)
+  const resolvedActive = activeNav || getActiveNavKey(pathname, { isAdmin })
   const groups = getNavGroupsForUser({ isAdmin })
 
   return (
-    <aside className="sidebar" aria-label="Sidebar">
+    <aside className="sidebar" aria-label={isAdmin ? 'Platform sidebar' : 'Sidebar'}>
       <div className="sidebar-header">
         <div className="brand">
           <img src="/images/Logo9-1 1.svg" alt="IROAS" />
@@ -30,12 +30,14 @@ export function Sidebar({
           <strong>{workspaceName}</strong>
           <small>{workspaceStatus}</small>
         </span>
-        <svg className="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {!isAdmin ? (
+          <svg className="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : null}
       </button>
 
-      <nav className="nav" aria-label="Main navigation">
+      <nav className="nav" aria-label={isAdmin ? 'Platform navigation' : 'Main navigation'}>
         {groups.map((group) => (
           <div className="nav-group" key={group.label}>
             <p className="nav-label">{group.label}</p>

@@ -88,15 +88,19 @@ function OnboardingPayment() {
     setError('')
     try {
       const result = await api.completeOnboardingPayment({})
-      if (result.alreadyPaid) {
-        goToReview(result)
+      if (result.alreadyPaid || result.payment?.paid || result.demo) {
+        goToReview({
+          userId: result.userId,
+          professionalEmail: result.professionalEmail,
+          payment: result.payment,
+        })
         return
       }
       if (!result.payUrl) {
-        throw new Error('Payment could not be started. Try again.')
+        throw new Error(
+          'Payment could not be started — no checkout URL returned. Configure AddPay in Platform Admin → Payment settings.',
+        )
       }
-      // Full navigation to AddPay's own hosted checkout — we never see or
-      // handle card/UPI details ourselves.
       window.location.href = result.payUrl
     } catch (err) {
       setError(err.message || 'Payment could not be started. Try again.')
@@ -106,7 +110,6 @@ function OnboardingPayment() {
 
   const amount = info?.amount ?? 999
   const currency = String(info?.currency || 'ZAR').toUpperCase()
-  const plan = String(info?.plan || 'starter')
   const money = formatMoney(amount)
   const pendingPayment = Boolean(info?.payment?.pending)
 
@@ -124,19 +127,22 @@ function OnboardingPayment() {
   if (verifying) {
     return (
       <main className="ob-pay-page">
-        <div className="ob-pay-loading-wrap">
-          <div className="ob-pay-spinner" aria-hidden="true" />
-          <p>Confirming your payment…</p>
-          {error ? (
-            <>
-              <p className="ob-pay-error" role="alert">
-                {error}
-              </p>
-              <button type="button" className="ob-pay-submit" onClick={() => checkStatus()}>
-                Check again
-              </button>
-            </>
-          ) : null}
+        <div className="ob-pay-shell">
+          <div className="ob-pay-panel ob-pay-verify">
+            <div className="ob-pay-spinner" aria-hidden="true" />
+            <h1>Confirming your payment…</h1>
+            <p className="ob-pay-sub">Please wait while we check with the bank.</p>
+            {error ? (
+              <>
+                <p className="ob-pay-error" role="alert">
+                  {error}
+                </p>
+                <button type="button" className="ob-pay-submit" onClick={() => checkStatus()}>
+                  Check again
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
       </main>
     )
@@ -151,90 +157,51 @@ function OnboardingPayment() {
           <span>Secure launch checkout</span>
         </header>
 
-        <div className="ob-pay-layout">
-          <aside className="ob-pay-order">
-            <p className="ob-pay-kicker">Order summary</p>
-            <h1 className="ob-pay-store">{info?.restaurantName || 'Your store'}</h1>
-            <p className="ob-pay-order-sub">
-              Submit for admin review. You’ll get a welcome email with your User ID and
-              professional address.
-            </p>
+        <div className="ob-pay-panel">
+          <p className="ob-pay-badge">Payment gateway</p>
+          <h1>Complete your launch payment</h1>
+          <p className="ob-pay-sub">
+            Pay to submit <strong>{info?.restaurantName || 'your store'}</strong> for admin
+            review. You’ll be taken to AddPay’s secure page. After payment you receive a welcome
+            email with your User ID and professional email.
+          </p>
 
             <div className="ob-pay-price">
               <span>Amount due</span>
               <strong>
-                {money}
-                <small>{currency}</small>
+                {money} <em>{currency}</em>
               </strong>
             </div>
+          </div>
 
-            <ul className="ob-pay-meta">
-              <li>
-                <span>Plan</span>
-                <strong>{plan.charAt(0).toUpperCase() + plan.slice(1)}</strong>
-              </li>
-              <li>
-                <span>User ID</span>
-                <strong>{info?.userId || '—'}</strong>
-              </li>
-              <li>
-                <span>Professional email</span>
-                <strong className="ob-pay-email">{info?.professionalEmail || '—'}</strong>
-              </li>
-            </ul>
+          {!info?.addpayConfigured ? (
+            <p className="ob-pay-note">
+              AddPay is not configured — this will complete as a demo payment (no real charge).
+              Admins can add credentials under Platform Admin → Payment settings.
+            </p>
+          ) : null}
 
-            <div className="ob-pay-trust">
-              <span>
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"
-                  />
-                </svg>
-                Encrypted checkout
-              </span>
-              <span>Processed securely by AddPay</span>
-            </div>
-          </aside>
-
-          <section className="ob-pay-panel">
-            <header className="ob-pay-panel-head">
-              <h2>Pay to submit for review</h2>
-              <p>
-                You’ll be taken to AddPay’s secure page to complete payment by card, UPI, or
-                EFT.
+          <form className="ob-pay-form" onSubmit={pay}>
+            {pendingPayment ? (
+              <p className="ob-pay-note">
+                A previous attempt didn’t complete — you can try again below.
               </p>
-            </header>
+            ) : null}
 
-            <form className="ob-pay-form" onSubmit={pay}>
-              {pendingPayment ? (
-                <p className="ob-pay-note">
-                  A previous attempt didn’t complete — you can try again below.
-                </p>
-              ) : null}
-
-              {error ? (
-                <p className="ob-pay-error" role="alert">
-                  {error}
-                </p>
-              ) : null}
-
-              <button type="submit" className="ob-pay-submit" disabled={paying}>
-                {paying ? (
-                  <>
-                    <span className="ob-pay-btn-spin" aria-hidden="true" />
-                    Redirecting to checkout…
-                  </>
-                ) : (
-                  <>Pay {money} securely</>
-                )}
-              </button>
-
-              <p className="ob-pay-fine">
-                After payment, an admin is notified to verify and approve your account.
+            {error ? (
+              <p className="ob-pay-error" role="alert">
+                {error}
               </p>
-            </form>
-          </section>
+            ) : null}
+
+            <button type="submit" className="ob-pay-submit" disabled={paying}>
+              {paying ? 'Redirecting to checkout…' : `Pay ${money} securely`}
+            </button>
+            <p className="ob-pay-fine">
+              Card and bank details are entered on AddPay’s page — never on IROAS. After payment,
+              an admin is emailed to verify and approve your account.
+            </p>
+          </form>
         </div>
       </div>
     </main>

@@ -4,7 +4,9 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
 import { ROUTES } from '../../constants/routes.js'
+import { PlatformSubnav } from '../PlatformAdmin/PlatformSubnav.jsx'
 import './EmailSettings.css'
+import '../PlatformAdmin/PlatformAdminExtra.css'
 
 function PaymentSettings() {
   const toast = useToast()
@@ -83,11 +85,15 @@ function PaymentSettings() {
   }
 
   return (
-    <DashboardLayout pageClassName="email-settings-page" activeNav="platform-admin" variant="admin">
+    <DashboardLayout
+      pageClassName="email-settings-page"
+      activeNav="platform-settings-payment"
+      variant="admin"
+    >
       <div className="es-page-head">
         <div className="es-page-head-main">
-          <Link className="es-back" to={ROUTES.PLATFORM_ADMIN}>
-            ← Platform Admin
+          <Link className="es-back" to={ROUTES.PLATFORM_SETTINGS}>
+            ← Platform settings
           </Link>
           <p className="eyebrow">Platform</p>
           <h1>Payment settings</h1>
@@ -112,6 +118,8 @@ function PaymentSettings() {
           </button>
         </div>
       </div>
+
+      <PlatformSubnav active="platform-settings-payment" />
 
       {loading ? (
         <p className="es-muted">Loading payment settings…</p>

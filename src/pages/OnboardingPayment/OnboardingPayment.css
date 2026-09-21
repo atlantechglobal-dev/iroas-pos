@@ -219,6 +219,40 @@
   line-height: 1.45;
 }
 
+.ob-pay-amount em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.ob-pay-verify {
+  text-align: center;
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+
+.ob-pay-verify h1 {
+  margin-top: 16px;
+}
+
+.ob-pay-spinner {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 2.5px solid #e8e4dc;
+  border-top-color: var(--accent);
+  animation: ob-pay-spin 0.7s linear infinite;
+}
+
+@keyframes ob-pay-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .ob-pay-form {
   display: flex;
   flex-direction: column;

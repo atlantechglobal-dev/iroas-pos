@@ -31,7 +31,7 @@ import {
   sendOnboardingPaymentEmails,
 } from '../services/onboardingMessaging.js'
 import { addpayRequest } from '../services/addpayClient.js'
-import { getPaymentSettings } from '../services/paymentSettings.js'
+import { getPaymentSettings, isPaymentConfigured } from '../services/paymentSettings.js'
 
 const router = Router()
 
@@ -242,6 +242,7 @@ router.get('/onboarding-payment', (req, res) => {
     ownerEmail: req.user.email || '',
     paid,
     payment: settings?.onboardingPayment || null,
+    addpayConfigured: isPaymentConfigured(),
   })
 })
 
@@ -252,10 +253,8 @@ function appBaseUrl() {
 }
 
 /**
- * Start a hosted AddPay checkout. We never collect card/UPI details
- * ourselves — the browser is redirected to AddPay's own page, and the
- * actual "paid" flag only ever gets set by the signed webhook below, never
- * by this request completing.
+ * Start a hosted AddPay checkout. When AddPay credentials are missing,
+ * complete a local demo payment so onboarding can continue in development.
  */
 router.post('/onboarding-payment', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
@@ -276,13 +275,59 @@ router.post('/onboarding-payment', async (req, res) => {
       alreadyPaid: true,
       userId: formatUserId(req.user.id),
       professionalEmail,
+      ownerEmail: req.user.email || '',
+      restaurantName: restaurant.name,
       payment: settings.onboardingPayment,
     })
   }
 
   const amount = onboardingPlanAmount(restaurant.plan)
-  const reference = `ONB-${restaurant.id}-${Date.now().toString(36).toUpperCase()}`
   const professionalEmail = professionalEmailForRestaurant(restaurant)
+
+  // Demo path — AddPay not configured yet
+  if (!isPaymentConfigured()) {
+    const reference = `DEMO-${Date.now().toString(36).toUpperCase()}-${restaurant.id}`
+    const payment = {
+      paid: true,
+      paidAt: new Date().toISOString(),
+      method: 'demo',
+      amount,
+      currency: 'ZAR',
+      reference,
+      gateway: 'iroas_demo',
+    }
+    const nextSettings = {
+      ...settings,
+      onboardingPayment: payment,
+      professionalEmail,
+    }
+    db.prepare(
+      `UPDATE restaurants SET settings_json = ?, email = COALESCE(NULLIF(email, ''), ?),
+       status = CASE WHEN status = 'onboarding' THEN 'pending_approval' ELSE status END,
+       updated_at = datetime('now') WHERE id = ?`,
+    ).run(JSON.stringify(nextSettings), professionalEmail || null, restaurant.id)
+
+    const updated = {
+      ...restaurant,
+      email: restaurant.email || professionalEmail,
+      status: restaurant.status === 'onboarding' ? 'pending_approval' : restaurant.status,
+    }
+    const emails = await sendOnboardingPaymentEmails({ restaurant: updated, payment })
+
+    return res.json({
+      ok: true,
+      alreadyPaid: true,
+      demo: true,
+      userId: formatUserId(req.user.id),
+      professionalEmail,
+      ownerEmail: req.user.email || '',
+      restaurantName: restaurant.name,
+      payment,
+      emails,
+    })
+  }
+
+  const reference = `ONB-${restaurant.id}-${Date.now().toString(36).toUpperCase()}`
   const appBase = appBaseUrl()
 
   let checkout
@@ -303,7 +348,9 @@ router.post('/onboarding-payment', async (req, res) => {
       getPaymentSettings(),
     )
   } catch (err) {
-    return res.status(err.status || 502).json({ error: err.message || 'Unable to start payment.' })
+    return res.status(err.status || 502).json({
+      error: err.message || 'Unable to start payment with AddPay.',
+    })
   }
 
   let data = checkout.data
@@ -314,9 +361,12 @@ router.post('/onboarding-payment', async (req, res) => {
       data = null
     }
   }
-  const payUrl = data?.pay_url
+  const payUrl = data?.pay_url || data?.payUrl || data?.checkout_url
   if (!payUrl) {
-    return res.status(502).json({ error: 'AddPay did not return a payment URL.' })
+    console.error('[addpay] checkout response missing pay_url:', JSON.stringify(checkout).slice(0, 800))
+    return res.status(502).json({
+      error: 'AddPay did not return a payment URL. Check Payment settings / sandbox credentials.',
+    })
   }
 
   const nextSettings = {

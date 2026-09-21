@@ -1,44 +1,24 @@
 import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
-import { useAuth } from '../../hooks/useAuth.js'
 import { MESSAGES } from '../../constants/messages.js'
-import { ROUTES } from '../../constants/routes.js'
 import './Settings.css'
 
 function Settings() {
   const navigate = useNavigate()
   const toast = useToast()
-  const { isAdmin } = useAuth()
-
   const sections = [
     {
       label: 'Restaurant',
       items: [
         { icon: '🏬', title: 'Restaurant settings', desc: 'Hours, channels, ordering rules', route: '/restaurant-profile' },
         { icon: '👥', title: 'Users & permissions', desc: 'Roles, invitations, access logs', route: '/settings/users' },
-        { icon: '💳', title: 'Billing & plan', desc: 'Pro plan · ₹4,999 / month', route: '/settings/billing' },
+        { icon: '💳', title: 'Billing & plan', desc: 'Your subscription & invoices', route: '/settings/billing' },
       ],
     },
     {
-      label: 'Platform',
+      label: 'Workspace',
       items: [
-        ...(isAdmin
-          ? [
-              {
-                icon: '✉️',
-                title: 'Email settings',
-                desc: 'ZeptoMail API · welcome, approve & detail emails',
-                route: ROUTES.SETTINGS_EMAIL,
-              },
-              {
-                icon: '💰',
-                title: 'Payment settings',
-                desc: 'AddPay credentials for onboarding launch payment',
-                route: ROUTES.SETTINGS_PAYMENT,
-              },
-            ]
-          : []),
         { icon: '🔌', title: 'Integrations', desc: 'Zomato, Swiggy, accounting, KOT printers', route: '/pos-integration' },
         { icon: '🔔', title: 'Notifications', desc: 'Routes for orders, low stock, reviews', route: '/notifications' },
         { icon: '🛡', title: 'Security', desc: '2FA, IP allowlist, session policy', route: '/settings/security' },

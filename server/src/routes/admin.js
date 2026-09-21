@@ -32,10 +32,33 @@ import {
   isEmailConfigured,
 } from '../services/emailService.js'
 import { getPublicPaymentSettings, savePaymentSettings } from '../services/paymentSettings.js'
+import {
+  appendPlatformAudit,
+  createPlatformStaff,
+  getPlatformHealth,
+  listFeatureFlags,
+  listPlans,
+  listPlatformAudit,
+  listPlatformFeed,
+  listPlatformStaff,
+  saveFeatureFlags,
+  upsertPlan,
+} from '../services/platformAdminService.js'
 
 const router = Router()
 
 router.use(requireAuth, requireAdmin)
+
+function auditFromReq(req, action, entityType, entityId, detail) {
+  appendPlatformAudit({
+    actorId: req.user?.id,
+    actorEmail: req.user?.email || '',
+    action,
+    entityType,
+    entityId,
+    detail,
+  })
+}
 
 router.get('/stats', (req, res) => {
   const activeTenants = db
@@ -82,10 +105,12 @@ router.get('/tenants', (req, res) => {
     .prepare(
       `SELECT r.id, r.name, r.city, r.country, r.plan, r.status, r.launched_at,
               r.submitted_at, r.cuisine, r.subdomain, r.custom_domain, r.created_at,
-              r.rejection_reason, r.rejected_at,
-              u.name AS owner_name, u.email AS owner_email
+              r.rejection_reason, r.rejected_at, r.reviewed_at, r.reviewed_by,
+              u.name AS owner_name, u.email AS owner_email,
+              reviewer.name AS reviewer_name, reviewer.email AS reviewer_email
        FROM restaurants r
        JOIN users u ON u.id = r.owner_id
+       LEFT JOIN users reviewer ON reviewer.id = r.reviewed_by
        WHERE r.status != 'deleted'
        ORDER BY
          CASE r.status
@@ -94,7 +119,7 @@ router.get('/tenants', (req, res) => {
            WHEN 'onboarding' THEN 2
            ELSE 3
          END,
-         COALESCE(r.submitted_at, r.created_at) DESC`,
+         COALESCE(r.reviewed_at, r.submitted_at, r.created_at) DESC`,
     )
     .all()
 
@@ -158,7 +183,7 @@ router.patch('/tenants/:id', (req, res) => {
        city = ?, country = ?, timezone = ?, address = ?, operating_hours = ?,
        subdomain = ?, custom_domain = ?, domain_suffix = ?,
        primary_color = ?, secondary_color = ?, accent_color = ?, font = ?, theme = ?,
-       logo_data_url = ?,
+       logo_data_url = ?, plan = ?,
        updated_at = datetime('now')
      WHERE id = ?`,
   ).run(
@@ -182,6 +207,7 @@ router.patch('/tenants/:id', (req, res) => {
     body.font ?? restaurant.font,
     body.theme ?? restaurant.theme,
     body.logoDataUrl !== undefined ? body.logoDataUrl : restaurant.logo_data_url,
+    body.plan !== undefined ? String(body.plan) : restaurant.plan,
     restaurant.id,
   )
 
@@ -190,9 +216,19 @@ router.patch('/tenants/:id', (req, res) => {
     action: 'update',
     previousStatus: restaurant.status,
     newStatus: restaurant.status,
-    note: 'Admin updated application details',
+    note:
+      body.plan !== undefined && body.plan !== restaurant.plan
+        ? `Admin updated application details (plan → ${body.plan})`
+        : 'Admin updated application details',
     changedBy: req.user.id,
   })
+  auditFromReq(
+    req,
+    'tenant.update',
+    'tenant',
+    restaurant.id,
+    body.plan !== undefined ? `Plan set to ${body.plan}` : 'Updated tenant details',
+  )
 
   const row = getTenantRow(restaurant.id)
   res.json({ tenant: mapTenant(row), events: listTenantEvents(restaurant.id) })
@@ -230,6 +266,7 @@ router.post('/tenants/:id/approve', async (req, res) => {
     note: 'Approved and published',
     changedBy: req.user.id,
   })
+  auditFromReq(req, 'tenant.approve', 'tenant', restaurant.id, restaurant.name || '')
 
   const updated = { ...restaurant, status: 'live' }
   createNotification({
@@ -283,6 +320,7 @@ router.post('/tenants/:id/reject', (req, res) => {
     note: reason,
     changedBy: req.user.id,
   })
+  auditFromReq(req, 'tenant.reject', 'tenant', restaurant.id, reason)
 
   const updated = { ...restaurant, status: 'rejected' }
   notifyOwner({
@@ -669,6 +707,7 @@ router.get('/email-settings', (_req, res) => {
 router.put('/email-settings', (req, res) => {
   try {
     const settings = saveEmailSettings(req.body || {})
+    auditFromReq(req, 'settings.email', 'settings', 'email', 'Updated email settings')
     res.json({ ok: true, settings })
   } catch (err) {
     res.status(err.status || 400).json({ error: err.message || 'Unable to save email settings.' })
@@ -717,9 +756,66 @@ router.get('/payment-settings', (_req, res) => {
 router.put('/payment-settings', (req, res) => {
   try {
     const settings = savePaymentSettings(req.body || {})
+    auditFromReq(req, 'settings.payment', 'settings', 'payment', 'Updated payment settings')
     res.json({ ok: true, settings })
   } catch (err) {
     res.status(err.status || 400).json({ error: err.message || 'Unable to save payment settings.' })
+  }
+})
+
+router.get('/plans', (_req, res) => {
+  res.json({ plans: listPlans() })
+})
+
+router.put('/plans/:id', (req, res) => {
+  try {
+    const plan = upsertPlan({ ...req.body, id: req.params.id })
+    auditFromReq(req, 'plans.update', 'plan', plan.id, `${plan.name} · R${plan.priceZar}`)
+    res.json({ ok: true, plan, plans: listPlans() })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to save plan.' })
+  }
+})
+
+router.get('/feature-flags', (_req, res) => {
+  res.json({ flags: listFeatureFlags() })
+})
+
+router.put('/feature-flags', (req, res) => {
+  try {
+    const flags = saveFeatureFlags(req.body?.flags || req.body || [])
+    auditFromReq(req, 'flags.update', 'feature_flags', null, `Updated ${flags.length} flags`)
+    res.json({ ok: true, flags })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to save flags.' })
+  }
+})
+
+router.get('/audit', (req, res) => {
+  const limit = Number(req.query.limit) || 100
+  res.json({ entries: listPlatformAudit({ limit }) })
+})
+
+router.get('/feed', (req, res) => {
+  const limit = Number(req.query.limit) || 40
+  res.json({ items: listPlatformFeed({ limit }) })
+})
+
+router.get('/health', (_req, res) => {
+  res.json(getPlatformHealth())
+})
+
+router.get('/staff', (_req, res) => {
+  res.json({ staff: listPlatformStaff() })
+})
+
+router.post('/staff', (req, res) => {
+  try {
+    const user = createPlatformStaff(req.body || {})
+    auditFromReq(req, 'staff.create', 'user', user.id, user.email)
+    res.status(201).json({ ok: true, user, staff: listPlatformStaff() })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to create staff user.' })
   }
 })
 

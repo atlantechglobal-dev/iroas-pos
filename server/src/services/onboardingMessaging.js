@@ -1,6 +1,7 @@
 import { db } from '../db.js'
 import { createNotification, queueEmailAndWait } from './identityService.js'
 import { getAdminNotifyEmail, getEmailSettings, isEmailConfigured } from './emailService.js'
+import { getPlanAmount } from './platformAdminService.js'
 
 function adminInbox() {
   return getAdminNotifyEmail()
@@ -51,15 +52,7 @@ export function professionalEmailForRestaurant(restaurant) {
 }
 
 export function onboardingPlanAmount(plan) {
-  const key = String(plan || 'starter').toLowerCase()
-  if (key === 'growth' || key === 'pro') return 2499
-  if (key === 'enterprise') return 4999
-  return 1
-}
-
-export function formatMoney(amount) {
-  const n = Math.round(Number(amount) || 0)
-  return `R${n.toLocaleString('en-ZA')}`
+  return getPlanAmount(plan)
 }
 
 function ownerRow(ownerId) {

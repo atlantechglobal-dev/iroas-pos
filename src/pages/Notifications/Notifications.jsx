@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
+import { useAuth } from '../../hooks/useAuth.js'
 import { api } from '../../lib/api'
 import { MESSAGES } from '../../constants/messages.js'
 import './Notifications.css'
@@ -47,6 +48,7 @@ function formatRelative(iso) {
 
 function Notifications() {
   const toast = useToast()
+  const { isAdmin } = useAuth()
   const comingSoon = (label) => toast.info(MESSAGES.COMING_SOON(label))
 
   const [filter, setFilter] = useState('All')
@@ -94,7 +96,12 @@ function Notifications() {
   }
 
   return (
-    <DashboardLayout pageClassName="notifications-page" activeNav="notifications">
+    <DashboardLayout
+      pageClassName="notifications-page"
+      activeNav={isAdmin ? 'platform-notifications' : 'notifications'}
+      variant={isAdmin ? 'admin' : 'owner'}
+      adminSubtitle="Platform alerts"
+    >
       <div className="page-head">
         <div>
           <p className="eyebrow">System</p>

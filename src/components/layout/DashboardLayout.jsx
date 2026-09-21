@@ -18,6 +18,7 @@ export function DashboardLayout({
   activeNav,
   variant = 'owner',
   adminSubtitle,
+  searchPlaceholder,
   shellStyle,
   allowPendingContent = false,
   children,
@@ -27,17 +28,19 @@ export function DashboardLayout({
   const { user, logout, isAdmin, restaurantStatus: authRestaurantStatus } = useAuth()
   const toast = useToast()
   const { displayRestaurant, restaurantStatus } = useRestaurant({
-    enabled: variant === 'owner' && !isAdmin,
+    enabled: !isAdmin && variant === 'owner',
   })
 
   const [profileOpen, setProfileOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const roleLabel = isAdmin ? 'Platform Admin' : 'Owner'
-  const workspaceName = variant === 'admin' ? 'IROAS Platform' : displayRestaurant
+  // Platform admins always get the admin shell + sidebar, even if a page forgot variant="admin"
+  const effectiveVariant = isAdmin ? 'admin' : variant
+  const workspaceName = effectiveVariant === 'admin' ? 'IROAS Platform' : displayRestaurant
   const workspaceStatus =
-    variant === 'admin'
-      ? adminSubtitle || 'All tenants'
+    effectiveVariant === 'admin'
+      ? adminSubtitle || 'Super admin'
       : isPendingApproval(authRestaurantStatus || restaurantStatus)
         ? 'Awaiting approval'
         : restaurantStatus === 'live' || authRestaurantStatus === 'live'
@@ -45,7 +48,7 @@ export function DashboardLayout({
           : 'Onboarding'
 
   const showApprovalGate =
-    variant === 'owner' &&
+    effectiveVariant === 'owner' &&
     !isAdmin &&
     !allowPendingContent &&
     isPendingApproval(authRestaurantStatus || restaurantStatus)
@@ -95,7 +98,13 @@ export function DashboardLayout({
           workspaceName={workspaceName}
           workspaceStatus={workspaceStatus}
           onNavClick={handleNavClick}
-          onWorkspaceClick={() => toast.info('Switch restaurant — demo preview with sample data.')}
+          onWorkspaceClick={() => {
+            if (isAdmin) {
+              navigate(ROUTES.PLATFORM_ADMIN)
+              return
+            }
+            toast.info('Switch restaurant — demo preview with sample data.')
+          }}
           onClose={() => setSidebarOpen(false)}
         />
 
@@ -103,17 +112,35 @@ export function DashboardLayout({
           <Topbar
             user={user}
             roleLabel={roleLabel}
+            searchPlaceholder={
+              searchPlaceholder ||
+              (isAdmin
+                ? 'Search tenants, owners, plans…'
+                : 'Search orders, menu items, customers...')
+            }
             profileOpen={profileOpen}
             onProfileToggle={() => setProfileOpen((prev) => !prev)}
             onProfileClose={() => setProfileOpen(false)}
             onMenuToggle={() => setSidebarOpen(true)}
             onSettings={() => {
               setProfileOpen(false)
-              navigate(ROUTES.SETTINGS)
+              navigate(isAdmin ? ROUTES.PLATFORM_SETTINGS : ROUTES.SETTINGS)
             }}
             onLogout={logout}
-            onQuickAction={() => toast.info('Quick actions — demo preview with sample data.')}
-            onNotifications={() => toast.info('No new notifications.')}
+            onQuickAction={() =>
+              toast.info(
+                isAdmin
+                  ? 'Quick actions — create tenant coming soon.'
+                  : 'Quick actions — demo preview with sample data.',
+              )
+            }
+            onNotifications={() => {
+              if (isAdmin) {
+                navigate(ROUTES.PLATFORM_NOTIFICATIONS)
+                return
+              }
+              toast.info('No new notifications.')
+            }}
           />
 
           <main className="content" id="top">

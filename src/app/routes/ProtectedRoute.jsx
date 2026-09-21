@@ -21,12 +21,17 @@ export function ProtectedRoute({
     return <Navigate to={ROUTES.UNAUTHORIZED} replace />
   }
 
-  if (requireLive && !adminOnly && restaurantStatus && !canUseDashboard(restaurantStatus)) {
+  // Platform admins use the operator shell — skip restaurant live/onboarding gates
+  if (isAdmin) {
+    return children
+  }
+
+  if (requireLive && restaurantStatus && !canUseDashboard(restaurantStatus)) {
     return <Navigate to={ROUTES.RESTAURANT_SETUP} replace />
   }
 
   // Wizard-only routes: once submitted, send pending owners to payment (not dashboard)
-  if (onboardingOnly && !adminOnly && restaurantStatus && canUseDashboard(restaurantStatus)) {
+  if (onboardingOnly && restaurantStatus && canUseDashboard(restaurantStatus)) {
     if (allowPending && isPendingApproval(restaurantStatus)) {
       return children
     }

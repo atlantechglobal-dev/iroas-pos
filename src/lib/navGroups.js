@@ -1,5 +1,6 @@
 import { ROUTES } from '../constants/routes.js'
 
+/** Restaurant owner / tenant sidebar */
 export const NAV_GROUPS = [
   {
     label: 'Overview',
@@ -51,6 +52,7 @@ export const NAV_GROUPS = [
         label: 'Role Permissions',
         icon: '/images/role key.svg',
         route: ROUTES.ROLE_PERMISSIONS,
+        hidden: true,
       },
     ],
   },
@@ -89,23 +91,152 @@ export const NAV_GROUPS = [
       { key: 'settings', label: 'Settings', icon: '/images/settings.svg', route: ROUTES.SETTINGS },
     ],
   },
+]
+
+/**
+ * Super admin / Platform Admin sidebar only.
+ * Restaurant Overview / Operations / Growth are never shown here.
+ */
+export const ADMIN_NAV_GROUPS = [
   {
     label: 'Platform',
-    adminOnly: true,
     items: [
       {
         key: 'platform-admin',
-        label: 'Platform Admin',
-        icon: '/images/platad.svg',
+        label: 'Dashboard',
+        icon: '/images/dashboard.svg',
         route: ROUTES.PLATFORM_ADMIN,
+      },
+      {
+        key: 'platform-customers',
+        label: 'Customers',
+        icon: '/images/cust.svg',
+        route: ROUTES.PLATFORM_CUSTOMERS,
+      },
+      {
+        key: 'platform-approve',
+        label: 'Approve',
+        icon: '/images/platad.svg',
+        route: ROUTES.PLATFORM_APPROVE,
+      },
+      {
+        key: 'platform-customer-onboarding',
+        label: 'Customer onboarding',
+        icon: '/images/directory.svg',
+        route: ROUTES.PLATFORM_CUSTOMER_ONBOARDING,
+      },
+      {
+        key: 'platform-plans',
+        label: 'Plans',
+        icon: '/images/payments.svg',
+        route: ROUTES.PLATFORM_PLANS,
+      },
+      {
+        key: 'platform-identities',
+        label: 'Identity review',
+        icon: '/images/digicard.svg',
+        route: ROUTES.PLATFORM_IDENTITIES,
+      },
+      {
+        key: 'platform-products',
+        label: 'Products',
+        icon: '/images/pos.svg',
+        route: ROUTES.PLATFORM_PRODUCTS,
+      },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      {
+        key: 'platform-notifications',
+        label: 'Notifications',
+        icon: '/images/noti.svg',
+        route: ROUTES.PLATFORM_NOTIFICATIONS,
+      },
+      {
+        key: 'platform-audit',
+        label: 'Audit log',
+        icon: '/images/audit.svg',
+        route: ROUTES.PLATFORM_AUDIT,
+      },
+      {
+        key: 'platform-staff',
+        label: 'Platform staff',
+        icon: '/images/stafb.svg',
+        route: ROUTES.PLATFORM_STAFF,
+      },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      {
+        key: 'platform-settings',
+        label: 'Platform settings',
+        icon: '/images/settings.svg',
+        route: ROUTES.PLATFORM_SETTINGS,
+      },
+      {
+        key: 'platform-settings-email',
+        label: 'Email settings',
+        icon: '/images/msg.svg',
+        route: ROUTES.PLATFORM_SETTINGS_EMAIL,
+      },
+      {
+        key: 'platform-settings-payment',
+        label: 'Payment settings',
+        icon: '/images/lock.svg',
+        route: ROUTES.PLATFORM_SETTINGS_PAYMENT,
+      },
+      {
+        key: 'platform-settings-flags',
+        label: 'Feature flags',
+        icon: '/images/platad.svg',
+        route: ROUTES.PLATFORM_SETTINGS_FLAGS,
       },
     ],
   },
 ]
 
+const ADMIN_PATH_KEYS = [
+  [ROUTES.PLATFORM_ADMIN, 'platform-admin', true],
+  [ROUTES.PLATFORM_PLANS, 'platform-plans'],
+  [ROUTES.PLATFORM_CUSTOMERS, 'platform-customers'],
+  [ROUTES.PLATFORM_APPROVE, 'platform-approve'],
+  [ROUTES.PLATFORM_CUSTOMER_ONBOARDING, 'platform-customer-onboarding'],
+  [ROUTES.PLATFORM_IDENTITIES, 'platform-identities'],
+  [ROUTES.PLATFORM_PRODUCTS, 'platform-products'],
+  [ROUTES.PLATFORM_NOTIFICATIONS, 'platform-notifications'],
+  [ROUTES.PLATFORM_AUDIT, 'platform-audit'],
+  [ROUTES.PLATFORM_STAFF, 'platform-staff'],
+  [ROUTES.PLATFORM_SETTINGS_EMAIL, 'platform-settings-email'],
+  [ROUTES.PLATFORM_SETTINGS_PAYMENT, 'platform-settings-payment'],
+  [ROUTES.PLATFORM_SETTINGS_FLAGS, 'platform-settings-flags'],
+  [ROUTES.PLATFORM_SETTINGS, 'platform-settings'],
+  // Legacy redirects still highlight settings
+  [ROUTES.SETTINGS_EMAIL, 'platform-settings-email'],
+  [ROUTES.SETTINGS_PAYMENT, 'platform-settings-payment'],
+]
+
 /** Resolve sidebar active key from the current path (covers settings subpages too). */
-export function getActiveNavKey(pathname) {
+export function getActiveNavKey(pathname, { isAdmin = false } = {}) {
   if (!pathname) return null
+
+  if (isAdmin) {
+    for (const [route, key, exact] of ADMIN_PATH_KEYS) {
+      if (exact) {
+        if (pathname === route) return key
+        continue
+      }
+      if (pathname === route || pathname.startsWith(`${route}/`)) return key
+    }
+
+    const adminItems = ADMIN_NAV_GROUPS.flatMap((group) => group.items)
+    const exactAdmin = adminItems.find((item) => item.route === pathname)
+    if (exactAdmin) return exactAdmin.key
+    return 'platform-admin'
+  }
 
   if (pathname === ROUTES.BRAND || pathname.startsWith(`${ROUTES.BRAND}/`)) {
     return 'branding'
@@ -138,5 +269,15 @@ export function getActiveNavKey(pathname) {
 }
 
 export function getNavGroupsForUser({ isAdmin = false } = {}) {
-  return NAV_GROUPS.filter((group) => !group.adminOnly || isAdmin)
+  if (isAdmin) {
+    return ADMIN_NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.hidden),
+    })).filter((group) => group.items.length > 0)
+  }
+
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.hidden && !item.adminOnly),
+  })).filter((group) => group.items.length > 0)
 }

@@ -131,11 +131,15 @@ function EmailSettings() {
   }
 
   return (
-    <DashboardLayout pageClassName="email-settings-page" activeNav="platform-admin" variant="admin">
+    <DashboardLayout
+      pageClassName="email-settings-page"
+      activeNav="platform-settings-email"
+      variant="admin"
+    >
       <div className="es-page-head">
         <div className="es-page-head-main">
-          <Link className="es-back" to={ROUTES.PLATFORM_ADMIN}>
-            ← Platform Admin
+          <Link className="es-back" to={ROUTES.PLATFORM_SETTINGS}>
+            ← Platform settings
           </Link>
           <p className="eyebrow">Platform</p>
           <h1>Email settings</h1>

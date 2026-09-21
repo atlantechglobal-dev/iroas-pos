@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../lib/api'
 import { QrCodePreview } from '../QrCodePreview.jsx'
@@ -25,7 +25,7 @@ const CHECKS = [
 const STATUS_COPY = {
   pending_approval: 'Awaiting approval',
   onboarding: 'Onboarding',
-  live: 'Live',
+  live: 'Approved & live',
   rejected: 'Rejected',
 }
 
@@ -76,8 +76,15 @@ function Field({ label, value, name, editing, onChange, multiline }) {
   )
 }
 
-export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
+export function TenantReviewDrawer({
+  tenantId,
+  focusApprove = false,
+  variant = 'drawer',
+  onClose,
+  onChanged,
+}) {
   const toast = useToast()
+  const isPage = variant === 'page'
   const [tab, setTab] = useState('profile')
   const [loading, setLoading] = useState(true)
   const [tenant, setTenant] = useState(null)
@@ -95,6 +102,7 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteName, setDeleteName] = useState('')
   const [busy, setBusy] = useState('')
+  const checksRef = useRef(null)
 
   const load = async (id) => {
     const data = await api.adminTenant(id)
@@ -119,17 +127,18 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
       accentColor: data.tenant.accentColor || '#BDB8A4',
       font: data.tenant.font || '',
       theme: data.tenant.theme || '',
+      plan: data.tenant.plan || 'starter',
     })
   }
 
   useEffect(() => {
-    if (!tenantId) return undefined
+    if (!tenantId || isPage) return undefined
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = previous
     }
-  }, [tenantId])
+  }, [tenantId, isPage])
 
   useEffect(() => {
     if (!tenantId) return
@@ -142,6 +151,14 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
       .catch((err) => toast.error(err.message || 'Unable to load application.'))
       .finally(() => setLoading(false))
   }, [tenantId])
+
+  useEffect(() => {
+    if (!focusApprove || loading || !tenant || tenant.status !== 'pending_approval') return
+    const timer = window.setTimeout(() => {
+      checksRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [focusApprove, loading, tenant])
 
   const hostname = useMemo(
     () =>
@@ -171,6 +188,31 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
 
   const canApprove = tenant?.status === 'pending_approval' && CHECKS.every((item) => checks[item.id])
 
+  const reviewerLabel = useMemo(() => {
+    if (!tenant?.reviewedBy) return ''
+    const name = tenant.reviewedBy.name || tenant.reviewedBy.email || 'Admin'
+    const email =
+      tenant.reviewedBy.email && tenant.reviewedBy.name ? ` (${tenant.reviewedBy.email})` : ''
+    return `${name}${email}`
+  }, [tenant])
+
+  const approveEvent = useMemo(
+    () => events.find((event) => event.action === 'approve'),
+    [events],
+  )
+
+  const approvedByLabel =
+    reviewerLabel ||
+    (approveEvent
+      ? `${approveEvent.actor_name || approveEvent.actor_email || 'Admin'}${
+          approveEvent.actor_email && approveEvent.actor_name
+            ? ` (${approveEvent.actor_email})`
+            : ''
+        }`
+      : '')
+
+  const approvedAtLabel = formatWhen(tenant?.reviewedAt || approveEvent?.created_at)
+
   const handleSave = async () => {
     setBusy('save')
     try {
@@ -192,8 +234,13 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
     try {
       await api.adminApproveTenant(tenantId, checks)
       toast.success(`${form.name || 'Business'} approved and published`)
-      onChanged?.()
-      onClose()
+      if (isPage) {
+        await load(tenantId)
+        onChanged?.()
+      } else {
+        onChanged?.()
+        onClose()
+      }
     } catch (err) {
       toast.error(err.message || 'Unable to approve.')
     } finally {
@@ -206,8 +253,14 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
     try {
       await api.adminRejectTenant(tenantId, rejectReason.trim())
       toast.success('Application rejected')
-      onChanged?.()
-      onClose()
+      if (isPage) {
+        setRejectOpen(false)
+        await load(tenantId)
+        onChanged?.()
+      } else {
+        onChanged?.()
+        onClose()
+      }
     } catch (err) {
       toast.error(err.message || 'Unable to reject.')
     } finally {
@@ -229,10 +282,8 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
     }
   }
 
-  return createPortal(
-    <div className="tenant-review-overlay">
-      <button className="tenant-review-backdrop" type="button" aria-label="Close" onClick={onClose} />
-      <aside className="tenant-review-drawer" role="dialog" aria-labelledby="tenant-review-title">
+  const panel = (
+        <>
         {loading || !tenant ? (
           <p className="tenant-review-loading">Loading application…</p>
         ) : (
@@ -240,7 +291,9 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
             <header className="tenant-review-head">
               <div>
                 <div className="tenant-review-head-row">
-                  <p className="tenant-review-kicker">Application review</p>
+                  <p className="tenant-review-kicker">
+                    {isPage ? 'Approve profile' : 'Application review'}
+                  </p>
                   <span className={`tenant-review-status is-${tenant.status}`}>
                     {STATUS_COPY[tenant.status] || tenant.status}
                   </span>
@@ -249,12 +302,71 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
                 <p>
                   {tenant.owner?.name} · {tenant.owner?.email}
                   {tenant.submittedAt ? ` · Submitted ${formatWhen(tenant.submittedAt)}` : ''}
+                  {tenant.status === 'live' && approvedByLabel
+                    ? ` · Approved by ${tenant.reviewedBy?.name || tenant.reviewedBy?.email || approveEvent?.actor_name || 'Admin'}`
+                    : ''}
                 </p>
               </div>
-              <button type="button" className="tenant-review-close" onClick={onClose}>
-                Close
-              </button>
+              {!isPage ? (
+                <button type="button" className="tenant-review-close" onClick={onClose}>
+                  Close
+                </button>
+              ) : null}
             </header>
+
+            {tenant.status === 'pending_approval' ? (
+              <div className="tenant-review-approve-banner">
+                <div>
+                  <strong>Ready to approve?</strong>
+                  <span>Tick all checklist items, then publish for customers.</span>
+                </div>
+                <div className="tenant-review-approve-banner-actions">
+                  <button type="button" onClick={() => setRejectOpen(true)}>
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    className="is-primary"
+                    disabled={!canApprove || busy === 'approve'}
+                    onClick={handleApprove}
+                    title={
+                      canApprove
+                        ? 'Publish this restaurant for customers'
+                        : 'Complete the checklist first'
+                    }
+                  >
+                    {busy === 'approve' ? 'Publishing…' : 'Approve & publish'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {tenant.status === 'live' ? (
+              <div className="tenant-review-approve-banner is-approved">
+                <div>
+                  <strong>Approved &amp; live</strong>
+                  <span>
+                    {approvedByLabel
+                      ? `Approved by ${approvedByLabel}`
+                      : 'Published for customers'}
+                    {approvedAtLabel ? ` · ${approvedAtLabel}` : ''}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            {tenant.status === 'rejected' ? (
+              <div className="tenant-review-approve-banner is-rejected">
+                <div>
+                  <strong>Rejected</strong>
+                  <span>
+                    {approvedByLabel ? `By ${approvedByLabel}` : 'Sent back to the owner'}
+                    {approvedAtLabel ? ` · ${approvedAtLabel}` : ''}
+                    {tenant.rejectionReason ? ` — ${tenant.rejectionReason}` : ''}
+                  </span>
+                </div>
+              </div>
+            ) : null}
 
             <nav className="tenant-review-tabs">
               {TABS.map((item) => (
@@ -272,8 +384,34 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
             <div className="tenant-review-body">
               {tab === 'profile' && (
                 <div className="tenant-review-grid">
+                  {(tenant.status === 'live' || tenant.status === 'rejected') && (
+                    <>
+                      <div className="tenant-review-field">
+                        <span>{tenant.status === 'live' ? 'Approved by' : 'Reviewed by'}</span>
+                        <strong>{approvedByLabel || '—'}</strong>
+                      </div>
+                      <div className="tenant-review-field">
+                        <span>{tenant.status === 'live' ? 'Approved at' : 'Reviewed at'}</span>
+                        <strong>{approvedAtLabel || '—'}</strong>
+                      </div>
+                    </>
+                  )}
                   <Field label="Business name" name="name" value={form.name} editing={editing} onChange={onChange} />
                   <Field label="Cuisine / specialty" name="cuisine" value={form.cuisine} editing={editing} onChange={onChange} />
+                  <label className="tenant-review-field">
+                    <span>Plan</span>
+                    {editing ? (
+                      <select name="plan" value={form.plan || 'starter'} onChange={onChange}>
+                        <option value="starter">Starter</option>
+                        <option value="growth">Growth</option>
+                        <option value="enterprise">Enterprise</option>
+                        <option value="Starter">Starter (legacy)</option>
+                        <option value="Pro">Pro (legacy)</option>
+                      </select>
+                    ) : (
+                      <strong>{form.plan || '—'}</strong>
+                    )}
+                  </label>
                   <Field label="City" name="city" value={form.city} editing={editing} onChange={onChange} />
                   <Field label="Country" name="country" value={form.country} editing={editing} onChange={onChange} />
                   <Field label="Phone" name="phone" value={form.phone} editing={editing} onChange={onChange} />
@@ -418,7 +556,7 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
             </div>
 
             {tenant.status === 'pending_approval' && (
-              <section className="tenant-review-checks">
+              <section className="tenant-review-checks" ref={checksRef}>
                 <p>Verify before publishing</p>
                 <div className="tenant-review-check-grid">
                   {CHECKS.map((item) => (
@@ -434,6 +572,11 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
                     </label>
                   ))}
                 </div>
+                <p className="tenant-review-check-hint">
+                  {canApprove
+                    ? 'All checks done — use Approve & publish below.'
+                    : 'Tick every checkbox above to enable Approve & publish.'}
+                </p>
               </section>
             )}
 
@@ -507,6 +650,11 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
                     className="is-primary"
                     disabled={!canApprove || busy === 'approve'}
                     onClick={handleApprove}
+                    title={
+                      canApprove
+                        ? 'Publish this restaurant for customers'
+                        : 'Complete the checklist above first'
+                    }
                   >
                     {busy === 'approve' ? 'Publishing…' : 'Approve & publish'}
                   </button>
@@ -515,6 +663,22 @@ export function TenantReviewDrawer({ tenantId, onClose, onChanged }) {
             </footer>
           </>
         )}
+        </>
+  )
+
+  if (isPage) {
+    return (
+      <section className="tenant-review-page" aria-labelledby="tenant-review-title">
+        {panel}
+      </section>
+    )
+  }
+
+  return createPortal(
+    <div className="tenant-review-overlay">
+      <button className="tenant-review-backdrop" type="button" aria-label="Close" onClick={onClose} />
+      <aside className="tenant-review-drawer" role="dialog" aria-labelledby="tenant-review-title">
+        {panel}
       </aside>
     </div>,
     document.body,

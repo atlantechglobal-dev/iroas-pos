@@ -47,6 +47,20 @@ export const ROUTES = {
   SETTINGS_AUDIT: '/settings/audit',
   SETTINGS_PRIVACY: '/settings/privacy',
   PLATFORM_ADMIN: '/platform-admin',
+  PLATFORM_PLANS: '/platform-admin/plans',
+  PLATFORM_CUSTOMERS: '/platform-admin/customers',
+  PLATFORM_CUSTOMER_ONBOARDING: '/platform-admin/customer-onboarding',
+  PLATFORM_APPROVE: '/platform-admin/approve',
+  PLATFORM_APPROVE_PROFILE: '/platform-admin/approve/:tenantId',
+  PLATFORM_IDENTITIES: '/platform-admin/identities',
+  PLATFORM_PRODUCTS: '/platform-admin/products',
+  PLATFORM_NOTIFICATIONS: '/platform-admin/notifications',
+  PLATFORM_AUDIT: '/platform-admin/audit',
+  PLATFORM_STAFF: '/platform-admin/staff',
+  PLATFORM_SETTINGS: '/platform-admin/settings',
+  PLATFORM_SETTINGS_EMAIL: '/platform-admin/settings/email',
+  PLATFORM_SETTINGS_PAYMENT: '/platform-admin/settings/payment',
+  PLATFORM_SETTINGS_FLAGS: '/platform-admin/settings/flags',
   GUEST_ONE_LINK: '/l/:slug',
   GUEST_BUSINESS_CARD: '/c/:slug',
   GUEST_SITE: '/s/:slug',
@@ -55,4 +69,8 @@ export const ROUTES = {
   GUEST_SITE_TABLE: '/s/:slug/t/:tableCode',
   NOT_FOUND: '/404',
   UNAUTHORIZED: '/403',
+}
+
+export function platformApproveProfilePath(tenantId) {
+  return `/platform-admin/approve/${tenantId}`
 }

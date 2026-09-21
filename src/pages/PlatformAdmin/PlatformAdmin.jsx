@@ -1,399 +1,589 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
-import { useDebounce } from '../../hooks/useDebounce.js'
+import { HorizontalDragScroll } from '../../components/HorizontalDragScroll.jsx'
+import { useAuth } from '../../hooks/useAuth.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { TenantReviewDrawer } from '../../components/admin/TenantReviewDrawer.jsx'
 import { ROUTES } from '../../constants/routes.js'
+import '../Dashboard/Dashboard.css'
 import './PlatformAdmin.css'
+import './PlatformAdminExtra.css'
 
-const INITIAL_FLAGS = [
-  {
-    key: 'kds_v2',
-    description: 'New kitchen display layout · 38% of tenants',
-    enabled: true,
-  },
-  {
-    key: 'ai_menu_copy',
-    description: 'AI-written dish descriptions · Beta cohort',
-    enabled: true,
-  },
-  {
-    key: 'table_merge',
-    description: 'Merge & split tables on the floor · All tenants',
-    enabled: true,
-  },
-  {
-    key: 'loyalty_wallet',
-    description: 'Stored-value customer wallet · Internal only',
-    enabled: false,
-  },
-  {
-    key: 'whatsapp_alerts',
-    description: 'Order updates over WhatsApp · 12% of tenants',
-    enabled: false,
-  },
-]
-
-const SYSTEM_HEALTH = [
-  { label: 'API', status: 'p95 128 ms · 0 errors', dot: 'green' },
-  { label: 'Order pipeline', status: 'queue depth 4', dot: 'green' },
-  {
-    label: 'Payments webhook',
-    status: '1 retry in last hour',
-    dot: 'green',
-  },
-  { label: 'POS bridge', status: '1 tenant degraded', dot: 'yellow' },
-]
-
-const AUDIT_LOG = [
-  {
-    text: 'Suspended tenant Kaapi Club',
-    meta: 'you@iroas.io · 12 min ago',
-  },
-  {
-    text: 'Enabled flag ai_menu_copy for Bao Republic',
-    meta: 'ops@iroas.io · 2 hr ago',
-  },
-  {
-    text: 'Upgraded Nomad Pizzeria to Growth',
-    meta: 'you@iroas.io · yesterday',
-  },
-  {
-    text: 'Issued credit note ₹1,999 to Coast & Co.',
-    meta: 'billing@iroas.io · 2 days ago',
-  },
-]
-
-const STATUS_CLASS = {
-  live: 'active-status',
-  onboarding: 'trial-status',
-  pending_approval: 'past-status',
-  rejected: 'suspended-status',
+const EMPTY_STATS = {
+  activeTenants: 0,
+  onboardingTenants: 0,
+  pendingApprovals: 0,
+  rejectedTenants: 0,
+  totalTenants: 0,
+  identityPending: 0,
 }
 
-const STATUS_LABEL = {
-  live: 'Active',
-  onboarding: 'Onboarding',
-  pending_approval: 'Awaiting approval',
-  rejected: 'Rejected',
+const STATUS_PILL = {
+  live: { label: 'Live', className: 'status-ready' },
+  pending_approval: { label: 'Awaiting', className: 'status-preparing' },
+  onboarding: { label: 'Onboarding', className: 'status-new' },
+  rejected: { label: 'Rejected', className: 'status-completed' },
 }
 
-const TENANT_FILTERS = [
-  { id: '', label: 'All' },
-  { id: 'pending_approval', label: 'Awaiting' },
-  { id: 'onboarding', label: 'Onboarding' },
-  { id: 'live', label: 'Live' },
-  { id: 'rejected', label: 'Rejected' },
-]
+function formatRelative(iso) {
+  if (!iso) return ''
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ''
+  const diff = Date.now() - then
+  if (diff < 60_000) return 'just now'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} hr ago`
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
 
 function PlatformAdmin() {
   const toast = useToast()
+  const navigate = useNavigate()
+  const { user } = useAuth()
 
-  const [tenantSearch, setTenantSearch] = useState('')
-  const debouncedSearch = useDebounce(tenantSearch, 250)
-  const [flags, setFlags] = useState(INITIAL_FLAGS)
-  const [tenants, setTenants] = useState([])
   const [stats, setStats] = useState(null)
+  const [health, setHealth] = useState(null)
+  const [tenants, setTenants] = useState([])
+  const [pending, setPending] = useState([])
+  const [feed, setFeed] = useState([])
+  const [loading, setLoading] = useState(true)
   const [reviewTenantId, setReviewTenantId] = useState(null)
-  const [tenantFilter, setTenantFilter] = useState('')
 
-  const loadTenants = (search = debouncedSearch, status = tenantFilter) => {
-    api
-      .adminTenants(search, status)
-      .then(({ tenants }) => setTenants(tenants))
-      .catch(() => setTenants([]))
+  const load = () => {
+    setLoading(true)
+    Promise.all([
+      api.adminStats(),
+      api.adminHealth().catch(() => null),
+      api.adminTenants('', ''),
+      api.adminTenants('', 'pending_approval'),
+      api.adminFeed(8).catch(() => ({ items: [] })),
+    ])
+      .then(([statsData, healthData, allTenants, pendingTenants, feedData]) => {
+        setStats(statsData)
+        setHealth(healthData)
+        setTenants(allTenants?.tenants || [])
+        setPending(pendingTenants?.tenants || [])
+        setFeed(feedData?.items || [])
+      })
+      .catch(() => {
+        setStats(EMPTY_STATS)
+        setTenants([])
+        setPending([])
+        toast.error('Unable to load dashboard.')
+      })
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    loadTenants()
-    api
-      .adminStats()
-      .then(setStats)
-      .catch(() => setStats(null))
+    load()
   }, [])
 
-  useEffect(() => {
-    loadTenants(debouncedSearch, tenantFilter)
-  }, [debouncedSearch, tenantFilter])
+  const displayStats = stats || EMPTY_STATS
+  const firstName = (user?.name || 'Admin').split(' ')[0]
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const todayLabel = new Date()
+    .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    .toUpperCase()
 
-  const toggleFlag = (key) => {
-    setFlags((prev) =>
-      prev.map((flag) =>
-        flag.key === key ? { ...flag, enabled: !flag.enabled } : flag,
-      ),
-    )
-  }
+  const planMix = useMemo(() => {
+    const counts = { starter: 0, growth: 0, enterprise: 0, other: 0 }
+    for (const t of tenants) {
+      const key = String(t.plan || 'starter').toLowerCase()
+      if (key.includes('enter')) counts.enterprise += 1
+      else if (key.includes('growth') || key === 'pro') counts.growth += 1
+      else if (key.includes('start')) counts.starter += 1
+      else counts.other += 1
+    }
+    const total = Math.max(tenants.length, 1)
+    return [
+      { name: 'Starter', count: counts.starter, pct: Math.round((counts.starter / total) * 100) },
+      { name: 'Growth', count: counts.growth, pct: Math.round((counts.growth / total) * 100) },
+      { name: 'Enterprise', count: counts.enterprise, pct: Math.round((counts.enterprise / total) * 100) },
+    ]
+  }, [tenants])
 
-  const handleImpersonate = (name) => {
-    toast.info(`Impersonating ${name}`)
-  }
+  const topLive = useMemo(() => {
+    return tenants
+      .filter((t) => t.status === 'live')
+      .slice(0, 4)
+      .map((t, i) => ({
+        rank: String(i + 1).padStart(2, '0'),
+        name: t.name || 'Untitled',
+        tag: t.plan || 'Starter',
+        meta: [t.city, t.owner_email].filter(Boolean).join(' · ') || 'Live tenant',
+        id: t.id,
+      }))
+  }, [tenants])
 
-  const refreshTenants = () => {
-    loadTenants(debouncedSearch, tenantFilter)
-    api.adminStats().then(setStats).catch(() => {})
-  }
+  const attention = useMemo(() => {
+    const items = []
+    if ((displayStats.pendingApprovals || 0) > 0) {
+      items.push({
+        name: 'Tenant approvals',
+        meta: `${displayStats.pendingApprovals} restaurants waiting to go live`,
+        level: 'Critical',
+        levelClass: 'level-critical',
+        to: ROUTES.PLATFORM_APPROVE,
+      })
+    }
+    if ((displayStats.identityPending || 0) > 0) {
+      items.push({
+        name: 'Identity review',
+        meta: `${displayStats.identityPending} Digital IDs need moderation`,
+        level: 'Low',
+        levelClass: 'level-low',
+        to: ROUTES.PLATFORM_IDENTITIES,
+      })
+    }
+    const pay = (health?.checks || []).find((c) => c.key === 'payment')
+    if (pay && !pay.ok) {
+      items.push({
+        name: 'Payment settings',
+        meta: 'Launch payments not configured',
+        level: 'Watch',
+        levelClass: 'level-watch',
+        to: ROUTES.PLATFORM_SETTINGS_PAYMENT,
+      })
+    }
+    const email = (health?.checks || []).find((c) => c.key === 'email')
+    if (email && !email.ok) {
+      items.push({
+        name: 'Email settings',
+        meta: 'Transactional email not configured',
+        level: 'Watch',
+        levelClass: 'level-watch',
+        to: ROUTES.PLATFORM_SETTINGS_EMAIL,
+      })
+    }
+    if (!items.length) {
+      items.push({
+        name: 'All clear',
+        meta: 'No critical platform alerts right now',
+        level: 'Watch',
+        levelClass: 'level-watch',
+        to: ROUTES.PLATFORM_NOTIFICATIONS,
+      })
+    }
+    return items.slice(0, 4)
+  }, [displayStats, health])
 
-  const STATS = stats
-    ? [
-        { title: '▣   Active tenants', number: stats.activeTenants, small: 'currently live' },
-        { title: '⌁   Onboarding', number: stats.onboardingTenants, small: 'in setup' },
-        {
-          title: '◐   Pending approval',
-          number: stats.pendingApprovals ?? 0,
-          small: 'awaiting review',
-        },
-        {
-          title: '⊘   Rejected',
-          number: stats.rejectedTenants ?? 0,
-          small: 'sent back',
-        },
-      ]
-    : []
+  const statusGrid = useMemo(() => {
+    const cells = []
+    const sample = tenants.slice(0, 18)
+    for (let i = 0; i < 18; i += 1) {
+      const t = sample[i]
+      let kind = 'free'
+      if (t?.status === 'live') kind = 'occupied'
+      else if (t?.status === 'pending_approval') kind = 'reserved'
+      else if (t?.status === 'onboarding') kind = 'cleaning'
+      else if (t?.status === 'rejected') kind = 'free'
+      cells.push({ n: i + 1, kind, id: t?.id })
+    }
+    return cells
+  }, [tenants])
+
+  const statusCounts = useMemo(
+    () => ({
+      live: tenants.filter((t) => t.status === 'live').length,
+      pending: tenants.filter((t) => t.status === 'pending_approval').length,
+      onboarding: tenants.filter((t) => t.status === 'onboarding').length,
+      other: tenants.filter((t) => !['live', 'pending_approval', 'onboarding'].includes(t.status))
+        .length,
+    }),
+    [tenants],
+  )
 
   return (
     <DashboardLayout
-      pageClassName="platform-admin-page"
+      pageClassName="dashboard-page platform-admin-page"
       activeNav="platform-admin"
       variant="admin"
-      adminSubtitle={stats ? `${stats.totalTenants} tenants` : 'All tenants'}
+      adminSubtitle={loading ? 'Loading…' : `${displayStats.totalTenants || 0} tenants`}
+      searchPlaceholder="Search tenants, owners, plans…"
     >
-          {/* PAGE HEADER */}
-          <div className="page-header">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">PLATFORM · {todayLabel}</p>
+          <h1>
+            {greeting}, {firstName}
+          </h1>
+          <p className="page-desc">
+            Here&apos;s how the IROAS platform is doing right now — tenants, approvals, and
+            system health.
+          </p>
+        </div>
+
+        <div className="head-actions">
+          <Link className="btn btn-outline" to={ROUTES.PLATFORM_SETTINGS}>
+            Settings
+          </Link>
+          <Link className="btn btn-dark" to={ROUTES.PLATFORM_APPROVE}>
+            ✦ Approve
+            {(displayStats.pendingApprovals || 0) > 0
+              ? ` (${displayStats.pendingApprovals})`
+              : ''}
+          </Link>
+        </div>
+      </div>
+
+      <HorizontalDragScroll className="stat-cards">
+        <div className="stat-card">
+          <div className="stat-top">
+            <span className="stat-ico">▣</span>
+            <span className="trend up">Live</span>
+          </div>
+          <div className="stat-number">{loading ? '—' : displayStats.activeTenants}</div>
+          <p className="stat-sub">Live tenants</p>
+          <p className="stat-foot">Published & taking customers</p>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-top">
+            <span className="stat-ico">⌁</span>
+            <span className="trend up">Setup</span>
+          </div>
+          <div className="stat-number">{loading ? '—' : displayStats.onboardingTenants}</div>
+          <p className="stat-sub">In onboarding</p>
+          <p className="stat-foot">Still completing the wizard</p>
+        </div>
+
+        <button
+          type="button"
+          className="stat-card"
+          style={{ cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
+          onClick={() => navigate(ROUTES.PLATFORM_APPROVE)}
+        >
+          <div className="stat-top">
+            <span className="stat-ico">◐</span>
+            <span className="trend up">Review</span>
+          </div>
+          <div className="stat-number">{loading ? '—' : displayStats.pendingApprovals ?? 0}</div>
+          <p className="stat-sub">Awaiting approval</p>
+          <p className="stat-foot">Click to open Approve</p>
+        </button>
+
+        <button
+          type="button"
+          className="stat-card"
+          style={{ cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
+          onClick={() => navigate(ROUTES.PLATFORM_IDENTITIES)}
+        >
+          <div className="stat-top">
+            <span className="stat-ico">✦</span>
+            <span className="trend up">IDs</span>
+          </div>
+          <div className="stat-number">{loading ? '—' : displayStats.identityPending ?? 0}</div>
+          <p className="stat-sub">Identity queue</p>
+          <p className="stat-foot">Digital IDs to moderate</p>
+        </button>
+
+        <div className="stat-card">
+          <div className="stat-top">
+            <span className="stat-ico">⊘</span>
+            <span className="trend down">{displayStats.rejectedTenants ? 'Sent back' : 'Clear'}</span>
+          </div>
+          <div className="stat-number">{loading ? '—' : displayStats.rejectedTenants ?? 0}</div>
+          <p className="stat-sub">Rejected</p>
+          <p className="stat-foot">Need owner changes</p>
+        </div>
+      </HorizontalDragScroll>
+
+      <div className="two-col-row">
+        <section className="card">
+          <div className="card-head">
             <div>
-              <div className="page-label">PLATFORM</div>
-
-              <h1>Platform Admin</h1>
-
-              <p>
-                Operator-only view across every restaurant on IROAS: tenants,
-                plans, feature rollout and system health.
-              </p>
+              <h2>Pending approvals</h2>
+              <span>Restaurants waiting for you to publish</span>
             </div>
-
-            <div className="platform-admin-actions">
-              <Link className="email-settings-link" to={ROUTES.SETTINGS_EMAIL}>
-                Email settings
-              </Link>
-              <Link className="email-settings-link" to={ROUTES.SETTINGS_PAYMENT}>
-                Payment settings
-              </Link>
-              <button
-                className="new-tenant"
-                onClick={() => toast.info('New tenant flow is not available yet.')}
-              >
-                <img src="/images/new.svg" alt="New tenant" />
-                <span>New tenant</span>
-              </button>
-            </div>
+            <button
+              className="link-btn"
+              type="button"
+              onClick={() => navigate(ROUTES.PLATFORM_APPROVE)}
+            >
+              View all
+            </button>
           </div>
 
-          {/* STAT CARDS */}
-          <div className="stats-grid">
-            {STATS.map((stat) => (
-              <div className="stat-card" key={stat.title}>
-                <div className="stat-title">{stat.title}</div>
-                <div className="stat-number">{stat.number}</div>
-                <div className="stat-small">{stat.small}</div>
+          <ul className="order-list">
+            {pending.slice(0, 5).map((tenant) => {
+              const pill = STATUS_PILL[tenant.status] || STATUS_PILL.onboarding
+              return (
+                <li
+                  key={tenant.id}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setReviewTenantId(tenant.id)}
+                >
+                  <span className="order-id">
+                    {(tenant.name || 'T').charAt(0).toUpperCase()}
+                  </span>
+                  <div className="order-main">
+                    <div className="order-top">
+                      <span className={`status-pill ${pill.className}`}>{pill.label}</span>
+                    </div>
+                    <p>
+                      {tenant.name || 'Untitled'} · {tenant.owner_name || tenant.owner_email || '—'}
+                    </p>
+                  </div>
+                  <div className="order-side">
+                    <strong>{tenant.plan || 'Starter'}</strong>
+                    <small>{formatRelative(tenant.submitted_at)}</small>
+                  </div>
+                </li>
+              )
+            })}
+            {!loading && pending.length === 0 ? (
+              <li>
+                <div className="order-main">
+                  <div className="order-top">
+                    <span className="status-pill status-ready">Clear</span>
+                  </div>
+                  <p>No applications awaiting approval.</p>
+                </div>
+              </li>
+            ) : null}
+          </ul>
+        </section>
+
+        <section className="card">
+          <div className="card-head">
+            <div>
+              <h2>Platform activity</h2>
+              <span>
+                {feed.length ? `${feed.length} recent events` : 'No recent events yet'}
+              </span>
+            </div>
+            <button
+              className="link-btn"
+              type="button"
+              onClick={() => navigate(ROUTES.PLATFORM_NOTIFICATIONS)}
+            >
+              All
+            </button>
+          </div>
+
+          <ul className="reservation-list">
+            {feed.length === 0 && !loading ? (
+              <li>
+                <div className="reservation-main">
+                  <strong>No activity yet</strong>
+                  <p>Approvals, identity updates, and operator actions show here.</p>
+                </div>
+              </li>
+            ) : null}
+            {feed.slice(0, 5).map((item) => (
+              <li key={item.id}>
+                <span className="party-count">
+                  {item.type === 'approval' ? 'A' : item.type === 'identity' ? 'I' : '·'}
+                </span>
+                <div className="reservation-main">
+                  <strong>{item.title}</strong>
+                  <p>{item.body || 'Platform event'}</p>
+                </div>
+                <div className="reservation-side">
+                  <strong>{formatRelative(item.createdAt)}</strong>
+                  <small>{String(item.type || 'event').toUpperCase()}</small>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <div className="two-col-row">
+        <section className="card">
+          <div className="card-head">
+            <div>
+              <h2>Live tenants</h2>
+              <span>Recently published businesses</span>
+            </div>
+            <button
+              className="link-btn"
+              type="button"
+              onClick={() => navigate(ROUTES.PLATFORM_CUSTOMERS)}
+            >
+              Directory
+            </button>
+          </div>
+
+          <ul className="menu-list">
+            {topLive.map((item) => (
+              <li
+                key={item.id}
+                style={{ cursor: 'pointer' }}
+                onClick={() => setReviewTenantId(item.id)}
+              >
+                <span className="rank-badge">{item.rank}</span>
+                <div className="menu-main">
+                  <div className="menu-top">
+                    <strong>{item.name}</strong>
+                    <span className="tag-pill">{item.tag}</span>
+                  </div>
+                  <p>{item.meta}</p>
+                </div>
+                <span className="menu-trend up">Live</span>
+              </li>
+            ))}
+            {!loading && topLive.length === 0 ? (
+              <li>
+                <div className="menu-main">
+                  <div className="menu-top">
+                    <strong>No live tenants yet</strong>
+                  </div>
+                  <p>Approved restaurants will appear here.</p>
+                </div>
+              </li>
+            ) : null}
+          </ul>
+        </section>
+
+        <section className="card">
+          <div className="card-head">
+            <div>
+              <h2>System health</h2>
+              <span>Platform services</span>
+            </div>
+            <button
+              className="link-btn"
+              type="button"
+              onClick={() => navigate(ROUTES.PLATFORM_SETTINGS)}
+            >
+              Settings
+            </button>
+          </div>
+
+          <ul className="staff-list">
+            {(health?.checks || []).map((check) => (
+              <li key={check.key}>
+                <span className="staff-avatar">{check.label.charAt(0)}</span>
+                <div className="staff-main">
+                  <strong>{check.label}</strong>
+                  <p>{check.status}</p>
+                </div>
+                <div className="staff-status">
+                  <span className={`status-dot ${check.ok ? 'green' : 'yellow'}`} />
+                  {check.ok ? 'Healthy' : 'Needs setup'}
+                </div>
+              </li>
+            ))}
+            {!loading && !(health?.checks || []).length ? (
+              <li>
+                <div className="staff-main">
+                  <strong>Health unavailable</strong>
+                  <p>Could not load platform checks.</p>
+                </div>
+              </li>
+            ) : null}
+          </ul>
+
+          <div className="staff-footer">
+            <span>
+              Total tenants: <strong>{displayStats.totalTenants || 0}</strong>
+            </span>
+            <span>
+              Rejected: <strong>{displayStats.rejectedTenants || 0}</strong>
+            </span>
+          </div>
+        </section>
+      </div>
+
+      <div className="three-col-row">
+        <section className="card">
+          <div className="card-head">
+            <div>
+              <h2>Plan mix</h2>
+              <span>Share across tenants</span>
+            </div>
+          </div>
+          <div className="channel-mix">
+            {planMix.map((row) => (
+              <div key={row.name}>
+                <div className="channel-labels">
+                  <span>{row.name}</span>
+                  <span>
+                    {row.count} · {row.pct}%
+                  </span>
+                </div>
+                <div className="channel-track">
+                  <div className="channel-fill" style={{ width: `${row.pct}%` }} />
+                </div>
               </div>
             ))}
           </div>
+        </section>
 
-          {/* TENANTS */}
-          <section className="tenants-card">
-            <div className="card-header">
-              <div>
-                <h2>Tenants</h2>
-                <span>{tenants.length} shown · review before publish</span>
-              </div>
-
-              <div className="tenant-toolbar">
-                <div className="tenant-filters">
-                  {TENANT_FILTERS.map((filter) => (
-                    <button
-                      key={filter.id || 'all'}
-                      type="button"
-                      className={`tenant-filter ${tenantFilter === filter.id ? 'is-active' : ''}`}
-                      onClick={() => setTenantFilter(filter.id)}
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search tenants..."
-                  value={tenantSearch}
-                  onChange={(event) => setTenantSearch(event.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>BUSINESS</th>
-                    <th>OWNER</th>
-                    <th>PLAN</th>
-                    <th>SUBMITTED</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {tenants.map((tenant) => (
-                    <tr
-                      key={tenant.id}
-                      className="tenant-row"
-                      onClick={() => setReviewTenantId(tenant.id)}
-                    >
-                      <td>
-                        <div className="tenant-business">
-                          <span className="tenant-avatar" aria-hidden="true">
-                            {(tenant.name || 'B').charAt(0).toUpperCase()}
-                          </span>
-                          <span>
-                            <strong>{tenant.name || 'Untitled business'}</strong>
-                            <small>{tenant.city || 'No city set'}</small>
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <strong>{tenant.owner_name}</strong>
-                        <small>{tenant.owner_email}</small>
-                      </td>
-                      <td>{tenant.plan}</td>
-                      <td>
-                        {tenant.submitted_at
-                          ? new Date(tenant.submitted_at).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : '—'}
-                      </td>
-                      <td>
-                        <span className={`status ${STATUS_CLASS[tenant.status] || 'trial-status'}`}>
-                          {STATUS_LABEL[tenant.status] || tenant.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="tenant-actions" onClick={(event) => event.stopPropagation()}>
-                          <button
-                            className="impersonate"
-                            type="button"
-                            onClick={() => setReviewTenantId(tenant.id)}
-                          >
-                            {tenant.status === 'pending_approval' ? 'Review' : 'View'}
-                          </button>
-                          {tenant.status !== 'pending_approval' && (
-                            <button
-                              className="impersonate"
-                              type="button"
-                              onClick={() =>
-                                handleImpersonate(tenant.name || tenant.owner_name)
-                              }
-                            >
-                              Impersonate
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {tenants.length === 0 && (
-                    <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '24px' }}>
-                        No tenants match this search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* BOTTOM */}
-          <div className="bottom-grid">
-            {/* FEATURE FLAGS */}
-            <section className="feature-card">
-              <div className="feature-header">
-                <h2>Feature flags</h2>
-                <span>Gradual rollout across tenants</span>
-              </div>
-
-              {flags.map((flag) => (
-                <div className="feature-row" key={flag.key}>
-                  <div className="flag-icon">⚑</div>
-
-                  <div className="feature-info">
-                    <strong>{flag.key}</strong>
-                    <small>{flag.description}</small>
-                  </div>
-
-                  <label className="switch">
-                    <input
-                      type="checkbox"
-                      checked={flag.enabled}
-                      onChange={() => toggleFlag(flag.key)}
-                    />
-                    <span></span>
-                  </label>
-                </div>
-              ))}
-            </section>
-
-            {/* RIGHT COLUMN */}
-            <div className="right-column">
-              {/* SYSTEM HEALTH */}
-              <div className="side-card system-health">
-                <h2>System health</h2>
-
-                {SYSTEM_HEALTH.map((item) => (
-                  <div className="health-item" key={item.label}>
-                    <div className="health-left">
-                      <img
-                        src="/images/db.svg"
-                        className="health-icon"
-                        alt=""
-                      />
-                      <div>
-                        <strong>{item.label}</strong>
-                        <p>{item.status}</p>
-                      </div>
-                    </div>
-                    <span className={`status-dot ${item.dot}`}></span>
-                  </div>
-                ))}
-              </div>
-
-              {/* AUDIT TRAIL */}
-              <section className="small-card audit-card">
-                <h2>Audit trail</h2>
-                <p>Operator actions</p>
-
-                {AUDIT_LOG.map((entry) => (
-                  <div className="audit-item" key={entry.text}>
-                    <img src="/images/audit.svg" alt="icon" />
-                    <div>
-                      <strong>{entry.text}</strong>
-                      <small>{entry.meta}</small>
-                    </div>
-                  </div>
-                ))}
-              </section>
+        <section className="card">
+          <div className="card-head">
+            <div>
+              <h2>Needs attention</h2>
+              <span>Auto-flagged from platform status</span>
             </div>
           </div>
-          {reviewTenantId ? (
-            <TenantReviewDrawer
-              tenantId={reviewTenantId}
-              onClose={() => setReviewTenantId(null)}
-              onChanged={refreshTenants}
-            />
-          ) : null}
+          <ul className="stock-list">
+            {attention.map((item) => (
+              <li
+                key={item.name}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(item.to)}
+              >
+                <div>
+                  <strong>{item.name}</strong>
+                  <p>{item.meta}</p>
+                </div>
+                <span className={`level-pill ${item.levelClass}`}>{item.level}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="card">
+          <div className="card-head">
+            <div>
+              <h2>Tenant snapshot</h2>
+              <span>
+                {tenants.length} shown · {statusCounts.live} live
+              </span>
+            </div>
+          </div>
+          <div className="floor-grid">
+            {statusGrid.map((cell) => (
+              <button
+                key={cell.n}
+                type="button"
+                className={`floor-cell floor-${cell.kind}`}
+                title={cell.id ? `Tenant #${cell.id}` : 'Empty'}
+                onClick={() => cell.id && setReviewTenantId(cell.id)}
+              >
+                {cell.n}
+              </button>
+            ))}
+          </div>
+          <div className="floor-legend">
+            <span>
+              <i className="dot floor-occupied" /> Live {statusCounts.live}
+            </span>
+            <span>
+              <i className="dot floor-reserved" /> Awaiting {statusCounts.pending}
+            </span>
+            <span>
+              <i className="dot floor-cleaning" /> Setup {statusCounts.onboarding}
+            </span>
+            <span>
+              <i className="dot floor-free" /> Other {statusCounts.other}
+            </span>
+          </div>
+        </section>
+      </div>
+
+      {reviewTenantId ? (
+        <TenantReviewDrawer
+          tenantId={reviewTenantId}
+          onClose={() => setReviewTenantId(null)}
+          onChanged={load}
+        />
+      ) : null}
     </DashboardLayout>
   )
 }

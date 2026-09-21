@@ -407,6 +407,88 @@
   background: #f4f8ec;
 }
 
+.tenant-review-approve-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 0 20px 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #eaf5db;
+  border: 1px solid #cfe6a4;
+}
+
+.tenant-review-approve-banner strong {
+  display: block;
+  font-size: 14px;
+  color: #2f5310;
+}
+
+.tenant-review-approve-banner span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: #4c8a1a;
+}
+
+.tenant-review-approve-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tenant-review-approve-banner-actions button {
+  border: 1px solid #ece8df;
+  background: #fff;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tenant-review-approve-banner-actions .is-primary {
+  background: #8bc53f;
+  border-color: #8bc53f;
+  color: #16210a;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(139, 197, 63, 0.28);
+}
+
+.tenant-review-approve-banner-actions .is-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.tenant-review-approve-banner.is-approved {
+  background: #eaf5db;
+  border-color: #cfe6a4;
+}
+
+.tenant-review-approve-banner.is-rejected {
+  background: #fff1ef;
+  border-color: #f3c7c2;
+}
+
+.tenant-review-approve-banner.is-rejected strong {
+  color: #9b2c22;
+}
+
+.tenant-review-approve-banner.is-rejected span {
+  color: #c0453a;
+}
+
+.tenant-review-check-hint {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: #8b8b8f;
+  line-height: 1.4;
+}
+
 .tenant-review-dialog {
   padding: 14px 24px 12px;
   border-top: 1px solid #f3c7c2;
@@ -509,6 +591,9 @@
   background: #8bc53f;
   border-color: #8bc53f;
   color: #16210a;
+  font-weight: 800;
+  min-width: 160px;
+  box-shadow: 0 6px 16px rgba(139, 197, 63, 0.28);
 }
 
 .tenant-review-footer .is-primary:disabled {
@@ -536,6 +621,27 @@
     transform: translateX(0);
     opacity: 1;
   }
+}
+
+.tenant-review-page {
+  background: #fff;
+  border: 1px solid #ece8df;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: min(78vh, 920px);
+  box-shadow: 0 2px 12px rgba(30, 25, 15, 0.04);
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Inter",
+    "Segoe UI", sans-serif;
+}
+
+.tenant-review-page .tenant-review-head {
+  background: linear-gradient(180deg, #fffdf5 0%, #fff 100%);
+}
+
+.tenant-review-page .tenant-review-body {
+  flex: 1;
 }
 
 @media (max-width: 720px) {

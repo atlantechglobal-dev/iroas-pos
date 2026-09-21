@@ -520,6 +520,112 @@ db.exec(`
     value_json TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS platform_plans (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    tagline TEXT,
+    price_zar REAL NOT NULL DEFAULT 0,
+    billing TEXT NOT NULL DEFAULT 'one-time launch',
+    popular INTEGER NOT NULL DEFAULT 0,
+    features_json TEXT NOT NULL DEFAULT '[]',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS feature_flags (
+    key TEXT PRIMARY KEY,
+    description TEXT NOT NULL DEFAULT '',
+    enabled INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS platform_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    actor_email TEXT,
+    action TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id TEXT,
+    detail TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_platform_audit_created ON platform_audit(created_at DESC);
 `)
+
+// Seed default platform plans
+{
+  const count = db.prepare('SELECT COUNT(*) AS n FROM platform_plans').get().n
+  if (count === 0) {
+    const insert = db.prepare(
+      `INSERT INTO platform_plans (id, name, tagline, price_zar, billing, popular, features_json, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    insert.run(
+      'starter',
+      'Starter',
+      'Launch your digital storefront',
+      999,
+      'one-time launch',
+      0,
+      JSON.stringify([
+        'Guest website & menu',
+        'Business ID QR card',
+        'Reservations (basic)',
+        'Email notifications',
+        'Single location',
+      ]),
+      1,
+    )
+    insert.run(
+      'growth',
+      'Growth',
+      'Scale orders and marketing',
+      2499,
+      'one-time launch',
+      1,
+      JSON.stringify([
+        'Everything in Starter',
+        'Incoming orders & KDS',
+        'Table QR ordering',
+        'Reviews & One Link hub',
+        'Priority onboarding review',
+      ]),
+      2,
+    )
+    insert.run(
+      'enterprise',
+      'Enterprise',
+      'Multi-site and custom rollout',
+      4999,
+      'one-time launch',
+      0,
+      JSON.stringify([
+        'Everything in Growth',
+        'Multi-location ready',
+        'POS integration support',
+        'Dedicated success contact',
+        'Custom domain assist',
+      ]),
+      3,
+    )
+  }
+}
+
+// Seed default feature flags
+{
+  const count = db.prepare('SELECT COUNT(*) AS n FROM feature_flags').get().n
+  if (count === 0) {
+    const insert = db.prepare(
+      `INSERT INTO feature_flags (key, description, enabled) VALUES (?, ?, ?)`,
+    )
+    insert.run('kds_v2', 'New kitchen display layout', 1)
+    insert.run('ai_menu_copy', 'AI-written dish descriptions · Beta cohort', 1)
+    insert.run('table_merge', 'Merge & split tables on the floor · All tenants', 1)
+    insert.run('loyalty_wallet', 'Stored-value customer wallet · Internal only', 0)
+    insert.run('whatsapp_alerts', 'Order updates over WhatsApp', 0)
+  }
+}
 
 export default db

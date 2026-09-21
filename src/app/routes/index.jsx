@@ -31,6 +31,22 @@ const GuestOneLink = lazy(() => import('../../pages/GuestOneLink/GuestOneLink.js
 const GuestBusinessCard = lazy(() => import('../../pages/GuestBusinessCard/GuestBusinessCard.jsx'))
 const GuestSite = lazy(() => import('../../pages/GuestSite/GuestSite.jsx'))
 const PlatformAdmin = lazy(() => import('../../pages/PlatformAdmin/PlatformAdmin.jsx'))
+const PlatformPlans = lazy(() => import('../../pages/PlatformAdmin/Plans.jsx'))
+const PlatformCustomers = lazy(() => import('../../pages/PlatformAdmin/PlatformCustomers.jsx'))
+const PlatformCustomerOnboarding = lazy(
+  () => import('../../pages/PlatformAdmin/CustomerOnboarding.jsx'),
+)
+const PlatformApprove = lazy(() => import('../../pages/PlatformAdmin/Approve.jsx'))
+const PlatformApproveProfile = lazy(() => import('../../pages/PlatformAdmin/ApproveProfile.jsx'))
+const PlatformIdentityReview = lazy(() => import('../../pages/PlatformAdmin/IdentityReview.jsx'))
+const PlatformProducts = lazy(() => import('../../pages/PlatformAdmin/ProductsAdmin.jsx'))
+const PlatformNotifications = lazy(
+  () => import('../../pages/PlatformAdmin/PlatformNotifications.jsx'),
+)
+const PlatformAudit = lazy(() => import('../../pages/PlatformAdmin/PlatformAudit.jsx'))
+const PlatformStaff = lazy(() => import('../../pages/PlatformAdmin/PlatformStaff.jsx'))
+const PlatformSettings = lazy(() => import('../../pages/PlatformAdmin/PlatformSettings.jsx'))
+const PlatformFeatureFlags = lazy(() => import('../../pages/PlatformAdmin/FeatureFlags.jsx'))
 const Menu = lazy(() => import('../../pages/Menu/Menu.jsx'))
 const Orders = lazy(() => import('../../pages/Orders/Orders.jsx'))
 const Reservations = lazy(() => import('../../pages/Reservations/Reservations.jsx'))
@@ -161,8 +177,14 @@ export function AppRoutes() {
         <Route path={ROUTES.POS_INTEGRATION} element={withProtection(PosIntegration, LIVE_ONLY)} />
         <Route path={ROUTES.NOTIFICATIONS} element={withProtection(Notifications, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS} element={withProtection(Settings, LIVE_ONLY)} />
-        <Route path={ROUTES.SETTINGS_EMAIL} element={withProtection(EmailSettings, { adminOnly: true })} />
-        <Route path={ROUTES.SETTINGS_PAYMENT} element={withProtection(PaymentSettings, { adminOnly: true })} />
+        <Route
+          path={ROUTES.SETTINGS_EMAIL}
+          element={<Navigate to={ROUTES.PLATFORM_SETTINGS_EMAIL} replace />}
+        />
+        <Route
+          path={ROUTES.SETTINGS_PAYMENT}
+          element={<Navigate to={ROUTES.PLATFORM_SETTINGS_PAYMENT} replace />}
+        />
         <Route path={ROUTES.SETTINGS_USERS} element={withProtection(SettingsUsers, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_BILLING} element={withProtection(SettingsBilling, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_SECURITY} element={withProtection(SettingsSecurity, LIVE_ONLY)} />
@@ -171,6 +193,52 @@ export function AppRoutes() {
         <Route path={ROUTES.SETTINGS_AUDIT} element={withProtection(SettingsAudit, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_PRIVACY} element={withProtection(SettingsPrivacy, LIVE_ONLY)} />
         <Route path={ROUTES.PLATFORM_ADMIN} element={withProtection(PlatformAdmin, { adminOnly: true })} />
+        <Route path={ROUTES.PLATFORM_PLANS} element={withProtection(PlatformPlans, { adminOnly: true })} />
+        <Route
+          path={ROUTES.PLATFORM_CUSTOMERS}
+          element={withProtection(PlatformCustomers, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_CUSTOMER_ONBOARDING}
+          element={withProtection(PlatformCustomerOnboarding, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_APPROVE}
+          element={withProtection(PlatformApprove, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_APPROVE_PROFILE}
+          element={withProtection(PlatformApproveProfile, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_IDENTITIES}
+          element={withProtection(PlatformIdentityReview, { adminOnly: true })}
+        />        <Route
+          path={ROUTES.PLATFORM_PRODUCTS}
+          element={withProtection(PlatformProducts, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_NOTIFICATIONS}
+          element={withProtection(PlatformNotifications, { adminOnly: true })}
+        />
+        <Route path={ROUTES.PLATFORM_AUDIT} element={withProtection(PlatformAudit, { adminOnly: true })} />
+        <Route path={ROUTES.PLATFORM_STAFF} element={withProtection(PlatformStaff, { adminOnly: true })} />
+        <Route
+          path={ROUTES.PLATFORM_SETTINGS}
+          element={withProtection(PlatformSettings, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_SETTINGS_EMAIL}
+          element={withProtection(EmailSettings, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_SETTINGS_PAYMENT}
+          element={withProtection(PaymentSettings, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_SETTINGS_FLAGS}
+          element={withProtection(PlatformFeatureFlags, { adminOnly: true })}
+        />
 
         <Route path={ROUTES.UNAUTHORIZED} element={<Unauthorized />} />
         <Route path={ROUTES.NOT_FOUND} element={<NotFound />} />
