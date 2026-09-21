@@ -55,6 +55,11 @@ export function onboardingPlanAmount(plan) {
   return getPlanAmount(plan)
 }
 
+export function formatMoney(amount) {
+  const n = Math.round(Number(amount) || 0)
+  return `R${n.toLocaleString('en-ZA')}`
+}
+
 function ownerRow(ownerId) {
   return db.prepare('SELECT id, name, email, phone FROM users WHERE id = ?').get(ownerId)
 }
