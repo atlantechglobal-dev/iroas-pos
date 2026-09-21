@@ -290,7 +290,7 @@ router.post('/onboarding-payment', async (req, res) => {
     checkout = await addpayRequest(
       '/api/entry',
       {
-        method: 'pay.checkout',
+        method: 'pay.paycloud.checkout',
         merchant_order_no: reference,
         order_amount: amount,
         price_currency: 'ZAR',
