@@ -54,7 +54,7 @@ export function onboardingPlanAmount(plan) {
   const key = String(plan || 'starter').toLowerCase()
   if (key === 'growth' || key === 'pro') return 2499
   if (key === 'enterprise') return 4999
-  return 999
+  return 1
 }
 
 export function formatMoney(amount) {
