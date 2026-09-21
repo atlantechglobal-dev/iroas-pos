@@ -236,7 +236,7 @@ router.get('/onboarding-payment', (req, res) => {
     plan: restaurant.plan || 'starter',
     status: restaurant.status,
     amount: onboardingPlanAmount(restaurant.plan),
-    currency: 'INR',
+    currency: 'ZAR',
     userId: formatUserId(req.user.id),
     professionalEmail,
     ownerEmail: req.user.email || '',

@@ -8,6 +8,11 @@ import './OnboardingPayment.css'
 const RETURN_POLL_INTERVAL_MS = 2500
 const RETURN_POLL_TIMEOUT_MS = 30_000
 
+function formatMoney(amount) {
+  const n = Math.round(Number(amount) || 0)
+  return `R${n.toLocaleString('en-ZA')}`
+}
+
 function OnboardingPayment() {
   const navigate = useNavigate()
   const { setRestaurantStatus } = useAuth()
@@ -108,7 +113,10 @@ function OnboardingPayment() {
   if (loading) {
     return (
       <main className="ob-pay-page">
-        <p className="ob-pay-loading">Preparing secure checkout…</p>
+        <div className="ob-pay-loading-wrap">
+          <div className="ob-pay-spinner" aria-hidden="true" />
+          <p>Preparing secure checkout…</p>
+        </div>
       </main>
     )
   }
@@ -136,74 +144,51 @@ function OnboardingPayment() {
 
   return (
     <main className="ob-pay-page">
+      <div className="ob-pay-bg" aria-hidden="true" />
       <div className="ob-pay-shell">
         <header className="ob-pay-brand">
           <img src="/images/Logo9-1 1.svg" alt="IROAS" />
+          <span>Secure launch checkout</span>
         </header>
 
-        <div className="ob-pay-panel">
-          <p className="ob-pay-badge">Payment gateway</p>
-          <h1>Complete your launch payment</h1>
-          <p className="ob-pay-sub">
-            Pay to submit <strong>{info?.restaurantName || 'your store'}</strong> for admin
-            review. After payment you receive a welcome email with your User ID and
-            professional email.
-          </p>
+        <div className="ob-pay-layout">
+          <aside className="ob-pay-order">
+            <p className="ob-pay-kicker">Order summary</p>
+            <h1 className="ob-pay-store">{info?.restaurantName || 'Your store'}</h1>
+            <p className="ob-pay-order-sub">
+              Submit for admin review. You’ll get a welcome email with your User ID and
+              professional address.
+            </p>
 
-          <div className="ob-pay-summary">
-            <div>
-              <span>Plan</span>
-              <strong>{String(info?.plan || 'starter').toUpperCase()}</strong>
-            </div>
-            <div>
-              <span>User ID</span>
-              <strong>{info?.userId || '—'}</strong>
-            </div>
-            <div>
-              <span>Professional email</span>
-              <strong>{info?.professionalEmail || '—'}</strong>
-            </div>
-            <div className="ob-pay-amount">
+            <div className="ob-pay-price">
               <span>Amount due</span>
-              <strong>₹{info?.amount ?? 999}</strong>
-            </div>
-          </div>
-
-          <form className="ob-pay-form" onSubmit={pay}>
-            <p className="ob-pay-label">Pay with</p>
-            <div className="ob-pay-methods" role="radiogroup" aria-label="Payment method">
-              {METHODS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={method === m.id}
-                  className={`ob-pay-method${method === m.id ? ' is-selected' : ''}`}
-                  onClick={() => setMethod(m.id)}
-                >
-                  <strong>{m.label}</strong>
-                  <span>{m.hint}</span>
-                </button>
-              ))}
+              <strong>
+                {money}
+                <small>{currency}</small>
+              </strong>
             </div>
 
-            {method === 'upi' ? (
-              <label className="ob-pay-field">
-                UPI ID
-                <input required placeholder="name@upi" autoComplete="off" />
-              </label>
-            ) : null}
-            {method === 'card' ? (
-              <div className="ob-pay-card-fields">
-                <label className="ob-pay-field">
-                  Card number
-                  <input
-                    required
-                    name="cardNumber"
-                    placeholder="XXXX XXXX XXXX XXXX"
-                    inputMode="numeric"
-                    autoComplete="cc-number"
-                    maxLength={19}
+            <ul className="ob-pay-meta">
+              <li>
+                <span>Plan</span>
+                <strong>{plan.charAt(0).toUpperCase() + plan.slice(1)}</strong>
+              </li>
+              <li>
+                <span>User ID</span>
+                <strong>{info?.userId || '—'}</strong>
+              </li>
+              <li>
+                <span>Professional email</span>
+                <strong className="ob-pay-email">{info?.professionalEmail || '—'}</strong>
+              </li>
+            </ul>
+
+            <div className="ob-pay-trust">
+              <span>
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"
                   />
                 </svg>
                 Encrypted checkout
@@ -248,16 +233,8 @@ function OnboardingPayment() {
               <p className="ob-pay-fine">
                 After payment, an admin is notified to verify and approve your account.
               </p>
-            ) : null}
-
-            <button type="submit" className="ob-pay-submit" disabled={paying}>
-              {paying ? 'Processing…' : `Pay ₹${info?.amount ?? 999} securely`}
-            </button>
-            <p className="ob-pay-fine">
-              Demo gateway for launch — no real charge. Admin is emailed to verify and approve
-              your account.
-            </p>
-          </form>
+            </form>
+          </section>
         </div>
       </div>
     </main>
