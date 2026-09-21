@@ -166,12 +166,11 @@ function OnboardingPayment() {
             email with your User ID and professional email.
           </p>
 
-            <div className="ob-pay-price">
-              <span>Amount due</span>
-              <strong>
-                {money} <em>{currency}</em>
-              </strong>
-            </div>
+          <div className="ob-pay-price">
+            <span>Amount due</span>
+            <strong>
+              {money} <em>{currency}</em>
+            </strong>
           </div>
 
           {!info?.addpayConfigured ? (
