@@ -7,7 +7,6 @@ import { api } from '../../lib/api'
 import { prepareImageDataUrl } from '../../utils/imageFile.js'
 import { ROUTES } from '../../constants/routes.js'
 import {
-  BUSINESS_CATEGORIES,
   emptyIdentityForm,
   getCategoryFieldConfig,
   identityToForm,
@@ -25,6 +24,23 @@ function DigitalIdentityForm() {
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [categories, setCategories] = useState(() => visibleBusinessCategories())
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .businessCategories()
+      .then(({ categories: rows }) => {
+        if (cancelled) return
+        if (Array.isArray(rows) && rows.length) setCategories(rows)
+      })
+      .catch(() => {
+        /* keep static fallback */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     api
@@ -164,15 +180,13 @@ function DigitalIdentityForm() {
               Business category *
               <select value={form.category} onChange={setField('category')}>
                 <option value="">Select category</option>
-                {visibleBusinessCategories().map((c) => (
+                {categories.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
-                {/* Keep a previously saved hidden category selectable so existing records don't break */}
-                {form.category &&
-                BUSINESS_CATEGORIES.includes(form.category) &&
-                !visibleBusinessCategories().includes(form.category) ? (
+                {/* Keep a previously saved category selectable if it was removed from the catalog */}
+                {form.category && !categories.includes(form.category) ? (
                   <option value={form.category}>{form.category}</option>
                 ) : null}
               </select>

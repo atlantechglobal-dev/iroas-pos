@@ -2,10 +2,11 @@ import { apiRequest } from './client.js'
 
 export const adminApi = {
   stats: () => apiRequest('/admin/stats'),
-  tenants: (search = '', status = '') => {
+  tenants: (search = '', status = '', kind = '') => {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (status) params.set('status', status)
+    if (kind) params.set('kind', kind)
     const qs = params.toString()
     return apiRequest(`/admin/tenants${qs ? `?${qs}` : ''}`)
   },
@@ -51,7 +52,24 @@ export const adminApi = {
   savePaymentSettings: (payload) =>
     apiRequest('/admin/payment-settings', { method: 'PUT', body: payload }),
   plans: () => apiRequest('/admin/plans'),
+  createPlan: (payload) => apiRequest('/admin/plans', { method: 'POST', body: payload }),
   savePlan: (id, payload) => apiRequest(`/admin/plans/${id}`, { method: 'PUT', body: payload }),
+  deletePlan: (id) => apiRequest(`/admin/plans/${id}`, { method: 'DELETE' }),
+  googleAuthSettings: () => apiRequest('/admin/google-auth-settings'),
+  saveGoogleAuthSettings: (payload) =>
+    apiRequest('/admin/google-auth-settings', { method: 'PUT', body: payload }),
+  businessCategories: () => apiRequest('/admin/business-categories'),
+  saveBusinessCategories: (categories) =>
+    apiRequest('/admin/business-categories', { method: 'PUT', body: { categories } }),
+  addBusinessCategory: (name) =>
+    apiRequest('/admin/business-categories', { method: 'POST', body: { name } }),
+  renameBusinessCategory: (oldName, newName) =>
+    apiRequest('/admin/business-categories/rename', {
+      method: 'PUT',
+      body: { oldName, newName },
+    }),
+  deleteBusinessCategory: (name) =>
+    apiRequest('/admin/business-categories', { method: 'DELETE', body: { name } }),
   featureFlags: () => apiRequest('/admin/feature-flags'),
   saveFeatureFlags: (flags) =>
     apiRequest('/admin/feature-flags', { method: 'PUT', body: { flags } }),
@@ -60,4 +78,7 @@ export const adminApi = {
   health: () => apiRequest('/admin/health'),
   staff: () => apiRequest('/admin/staff'),
   createStaff: (payload) => apiRequest('/admin/staff', { method: 'POST', body: payload }),
+  professionalCard: () => apiRequest('/admin/professional-card'),
+  saveProfessionalCard: (payload) =>
+    apiRequest('/admin/professional-card', { method: 'PUT', body: payload }),
 }

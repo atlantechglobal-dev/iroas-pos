@@ -19,6 +19,8 @@ import {
   isEmailConfigured,
   verifyEmailConnection,
 } from './services/emailService.js'
+import { ensureGoogleAuthSettingsBootstrapped } from './services/googleAuthSettings.js'
+import { ensureBusinessCategoriesBootstrapped } from './services/businessCategories.js'
 
 if (!process.env.JWT_SECRET) {
   console.error('JWT_SECRET is not set. Copy server/.env.example to server/.env and set it.')
@@ -80,6 +82,8 @@ const PORT = process.env.PORT || 4000
 app.listen(PORT, async () => {
   console.log(`IROAS API listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`)
   const boot = ensureEmailSettingsBootstrapped()
+  ensureGoogleAuthSettingsBootstrapped()
+  ensureBusinessCategoriesBootstrapped()
   if (isEmailConfigured()) {
     const check = await verifyEmailConnection()
     const provider = check.provider || boot.provider || 'email'

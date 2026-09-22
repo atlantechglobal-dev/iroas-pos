@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -78,8 +77,6 @@ function ProductsAdmin() {
           <p>Moderate Website, Digital Business Card, and Mobile App requests.</p>
         </div>
       </div>
-
-      <PlatformSubnav active="platform-products" />
 
       <section className="tenants-card">
         <div className="card-header">

@@ -1,23 +1,23 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { ROUTES } from '../../constants/routes.js'
 import './ForgotPassword.css'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function ForgotPassword() {
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => String(location.state?.email || '').trim())
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
 
     setError('')
-    setSuccess(false)
 
     const trimmed = email.trim()
 
@@ -34,10 +34,13 @@ function ForgotPassword() {
     setLoading(true)
 
     try {
-      const { resetToken } = await api.forgotPassword(trimmed)
-      setSuccess(true)
-      setEmail('')
-      navigate('/account-recovery', { state: { email: trimmed, resetToken } })
+      const result = await api.forgotPassword(trimmed)
+      navigate(ROUTES.ACCOUNT_RECOVERY, {
+        state: {
+          email: trimmed,
+          previewUrl: result?.previewUrl || null,
+        },
+      })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -47,7 +50,6 @@ function ForgotPassword() {
 
   return (
     <main className="forgot-password-page">
-      {/* LEFT SIDE */}
       <section className="left-panel">
         <div className="logo">
           <img src="/images/logo.svg.svg" alt="IROAS Logo" />
@@ -64,8 +66,7 @@ function ForgotPassword() {
           <h1>Back in, in one click.</h1>
 
           <p className="description">
-            We'll email you a secure link that signs you in and lets you
-            choose a new password.
+            We'll email you a secure link that lets you choose a new password.
           </p>
 
           <ul className="features">
@@ -91,32 +92,28 @@ function ForgotPassword() {
           </ul>
         </div>
 
-        {/* TESTIMONIAL */}
         <div className="testimonial">
           <p>
-            "IROAS cut our onboarding to a single afternoon. Orders, QR menus
-            and staff scheduling just work."
+            "IROAS cut our onboarding to a single afternoon. Orders, QR menus and staff scheduling
+            just work."
           </p>
 
           <div className="author">
             <div className="avatar">AK</div>
 
             <div>
-              <strong>Arun Kapoor</strong>
-              <span>Owner, Kashi & Fig</span>
+              <strong>Aarav Kapoor</strong>
+              <span>Owner, Saffron & Fig</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* RIGHT SIDE */}
       <section className="right-panel">
         <div className="form-container">
           <h2>Forgot password</h2>
 
-          <p className="form-description">
-            We'll send a reset link to your email.
-          </p>
+          <p className="form-description">We'll send a reset link to your email.</p>
 
           <form onSubmit={handleSubmit}>
             <label htmlFor="email">EMAIL</label>
@@ -136,25 +133,19 @@ function ForgotPassword() {
               />
             </div>
 
-            {error && <p className="error-message show">{error}</p>}
+            {error ? <p className="error-message show">{error}</p> : null}
 
-            <button type="submit" className={loading ? 'loading' : ''}>
+            <button type="submit" className={loading ? 'loading' : ''} disabled={loading}>
               {loading ? 'Sending...' : 'Send reset link'}
             </button>
           </form>
 
-          <button className="back-link" onClick={() => navigate('/login')}>
+          <button className="back-link" type="button" onClick={() => navigate(ROUTES.LOGIN)}>
             <span>
               <img src="/images/plain arrow.svg" alt="" />
             </span>
             Back to sign in
           </button>
-
-          {success && (
-            <div className="success-message show">
-              ✓ Reset link sent! Check your email.
-            </div>
-          )}
         </div>
       </section>
     </main>

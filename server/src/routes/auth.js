@@ -7,7 +7,7 @@ import {
   isValidEmail,
   isValidMobile,
   isValidPassword,
-  isValidSignupName,
+  isValidPersonName,
   normalizeEmail,
   normalizeMobileDigits,
 } from '../utils/validation.js'
@@ -19,8 +19,46 @@ import {
   queueEmail,
   validateIdentityForSubmit,
 } from '../services/identityService.js'
+import { isEmailConfigured, sendEmail } from '../services/emailService.js'
+import {
+  getGoogleAuthSettings,
+  getPublicGoogleAuthSettings,
+  isGoogleAuthConfigured,
+} from '../services/googleAuthSettings.js'
+import { listBusinessCategories } from '../services/businessCategories.js'
+import { sendSignupReviewEmails } from '../services/onboardingMessaging.js'
+import { OAuth2Client } from 'google-auth-library'
 
 const router = Router()
+const googleClient = new OAuth2Client()
+
+function appBaseUrl() {
+  return String(process.env.PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:5173')
+    .trim()
+    .replace(/\/$/, '')
+}
+
+function publicUser(user) {
+  return { id: user.id, name: user.name, email: user.email, role: user.role }
+}
+
+function restaurantAwaitingAccountApproval(ownerId) {
+  const restaurant = db
+    .prepare('SELECT status, settings_json FROM restaurants WHERE owner_id = ?')
+    .get(ownerId)
+  if (!restaurant) return { blocked: false, deleted: false }
+  if (restaurant.status === 'deleted') return { blocked: false, deleted: true }
+  let awaiting = false
+  try {
+    awaiting = Boolean(JSON.parse(restaurant.settings_json || '{}').awaitingAccountApproval)
+  } catch {
+    awaiting = false
+  }
+  return { blocked: awaiting, deleted: false }
+}
+
+const ACCOUNT_NOT_APPROVED_MESSAGE =
+  'Your account is not approved yet. Once an admin approves it, you will be able to sign in.'
 
 function createSubmittedIdentity(userId, user, identityPayload) {
   if (!identityPayload || typeof identityPayload !== 'object') return null
@@ -124,20 +162,25 @@ function createSubmittedIdentity(userId, user, identityPayload) {
   return identity
 }
 
-router.post('/signup', (req, res) => {
-  const { name, restaurant, category, email, phone, password, identity } = req.body || {}
+router.post('/signup', async (req, res) => {
+  const { name, restaurant, category, city, email, phone, password, identity } = req.body || {}
   const normalizedEmail = normalizeEmail(email)
 
   const businessName =
     restaurant || identity?.businessName || identity?.brandName || ''
   const businessCategory = String(category || identity?.category || '').trim()
+  const cityName = String(city || identity?.city || '').trim()
 
   if (!name || !businessName || !normalizedEmail || !phone || !password) {
     return res.status(400).json({ error: 'All fields are required.' })
   }
 
-  if (!isValidSignupName(name)) {
-    return res.status(400).json({ error: 'Enter a valid first and last name using letters only.' })
+  if (!isValidPersonName(name)) {
+    return res.status(400).json({ error: 'Enter a valid name using letters only.' })
+  }
+
+  if (!cityName) {
+    return res.status(400).json({ error: 'City is required.' })
   }
 
   if (!isValidEmail(normalizedEmail)) {
@@ -165,27 +208,35 @@ router.post('/signup', (req, res) => {
       'INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)',
     )
     const insertRestaurant = db.prepare(
-      'INSERT INTO restaurants (owner_id, name, settings_json) VALUES (?, ?, ?)',
+      `INSERT INTO restaurants (owner_id, name, city, email, status, submitted_at, settings_json)
+       VALUES (?, ?, ?, ?, 'pending_approval', datetime('now'), ?)`,
     )
 
-    const settingsJson = businessCategory
-      ? JSON.stringify({ businessCategory })
-      : null
+    const settingsPayload = {
+      awaitingAccountApproval: true,
+      ...(businessCategory ? { businessCategory } : {}),
+    }
 
     // Everything below — including the optional Digital Identity submission —
     // runs in one transaction so a validation failure there doesn't leave a
     // signed-up user with no way to retry (email already taken, no token issued).
-    const { user, submittedIdentity } = db.transaction(() => {
+    const { user, submittedIdentity, restaurant } = db.transaction(() => {
       const userInfo = insertUser.run(name.trim(), normalizedEmail, mobileDigits, passwordHash, 'owner')
-      insertRestaurant.run(
+      const restaurantInfo = insertRestaurant.run(
         userInfo.lastInsertRowid,
         String(businessName).trim(),
-        settingsJson,
+        cityName,
+        normalizedEmail,
+        JSON.stringify(settingsPayload),
       )
 
       const createdUser = db
-        .prepare('SELECT id, name, email, role FROM users WHERE id = ?')
+        .prepare('SELECT id, name, email, phone, role FROM users WHERE id = ?')
         .get(userInfo.lastInsertRowid)
+
+      const createdRestaurant = db
+        .prepare('SELECT * FROM restaurants WHERE id = ?')
+        .get(restaurantInfo.lastInsertRowid)
 
       let identityResult = null
       if (identity) {
@@ -195,20 +246,41 @@ router.post('/signup', (req, res) => {
           contactPerson: identity.contactPerson || name.trim(),
           email: identity.email || normalizedEmail,
           phone: identity.phone || mobileDigits,
+          city: identity.city || cityName,
         }
         identityResult = createSubmittedIdentity(createdUser.id, createdUser, payload)
       }
 
-      return { user: createdUser, submittedIdentity: identityResult }
+      return {
+        user: createdUser,
+        submittedIdentity: identityResult,
+        restaurant: createdRestaurant,
+      }
     })()
 
+    let emails = null
+    try {
+      emails = await sendSignupReviewEmails({
+        restaurant,
+        owner: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone || mobileDigits,
+        },
+      })
+    } catch (err) {
+      console.error('[signup] review emails failed:', err.message || err)
+    }
+
     res.status(201).json({
-      token: signToken(user),
-      user,
+      pendingReview: true,
+      email: normalizedEmail,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
       identity: submittedIdentity,
-      message: submittedIdentity
-        ? 'Your Digital Identity information has been submitted successfully. Our team will review and validate the information. You will be notified once the Digital Identity is finalized.'
-        : undefined,
+      emails,
+      message:
+        'Thank you — your account is in review for approval. We will email you once an admin approves it.',
     })
   } catch (err) {
     if (err.status === 400) {
@@ -238,15 +310,122 @@ router.post('/login', (req, res) => {
   }
 
   if (user.role !== 'admin') {
-    const restaurant = db.prepare('SELECT status FROM restaurants WHERE owner_id = ?').get(user.id)
-    if (restaurant?.status === 'deleted') {
+    const gate = restaurantAwaitingAccountApproval(user.id)
+    if (gate.deleted) {
       return res.status(403).json({ error: 'This account has been closed. Contact IROAS support.' })
+    }
+    if (gate.blocked) {
+      return res.status(403).json({
+        error: ACCOUNT_NOT_APPROVED_MESSAGE,
+        code: 'ACCOUNT_PENDING_APPROVAL',
+      })
     }
   }
 
   res.json({
     token: signToken(user),
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    user: publicUser(user),
+  })
+})
+
+router.get('/google/config', (_req, res) => {
+  res.json(getPublicGoogleAuthSettings())
+})
+
+router.get('/business-categories', (_req, res) => {
+  res.json({ categories: listBusinessCategories() })
+})
+
+router.post('/google', async (req, res) => {
+  if (!isGoogleAuthConfigured()) {
+    return res.status(503).json({
+      error:
+        'Google sign-in is not configured. Set Google Client ID in Platform Admin → Google sign-in, or GOOGLE_CLIENT_ID in server/.env.',
+    })
+  }
+
+  const idToken = String(req.body?.idToken || req.body?.credential || '').trim()
+  if (!idToken) {
+    return res.status(400).json({ error: 'Google ID token is required.' })
+  }
+
+  const { clientId } = getGoogleAuthSettings()
+
+  let payload
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: clientId,
+    })
+    payload = ticket.getPayload()
+  } catch (err) {
+    console.error('[auth] Google token verify failed:', err.message || err)
+    return res.status(401).json({ error: 'Invalid Google sign-in token.' })
+  }
+
+  const googleId = String(payload?.sub || '').trim()
+  const email = normalizeEmail(payload?.email)
+  const emailVerified = Boolean(payload?.email_verified)
+  const name = String(payload?.name || email.split('@')[0] || 'Google user').trim()
+
+  if (!googleId || !email || !emailVerified) {
+    return res.status(401).json({ error: 'Google account email is missing or not verified.' })
+  }
+
+  let user = db.prepare('SELECT * FROM users WHERE google_id = ?').get(googleId)
+
+  if (!user) {
+    user = db.prepare('SELECT * FROM users WHERE lower(email) = ?').get(email)
+    if (user) {
+      if (user.google_id && user.google_id !== googleId) {
+        return res.status(409).json({
+          error: 'This email is already linked to a different Google account.',
+        })
+      }
+      db.prepare('UPDATE users SET google_id = ? WHERE id = ?').run(googleId, user.id)
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id)
+    }
+  }
+
+  if (!user) {
+    const passwordHash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10)
+    try {
+      user = db.transaction(() => {
+        const info = db
+          .prepare(
+            'INSERT INTO users (name, email, phone, password_hash, google_id, role) VALUES (?, ?, ?, ?, ?, ?)',
+          )
+          .run(name, email, null, passwordHash, googleId, 'owner')
+        db.prepare(
+          'INSERT INTO restaurants (owner_id, name, settings_json) VALUES (?, ?, ?)',
+        ).run(info.lastInsertRowid, `${name}'s restaurant`, null)
+        return db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid)
+      })()
+    } catch (err) {
+      if (String(err.message || '').includes('UNIQUE')) {
+        return res.status(409).json({ error: 'An account with this email already exists.' })
+      }
+      console.error('[auth] Google signup failed:', err)
+      return res.status(500).json({ error: 'Unable to create account with Google.' })
+    }
+  }
+
+  if (user.role !== 'admin') {
+    const gate = restaurantAwaitingAccountApproval(user.id)
+    if (gate.deleted) {
+      return res.status(403).json({ error: 'This account has been closed. Contact IROAS support.' })
+    }
+    if (gate.blocked) {
+      return res.status(403).json({
+        error: ACCOUNT_NOT_APPROVED_MESSAGE,
+        code: 'ACCOUNT_PENDING_APPROVAL',
+      })
+    }
+  }
+
+  res.json({
+    token: signToken(user),
+    user: publicUser(user),
   })
 })
 
@@ -260,17 +439,19 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ user })
 })
 
-// Demo-mode password reset: no real email is sent. The reset link/token is
-// returned directly in the API response so the flow is fully testable
-// without an email provider configured.
-router.post('/forgot-password', (req, res) => {
+// Password reset: creates a 30-minute token and emails a link.
+// Always returns { ok: true } so callers cannot probe which emails exist.
+router.post('/forgot-password', async (req, res) => {
   const { email } = req.body || {}
+  const normalizedEmail = normalizeEmail(email)
 
-  if (!email) {
+  if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
     return res.status(400).json({ error: 'Email is required.' })
   }
 
-  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+  const user = db
+    .prepare('SELECT id, name, email FROM users WHERE lower(email) = ?')
+    .get(normalizedEmail)
 
   // Always respond success to avoid leaking which emails are registered.
   if (!user) {
@@ -279,12 +460,71 @@ router.post('/forgot-password', (req, res) => {
 
   const token = crypto.randomBytes(24).toString('hex')
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+  const resetUrl = `${appBaseUrl()}/new-password?token=${encodeURIComponent(token)}`
 
-  db.prepare(
-    'INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)',
-  ).run(user.id, token, expiresAt)
+  db.transaction(() => {
+    db.prepare('UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0').run(user.id)
+    db.prepare(
+      'INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)',
+    ).run(user.id, token, expiresAt)
+  })()
 
-  res.json({ ok: true, resetToken: token })
+  const subject = 'Reset your IROAS password'
+  const body = [
+    `Hi ${user.name || 'there'},`,
+    '',
+    'We received a request to reset your IROAS password.',
+    'Open this link to choose a new password (expires in 30 minutes):',
+    '',
+    resetUrl,
+    '',
+    'If you did not request this, you can ignore this email.',
+    '',
+    '— Team IROAS',
+  ].join('\n')
+
+  const html = `
+    <div style="font-family:Plus Jakarta Sans,Segoe UI,sans-serif;color:#17171a;line-height:1.5;max-width:560px;margin:0 auto;">
+      <h1 style="font-size:22px;margin:0 0 12px;">Reset your password</h1>
+      <p>Hi ${String(user.name || 'there').replace(/</g, '')},</p>
+      <p>We received a request to reset your IROAS password. This link expires in <strong>30 minutes</strong>.</p>
+      <p style="margin:24px 0;">
+        <a href="${resetUrl}" style="display:inline-block;background:#8bc53f;color:#16210a;text-decoration:none;font-weight:800;padding:12px 18px;border-radius:999px;">
+          Choose a new password
+        </a>
+      </p>
+      <p style="color:#6b6b73;font-size:13px;word-break:break-all;">Or paste this link:<br/>${resetUrl}</p>
+      <p style="color:#6b6b73;font-size:13px;">If you did not request this, you can ignore this email.</p>
+      <p>— Team IROAS</p>
+    </div>
+  `
+
+  let previewUrl = null
+  try {
+    if (!isEmailConfigured()) {
+      console.warn(
+        '[auth] Password reset token created but email is not configured. Set ZeptoMail/SMTP or use Ethereal in development.',
+      )
+    } else {
+      const result = await sendEmail({
+        to: user.email,
+        toName: user.name || undefined,
+        subject,
+        body,
+        html,
+      })
+      previewUrl = result?.previewUrl || null
+      if (previewUrl) {
+        console.log(`[auth] Password reset preview: ${previewUrl}`)
+      }
+    }
+  } catch (err) {
+    console.error('[auth] Password reset email failed:', err.message || err)
+  }
+
+  const payload = { ok: true }
+  if (previewUrl) payload.previewUrl = previewUrl
+  return res.json(payload)
 })
 
 router.post('/reset-password', (req, res) => {
@@ -294,15 +534,15 @@ router.post('/reset-password', (req, res) => {
     return res.status(400).json({ error: 'Token and new password are required.' })
   }
 
-  if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+  if (!isValidPassword(password)) {
     return res.status(400).json({
-      error: 'Password must be 8+ characters with an uppercase letter and a number.',
+      error: 'Use at least 8 characters, including uppercase, lowercase, and a number.',
     })
   }
 
   const reset = db
     .prepare('SELECT * FROM password_resets WHERE token = ? AND used = 0')
-    .get(token)
+    .get(String(token).trim())
 
   if (!reset || new Date(reset.expires_at) < new Date()) {
     return res.status(400).json({ error: 'This reset link is invalid or has expired.' })
@@ -316,6 +556,9 @@ router.post('/reset-password', (req, res) => {
       reset.user_id,
     )
     db.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').run(reset.id)
+    db.prepare('UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0').run(
+      reset.user_id,
+    )
   })()
 
   res.json({ ok: true })

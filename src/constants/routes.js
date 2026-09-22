@@ -6,6 +6,8 @@ export const ROUTES = {
   NEW_PASSWORD: '/new-password',
   PASSWORD_UPDATED: '/password-updated',
   CREATE_ACCOUNT: '/create-account',
+  ACCOUNT_THANKS: '/account-thanks',
+  AWAITING_APPROVAL: '/awaiting-approval',
   RESTAURANT_SETUP: '/restaurant-setup',
   DOMAIN: '/domain',
   BRAND: '/brand',
@@ -52,14 +54,19 @@ export const ROUTES = {
   PLATFORM_CUSTOMER_ONBOARDING: '/platform-admin/customer-onboarding',
   PLATFORM_APPROVE: '/platform-admin/approve',
   PLATFORM_APPROVE_PROFILE: '/platform-admin/approve/:tenantId',
+  PLATFORM_ACCOUNT_APPROVE: '/platform-admin/account-approve',
+  PLATFORM_ACCOUNT_APPROVE_PROFILE: '/platform-admin/account-approve/:tenantId',
   PLATFORM_IDENTITIES: '/platform-admin/identities',
   PLATFORM_PRODUCTS: '/platform-admin/products',
   PLATFORM_NOTIFICATIONS: '/platform-admin/notifications',
   PLATFORM_AUDIT: '/platform-admin/audit',
   PLATFORM_STAFF: '/platform-admin/staff',
+  PLATFORM_PROFESSIONAL: '/platform-admin/professional',
   PLATFORM_SETTINGS: '/platform-admin/settings',
   PLATFORM_SETTINGS_EMAIL: '/platform-admin/settings/email',
   PLATFORM_SETTINGS_PAYMENT: '/platform-admin/settings/payment',
+  PLATFORM_SETTINGS_GOOGLE: '/platform-admin/settings/google',
+  PLATFORM_SETTINGS_CATEGORIES: '/platform-admin/settings/categories',
   PLATFORM_SETTINGS_FLAGS: '/platform-admin/settings/flags',
   GUEST_ONE_LINK: '/l/:slug',
   GUEST_BUSINESS_CARD: '/c/:slug',
@@ -72,5 +79,9 @@ export const ROUTES = {
 }
 
 export function platformApproveProfilePath(tenantId) {
-  return `/platform-admin/approve/${tenantId}`
+  return `/platform-admin/account-approve/${tenantId}`
+}
+
+export function platformAccountApproveProfilePath(tenantId) {
+  return `/platform-admin/account-approve/${tenantId}`
 }

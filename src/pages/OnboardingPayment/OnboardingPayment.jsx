@@ -3,51 +3,66 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth.js'
 import { ROUTES } from '../../constants/routes.js'
+import { formatPlanPrice } from '../../constants/plans.js'
+import { prefetchRoutes } from '../../lib/routePrefetch.js'
 import './OnboardingPayment.css'
 
 const RETURN_POLL_INTERVAL_MS = 2500
-const RETURN_POLL_TIMEOUT_MS = 30_000
+const RETURN_POLL_TIMEOUT_MS = 45_000
 
-function formatMoney(amount) {
-  const n = Math.round(Number(amount) || 0)
-  return `R${n.toLocaleString('en-ZA')}`
+function formatPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '')
+  if (!digits) return '—'
+  if (digits.startsWith('27') && digits.length >= 11) {
+    return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`
+  }
+  if (digits.length > 8) return `+${digits}`
+  return digits
 }
 
 function OnboardingPayment() {
   const navigate = useNavigate()
-  const { setRestaurantStatus } = useAuth()
+  const { setRestaurantStatus, setOnboardingPaid } = useAuth()
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState(null)
+  const [selectedPlanId, setSelectedPlanId] = useState('')
   const [verifying, setVerifying] = useState(false)
   const pollTimer = useRef(null)
   const pollDeadline = useRef(0)
 
   const isReturning = new URLSearchParams(window.location.search).get('paid') === 'return'
 
-  const goToReview = (data) => {
-    navigate(ROUTES.SETUP_REVIEW, {
-      replace: true,
-      state: {
-        fromPayment: true,
-        alreadyPaid: true,
-        userId: data.userId,
-        professionalEmail: data.professionalEmail,
-        payment: data.payment,
-      },
-    })
+  const goToDashboard = (data) => {
+    if (data?.status) setRestaurantStatus(data.status)
+    else setRestaurantStatus('live')
+    setOnboardingPaid(true)
+    prefetchRoutes(['dashboard'])
+    navigate(ROUTES.DASHBOARD, { replace: true })
+  }
+
+  const applyInfo = (data) => {
+    setInfo(data)
+    if (data.status) setRestaurantStatus(data.status)
+    const plans = Array.isArray(data.plans) ? data.plans : []
+    const current = String(data.plan || '').toLowerCase()
+    const preferred =
+      plans.find((p) => p.id === current)?.id ||
+      plans.find((p) => p.popular)?.id ||
+      plans[0]?.id ||
+      ''
+    setSelectedPlanId((prev) => prev || preferred)
   }
 
   const checkStatus = (isPoll = false) => {
     return api
       .getOnboardingPayment()
       .then((data) => {
-        setInfo(data)
-        if (data.status) setRestaurantStatus(data.status)
+        applyInfo(data)
         if (data.paid) {
           if (pollTimer.current) clearTimeout(pollTimer.current)
-          goToReview(data)
+          goToDashboard(data)
           return true
         }
         if (isPoll && Date.now() < pollDeadline.current) {
@@ -81,18 +96,28 @@ function OnboardingPayment() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const plans = Array.isArray(info?.plans) ? info.plans : []
+  const selected =
+    plans.find((p) => p.id === selectedPlanId) || plans.find((p) => p.popular) || plans[0] || null
+  const amount = selected ? Number(selected.priceZar) || 0 : Number(info?.amount) || 0
+  const money = formatPlanPrice(amount)
+  const pendingPayment = Boolean(info?.payment?.pending)
+
   const pay = async (event) => {
     event.preventDefault()
     if (paying) return
+    if (!selected?.id) {
+      setError('Select a launch plan to continue.')
+      return
+    }
     setPaying(true)
     setError('')
     try {
-      const result = await api.completeOnboardingPayment({})
+      const result = await api.completeOnboardingPayment({ planId: selected.id })
       if (result.alreadyPaid || result.payment?.paid || result.demo) {
-        goToReview({
-          userId: result.userId,
-          professionalEmail: result.professionalEmail,
-          payment: result.payment,
+        goToDashboard({
+          ...result,
+          status: result.status || 'live',
         })
         return
       }
@@ -107,11 +132,6 @@ function OnboardingPayment() {
       setPaying(false)
     }
   }
-
-  const amount = info?.amount ?? 999
-  const currency = String(info?.currency || 'ZAR').toUpperCase()
-  const money = formatMoney(amount)
-  const pendingPayment = Boolean(info?.payment?.pending)
 
   if (loading) {
     return (
@@ -131,7 +151,10 @@ function OnboardingPayment() {
           <div className="ob-pay-panel ob-pay-verify">
             <div className="ob-pay-spinner" aria-hidden="true" />
             <h1>Confirming your payment…</h1>
-            <p className="ob-pay-sub">Please wait while we check with the bank.</p>
+            <p className="ob-pay-sub">
+              Please wait while we check with AddPay. This page also re-queries the gateway if the
+              bank webhook is delayed.
+            </p>
             {error ? (
               <>
                 <p className="ob-pay-error" role="alert">
@@ -151,57 +174,143 @@ function OnboardingPayment() {
   return (
     <main className="ob-pay-page">
       <div className="ob-pay-bg" aria-hidden="true" />
-      <div className="ob-pay-shell">
+      <div className="ob-pay-shell ob-pay-shell-wide">
         <header className="ob-pay-brand">
           <img src="/images/Logo9-1 1.svg" alt="IROAS" />
-          <span>Secure launch checkout</span>
+          <span>Choose your launch plan</span>
         </header>
 
-        <div className="ob-pay-panel">
-          <p className="ob-pay-badge">Payment gateway</p>
-          <h1>Complete your launch payment</h1>
-          <p className="ob-pay-sub">
-            Pay to submit <strong>{info?.restaurantName || 'your store'}</strong> for admin
-            review. You’ll be taken to AddPay’s secure page. After payment you receive a welcome
-            email with your User ID and professional email.
+        <section className="ob-pay-account">
+          <p className="ob-pay-kicker-light">Your account</p>
+          <h1>{info?.restaurantName || 'Your business'}</h1>
+          <p className="ob-pay-account-sub">
+            Same details from Create account — confirm, pick a plan, then pay to submit for review.
           </p>
+          <dl className="ob-pay-account-grid">
+            <div>
+              <dt>Name</dt>
+              <dd>{info?.ownerName || '—'}</dd>
+            </div>
+            <div>
+              <dt>Work email</dt>
+              <dd>{info?.ownerEmail || '—'}</dd>
+            </div>
+            <div>
+              <dt>Mobile</dt>
+              <dd>{formatPhone(info?.ownerPhone)}</dd>
+            </div>
+            <div>
+              <dt>City</dt>
+              <dd>{info?.city || '—'}</dd>
+            </div>
+            <div>
+              <dt>Category</dt>
+              <dd>{info?.category || '—'}</dd>
+            </div>
+            <div>
+              <dt>User ID</dt>
+              <dd>{info?.userId || '—'}</dd>
+            </div>
+          </dl>
+        </section>
 
-          <div className="ob-pay-price">
-            <span>Amount due</span>
+        <section className="ob-pay-plans-block">
+          <div className="ob-pay-plans-head">
+            <h2>Subscription plans</h2>
+            <p>Same packages from Platform Admin → Plans. Amounts are one-time launch fees in ZAR.</p>
+          </div>
+
+          {!plans.length ? (
+            <p className="ob-pay-error" role="alert">
+              No plans are available yet. Ask an admin to add plans under Platform Admin → Plans.
+            </p>
+          ) : (
+            <div className="ob-pay-plans-grid">
+              {plans.map((plan) => {
+                const active = selected?.id === plan.id
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    className={`ob-pay-plan-card${active ? ' is-selected' : ''}${
+                      plan.popular ? ' is-popular' : ''
+                    }`}
+                    onClick={() => setSelectedPlanId(plan.id)}
+                    aria-pressed={active}
+                  >
+                    {plan.popular ? <span className="ob-pay-plan-badge">Popular</span> : null}
+                    <p className="ob-pay-plan-id">{plan.id}</p>
+                    <h3>{plan.name}</h3>
+                    <p className="ob-pay-plan-tag">{plan.tagline || '—'}</p>
+                    <div className="ob-pay-plan-price">
+                      <strong>{formatPlanPrice(plan.priceZar)}</strong>
+                      <span>{plan.billing || 'one-time launch'} · ZAR</span>
+                    </div>
+                    <ul>
+                      {(plan.features || []).length ? (
+                        (plan.features || []).map((feature) => <li key={feature}>{feature}</li>)
+                      ) : (
+                        <li className="is-muted">No features listed</li>
+                      )}
+                    </ul>
+                    <span className="ob-pay-plan-select">
+                      {active ? 'Selected' : 'Select plan'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="ob-pay-panel ob-pay-checkout">
+          <div className="ob-pay-panel-head">
+            <h2>Pay to submit for review</h2>
+            <p>
+              {info?.addpayConfigured
+                ? 'You’ll be taken to AddPay’s secure page to complete payment by card, UPI, or EFT.'
+                : 'AddPay is not configured yet — continue will mark a demo payment so onboarding can proceed.'}
+            </p>
+          </div>
+
+          <div className="ob-pay-checkout-summary">
+            <span>Selected plan</span>
             <strong>
-              {money} <em>{currency}</em>
+              {selected?.name || '—'} · {money}
             </strong>
           </div>
 
-          {!info?.addpayConfigured ? (
+          {pendingPayment ? (
             <p className="ob-pay-note">
-              AddPay is not configured — this will complete as a demo payment (no real charge).
-              Admins can add credentials under Platform Admin → Payment settings.
+              A previous attempt didn’t complete — you can try again below.
+            </p>
+          ) : null}
+
+          {error ? (
+            <p className="ob-pay-error" role="alert">
+              {error}
             </p>
           ) : null}
 
           <form className="ob-pay-form" onSubmit={pay}>
-            {pendingPayment ? (
-              <p className="ob-pay-note">
-                A previous attempt didn’t complete — you can try again below.
-              </p>
-            ) : null}
-
-            {error ? (
-              <p className="ob-pay-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-
-            <button type="submit" className="ob-pay-submit" disabled={paying}>
-              {paying ? 'Redirecting to checkout…' : `Pay ${money} securely`}
+            <button
+              type="submit"
+              className="ob-pay-submit"
+              disabled={paying || !selected}
+            >
+              {paying
+                ? info?.addpayConfigured
+                  ? 'Redirecting to checkout…'
+                  : 'Completing demo payment…'
+                : info?.addpayConfigured
+                  ? `Pay ${money} securely`
+                  : `Continue with ${money} (demo)`}
             </button>
             <p className="ob-pay-fine">
-              Card and bank details are entered on AddPay’s page — never on IROAS. After payment,
-              an admin is emailed to verify and approve your account.
+              After payment you’ll go straight to your dashboard.
             </p>
           </form>
-        </div>
+        </section>
       </div>
     </main>
   )

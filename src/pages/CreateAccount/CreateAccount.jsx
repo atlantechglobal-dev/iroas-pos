@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, setSession } from '../../lib/api'
-import { useAuth } from '../../hooks/useAuth.js'
+import { api } from '../../lib/api'
 import { visibleBusinessCategories } from '../../constants/digitalIdentity.js'
 import { getBusinessCopy } from '../../constants/businessCopy.js'
 import {
@@ -18,6 +17,8 @@ import {
   formatE164,
   mobileDigitsOnly,
 } from '../../utils/validation.js'
+import { ROUTES } from '../../constants/routes.js'
+import { prefetchRoute, prefetchWhenIdle } from '../../lib/routePrefetch.js'
 import './CreateAccount.css'
 
 const ENABLE_CATEGORY_FLOW = true
@@ -25,9 +26,9 @@ const DEFAULT_CATEGORY = 'Restaurant'
 const DEFAULT_SIGNUP_COUNTRY_ISO = 'ZA'
 
 const initialErrors = {
-  firstName: '',
-  lastName: '',
+  name: '',
   restaurant: '',
+  city: '',
   category: '',
   email: '',
   phone: '',
@@ -36,12 +37,11 @@ const initialErrors = {
 
 function CreateAccount() {
   const navigate = useNavigate()
-  const { setUser, setRestaurantStatus } = useAuth()
 
   const [form, setForm] = useState({
-    firstName: '',
-    lastName: '',
+    name: '',
     restaurant: '',
+    city: '',
     category: '',
     email: '',
     phone: '',
@@ -53,7 +53,25 @@ function CreateAccount() {
   const [terms, setTerms] = useState(false)
   const [serverError, setServerError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState(() => visibleBusinessCategories())
   const copy = getBusinessCopy(ENABLE_CATEGORY_FLOW ? form.category : DEFAULT_CATEGORY)
+
+  useEffect(() => {
+    let cancelled = false
+    prefetchWhenIdle(['login', 'accountThanks'])
+    api
+      .businessCategories()
+      .then(({ categories: rows }) => {
+        if (cancelled) return
+        if (Array.isArray(rows) && rows.length) setCategories(rows)
+      })
+      .catch(() => {
+        /* keep static fallback */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const updateField = (field) => (event) => {
     const value = event.target.value
@@ -69,21 +87,19 @@ function CreateAccount() {
   const validateForm = () => {
     const nextErrors = { ...initialErrors }
 
-    if (!form.firstName.trim()) {
-      nextErrors.firstName = 'First name is required.'
-    } else if (!isValidPersonName(form.firstName)) {
-      nextErrors.firstName = 'Enter a valid first name using letters only.'
-    }
-
-    if (!form.lastName.trim()) {
-      nextErrors.lastName = 'Last name is required.'
-    } else if (!isValidPersonName(form.lastName)) {
-      nextErrors.lastName = 'Enter a valid last name using letters only.'
+    if (!form.name.trim()) {
+      nextErrors.name = 'Name is required.'
+    } else if (!isValidPersonName(form.name)) {
+      nextErrors.name = 'Enter a valid name using letters only.'
     }
 
     if (!form.restaurant.trim()) {
       const nameLabel = copy.nameLabel.toLowerCase()
       nextErrors.restaurant = `${nameLabel.charAt(0).toUpperCase()}${nameLabel.slice(1)} is required.`
+    }
+
+    if (!form.city.trim()) {
+      nextErrors.city = 'City is required.'
     }
 
     if (ENABLE_CATEGORY_FLOW && !form.category.trim()) {
@@ -127,13 +143,13 @@ function CreateAccount() {
     if (!validateForm()) return
 
     setLoading(true)
-
-    const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`
+    prefetchRoute('accountThanks')
 
     try {
-      const { token, user } = await api.signup({
-        name: fullName,
+      const result = await api.signup({
+        name: form.name.trim(),
         restaurant: form.restaurant.trim(),
+        city: form.city.trim(),
         category: ENABLE_CATEGORY_FLOW ? form.category : DEFAULT_CATEGORY,
         email: form.email.trim(),
         phone: formatE164(
@@ -143,10 +159,10 @@ function CreateAccount() {
         password: form.password,
       })
 
-      setSession(token, user)
-      setUser(user)
-      setRestaurantStatus('onboarding')
-      navigate('/restaurant-setup')
+      navigate(ROUTES.ACCOUNT_THANKS, {
+        replace: true,
+        state: { email: result.email || form.email.trim() },
+      })
     } catch (err) {
       setServerError(err.message)
     } finally {
@@ -208,45 +224,23 @@ function CreateAccount() {
           <p className="subtitle">Free 14-day trial · no card required.</p>
 
           <form onSubmit={handleSubmit} noValidate>
-            {/* FIRST + LAST NAME */}
-            <div className="two-fields">
-              <div className="field-group">
-                <label htmlFor="firstName">FIRST NAME</label>
+            <div className="field-group">
+              <label htmlFor="name">NAME</label>
 
-                <div className={`input-wrapper ${errors.firstName ? 'error' : ''}`}>
-                  <i className="fa-regular fa-user"></i>
+              <div className={`input-wrapper ${errors.name ? 'error' : ''}`}>
+                <i className="fa-regular fa-user"></i>
 
-                  <input
-                    type="text"
-                    id="firstName"
-                    name="firstName"
-                    placeholder="Ananya"
-                    autoComplete="given-name"
-                    value={form.firstName}
-                    onChange={updateField('firstName')}
-                  />
-                </div>
-                {errors.firstName && <p className="field-error">{errors.firstName}</p>}
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  placeholder="Your name"
+                  autoComplete="name"
+                  value={form.name}
+                  onChange={updateField('name')}
+                />
               </div>
-
-              <div className="field-group">
-                <label htmlFor="lastName">LAST NAME</label>
-
-                <div className={`input-wrapper ${errors.lastName ? 'error' : ''}`}>
-                  <i className="fa-regular fa-user"></i>
-
-                  <input
-                    type="text"
-                    id="lastName"
-                    name="lastName"
-                    placeholder="Rao"
-                    autoComplete="family-name"
-                    value={form.lastName}
-                    onChange={updateField('lastName')}
-                  />
-                </div>
-                {errors.lastName && <p className="field-error">{errors.lastName}</p>}
-              </div>
+              {errors.name && <p className="field-error">{errors.name}</p>}
             </div>
 
             {ENABLE_CATEGORY_FLOW ? (
@@ -261,7 +255,7 @@ function CreateAccount() {
                     onChange={updateField('category')}
                   >
                     <option value="">Select category</option>
-                    {visibleBusinessCategories().map((cat) => (
+                    {categories.map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
                       </option>
@@ -287,6 +281,25 @@ function CreateAccount() {
                 />
               </div>
               {errors.restaurant && <p className="field-error">{errors.restaurant}</p>}
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="city">CITY</label>
+
+              <div className={`input-wrapper ${errors.city ? 'error' : ''}`}>
+                <i className="fa-solid fa-location-dot"></i>
+
+                <input
+                  type="text"
+                  id="city"
+                  name="city"
+                  placeholder="Cape Town"
+                  autoComplete="address-level2"
+                  value={form.city}
+                  onChange={updateField('city')}
+                />
+              </div>
+              {errors.city && <p className="field-error">{errors.city}</p>}
             </div>
 
             {/* EMAIL */}
@@ -395,9 +408,11 @@ function CreateAccount() {
               Already have an account?{' '}
               <a
                 href="#login"
+                onMouseEnter={() => prefetchRoute('login')}
+                onFocus={() => prefetchRoute('login')}
                 onClick={(event) => {
                   event.preventDefault()
-                  navigate('/login')
+                  navigate(ROUTES.LOGIN)
                 }}
               >
                 Sign in

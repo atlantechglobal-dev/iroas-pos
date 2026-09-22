@@ -2,7 +2,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { TenantReviewDrawer } from '../../components/admin/TenantReviewDrawer.jsx'
 import { ROUTES } from '../../constants/routes.js'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -31,8 +30,6 @@ function ApproveProfile() {
           ← Back to Approve
         </button>
       </div>
-
-      <PlatformSubnav active="platform-approve" />
 
       <TenantReviewDrawer
         tenantId={tenantId}

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -48,8 +47,6 @@ function PlatformAudit() {
           <p>Persisted operator actions — approvals, settings, plans, and staff changes.</p>
         </div>
       </div>
-
-      <PlatformSubnav active="platform-audit" />
 
       <section className="tenants-card">
         <div className="card-header">

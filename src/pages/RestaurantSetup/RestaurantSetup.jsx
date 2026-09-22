@@ -12,6 +12,7 @@ import {
   restaurantPublicSlug,
   saveCardPreview,
 } from '../../utils/guestLinks.js'
+import { prefetchWhenIdle } from '../../lib/routePrefetch.js'
 import './RestaurantSetup.css'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -56,6 +57,7 @@ function RestaurantSetup() {
 
   // Load the restaurant profile already on file for this account
   useEffect(() => {
+    prefetchWhenIdle(['domain', 'brand', 'launch', 'onboardingPayment', 'dashboard'])
     api
       .getRestaurant()
       .then(({ restaurant }) => {

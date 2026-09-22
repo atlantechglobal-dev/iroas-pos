@@ -48,6 +48,12 @@ export function appendTenantEvent({ restaurantId, action, previousStatus, newSta
 
 export function mapTenant(row) {
   if (!row) return null
+  let settings = {}
+  try {
+    settings = row.settings_json ? JSON.parse(row.settings_json) : {}
+  } catch {
+    settings = {}
+  }
   return {
     id: row.id,
     ownerId: row.owner_id,
@@ -78,6 +84,9 @@ export function mapTenant(row) {
     rejectionReason: row.rejection_reason,
     rejectedAt: row.rejected_at,
     reviewedAt: row.reviewed_at,
+    awaitingAccountApproval: Boolean(settings.awaitingAccountApproval),
+    onboardingPaid: Boolean(settings?.onboardingPayment?.paid),
+    businessCategory: settings.businessCategory || settings.category || '',
     reviewedBy: row.reviewed_by
       ? {
           id: row.reviewed_by,

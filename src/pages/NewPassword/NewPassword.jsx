@@ -1,14 +1,22 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { ROUTES } from '../../constants/routes.js'
 import './NewPassword.css'
 
 function NewPassword() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
 
-  const email = location.state?.email || 'your account'
-  const token = location.state?.token
+  const token =
+    String(searchParams.get('token') || '').trim() ||
+    String(location.state?.token || '').trim() ||
+    ''
+  const email =
+    String(searchParams.get('email') || '').trim() ||
+    String(location.state?.email || '').trim() ||
+    ''
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -20,6 +28,7 @@ function NewPassword() {
   const requirements = {
     length: password.length >= 8,
     uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
     number: /[0-9]/.test(password),
   }
 
@@ -39,6 +48,12 @@ function NewPassword() {
     if (!/[A-Z]/.test(password)) {
       setMessageColor('#d33')
       setMessage('Password must contain one uppercase letter.')
+      return
+    }
+
+    if (!/[a-z]/.test(password)) {
+      setMessageColor('#d33')
+      setMessage('Password must contain one lowercase letter.')
       return
     }
 
@@ -63,7 +78,7 @@ function NewPassword() {
       setMessage('Password updated successfully!')
 
       setTimeout(() => {
-        navigate('/password-updated')
+        navigate(ROUTES.PASSWORD_UPDATED)
       }, 900)
     } catch (err) {
       setMessageColor('#d33')
@@ -75,7 +90,6 @@ function NewPassword() {
 
   return (
     <div className="new-password-page">
-      {/* LEFT SECTION */}
       <section className="left-section">
         <div className="logo">
           <img src="/images/logo.svg.svg" alt="IROAS Logo" />
@@ -90,8 +104,7 @@ function NewPassword() {
           <h1>Choose a new password.</h1>
 
           <p className="description">
-            Pick something strong and unique — your dashboard holds live
-            orders and payouts.
+            Pick something strong and unique — your dashboard holds live orders and payouts.
           </p>
 
           <div className="features">
@@ -117,11 +130,10 @@ function NewPassword() {
           </div>
         </div>
 
-        {/* Testimonial */}
         <div className="testimonial">
           <p>
-            "IROAS cut our onboarding to a single afternoon. Orders, QR menus
-            and staff scheduling just work."
+            "IROAS cut our onboarding to a single afternoon. Orders, QR menus and staff scheduling
+            just work."
           </p>
 
           <div className="person">
@@ -135,82 +147,100 @@ function NewPassword() {
         </div>
       </section>
 
-      {/* RIGHT SECTION */}
       <section className="right-section">
         <div className="password-box">
           <h2>New password</h2>
 
-          <p className="verified">Reset link verified for {email}.</p>
+          {!token ? (
+            <>
+              <p className="verified">
+                This reset link is missing or invalid. Request a new link to continue.
+              </p>
+              <Link className="update-btn" to={ROUTES.FORGOT_PASSWORD} style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
+                Request new reset link
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="verified">
+                {email ? `Reset link verified for ${email}.` : 'Reset link verified. Choose a new password.'}
+              </p>
 
-          {/* New Password */}
-          <div className="input-container">
-            <span className="input-icon">
-              <img src="/images/lock.svg" alt="" />
-            </span>
+              <div className="input-container">
+                <span className="input-icon">
+                  <img src="/images/lock.svg" alt="" />
+                </span>
 
-            <input
-              type={showPassword ? 'text' : 'password'}
-              id="password"
-              placeholder="New password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  placeholder="New password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
 
-            <button
-              className="eye-btn"
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-            >
-              <img src="/images/eyee.svg" alt="" />
-            </button>
-          </div>
+                <button
+                  className="eye-btn"
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                >
+                  <img src="/images/eyee.svg" alt="" />
+                </button>
+              </div>
 
-          {/* Confirm Password */}
-          <div className="input-container">
-            <span className="input-icon">
-              <img src="/images/lock.svg" alt="" />
-            </span>
+              <div className="input-container">
+                <span className="input-icon">
+                  <img src="/images/lock.svg" alt="" />
+                </span>
 
-            <input
-              type="password"
-              id="confirmPassword"
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-            />
-          </div>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  placeholder="Confirm new password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                />
+              </div>
 
-          {/* Requirements */}
-          <div className="requirements">
-            <div className={requirements.length ? 'valid' : ''}>
-              <span>✓</span>
-              At least 8 characters
-            </div>
+              <div className="requirements">
+                <div className={requirements.length ? 'valid' : ''}>
+                  <span>✓</span>
+                  At least 8 characters
+                </div>
 
-            <div className={requirements.uppercase ? 'valid' : ''}>
-              <span>✓</span>
-              One uppercase letter
-            </div>
+                <div className={requirements.uppercase ? 'valid' : ''}>
+                  <span>✓</span>
+                  One uppercase letter
+                </div>
 
-            <div className={requirements.number ? 'valid' : ''}>
-              <span>✓</span>
-              One number
-            </div>
-          </div>
+                <div className={requirements.lowercase ? 'valid' : ''}>
+                  <span>✓</span>
+                  One lowercase letter
+                </div>
 
-          {/* Button */}
-          <button
-            className="update-btn"
-            onClick={handleUpdatePassword}
-            disabled={loading}
-          >
-            {loading ? 'Updating...' : 'Update password'}
-          </button>
+                <div className={requirements.number ? 'valid' : ''}>
+                  <span>✓</span>
+                  One number
+                </div>
+              </div>
 
-          {message && (
-            <p className="update-message" style={{ color: messageColor }}>
-              {message}
-            </p>
+              <button
+                className="update-btn"
+                type="button"
+                onClick={handleUpdatePassword}
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : 'Update password'}
+              </button>
+
+              {message ? (
+                <p className="update-message" style={{ color: messageColor }}>
+                  {message}
+                </p>
+              ) : null}
+            </>
           )}
         </div>
       </section>

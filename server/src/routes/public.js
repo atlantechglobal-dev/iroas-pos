@@ -18,7 +18,8 @@ import { onOrderCreated } from '../services/orderMessaging.js'
 import { listDiningTables } from '../services/diningTables.js'
 import { verifyNotifySignature } from '../services/addpayClient.js'
 import { getPaymentSettings } from '../services/paymentSettings.js'
-import { sendOnboardingPaymentEmails } from '../services/onboardingMessaging.js'
+import { finalizeOnboardingPayment, parseRestaurantSettings } from '../services/onboardingPayment.js'
+import { getPublishedAdminCardBySlug } from '../services/platformAdminService.js'
 
 const router = Router()
 
@@ -213,6 +214,21 @@ router.get('/:slug/media/category/:catId', (req, res) => {
     )
     .get(req.params.catId, restaurant.id)
   return sendDataUrl(res, cat?.image_data_url || '')
+})
+
+/** Super-admin / platform professional business card (public share link). */
+router.get('/platform-card/:slug', (req, res) => {
+  const entry = getPublishedAdminCardBySlug(req.params.slug)
+  if (!entry) return res.status(404).json({ error: 'Card not found.' })
+  res.json({
+    type: 'platform_admin',
+    orgName: entry.orgName || 'IROAS',
+    theme: entry.theme || 'lime',
+    layout: entry.layout || 'split-gold',
+    publicSlug: entry.publicSlug || req.params.slug,
+    card: entry.card || {},
+    admin: entry.admin || null,
+  })
 })
 
 /** Public restaurant site payload (images as URLs, not base64) */
@@ -522,7 +538,7 @@ router.get('/:slug/order-history', (req, res) => {
 router.post(
   '/payments/addpay/webhook',
   express.urlencoded({ extended: true }),
-  (req, res) => {
+  async (req, res) => {
     const payload = { ...req.query, ...(req.body || {}) }
     delete payload.slug
 
@@ -542,7 +558,7 @@ router.post(
     const restaurant = db.prepare('SELECT * FROM restaurants WHERE id = ?').get(Number(match[1]))
     if (!restaurant) return respondSuccess()
 
-    const settings = parseSettings(restaurant)
+    const settings = parseRestaurantSettings(restaurant)
     const pending = settings?.onboardingPayment
     // Reference must match the one we handed out for this checkout attempt —
     // guards against a stale/replayed webhook from an earlier retry.
@@ -551,31 +567,36 @@ router.post(
 
     if (transStatus === 3) {
       // Cancelled — clear the pending flag so the owner can retry.
-      const nextSettings = { ...settings, onboardingPayment: { ...pending, pending: false, cancelledAt: new Date().toISOString() } }
-      db.prepare(`UPDATE restaurants SET settings_json = ?, updated_at = datetime('now') WHERE id = ?`)
-        .run(JSON.stringify(nextSettings), restaurant.id)
+      const nextSettings = {
+        ...settings,
+        onboardingPayment: {
+          ...pending,
+          pending: false,
+          cancelledAt: new Date().toISOString(),
+        },
+      }
+      db.prepare(`UPDATE restaurants SET settings_json = ?, updated_at = datetime('now') WHERE id = ?`).run(
+        JSON.stringify(nextSettings),
+        restaurant.id,
+      )
       return respondSuccess()
     }
 
     if (transStatus !== 2) return respondSuccess() // not a completed payment yet
 
-    const professionalEmail = settings.professionalEmail || restaurant.email || ''
-    const payment = {
-      ...pending,
-      paid: true,
-      pending: false,
-      paidAt: new Date().toISOString(),
-      addpayOrderNo: payload.order_no || null,
+    try {
+      await finalizeOnboardingPayment(restaurant, {
+        reference: orderRef,
+        amount: pending.amount,
+        currency: pending.currency || 'ZAR',
+        addpayOrderNo: payload.order_no || null,
+        method: 'addpay',
+        gateway: 'addpay',
+      })
+    } catch (err) {
+      console.error('[addpay webhook] finalize failed:', err.message || err)
+      return res.status(500).type('text/plain').send('error')
     }
-    const nextSettings = { ...settings, onboardingPayment: payment }
-
-    db.prepare(
-      `UPDATE restaurants SET settings_json = ?, email = COALESCE(NULLIF(email, ''), ?),
-       updated_at = datetime('now') WHERE id = ?`,
-    ).run(JSON.stringify(nextSettings), professionalEmail || null, restaurant.id)
-
-    const updated = { ...restaurant, email: restaurant.email || professionalEmail }
-    sendOnboardingPaymentEmails({ restaurant: updated, payment }).catch(() => {})
 
     return respondSuccess()
   },

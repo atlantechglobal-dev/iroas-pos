@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -56,8 +55,6 @@ function FeatureFlags() {
           {saving ? 'Saving…' : 'Save flags'}
         </button>
       </div>
-
-      <PlatformSubnav active="platform-settings-flags" />
 
       <section className="feature-card">
         <div className="feature-header">

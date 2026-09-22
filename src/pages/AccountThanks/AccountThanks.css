@@ -1,0 +1,163 @@
+.account-thanks-page {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  font-family: "Plus Jakarta Sans", "Inter", sans-serif;
+  background: #ffffff;
+  color: #171b1f;
+}
+
+.account-thanks-page .left-panel {
+  width: 50%;
+  min-height: 100vh;
+  color: white;
+  position: relative;
+  padding: 48px 56px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 70% 75%, rgba(105, 145, 25, 0.14), transparent 40%),
+    #11171d;
+}
+
+.account-thanks-page .logo img {
+  height: 38px;
+  width: auto;
+  display: block;
+}
+
+.account-thanks-page .left-content {
+  margin-top: 72px;
+  max-width: 420px;
+}
+
+.account-thanks-page .security-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(160, 210, 35, 0.1);
+  color: #a5d526;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  margin-bottom: 20px;
+}
+
+.account-thanks-page .security-badge img {
+  width: 11px;
+  height: 11px;
+}
+
+.account-thanks-page .left-content h1 {
+  margin: 0 0 16px;
+  font-size: clamp(34px, 4vw, 46px);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.account-thanks-page .description {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.account-thanks-page .right-panel {
+  width: 50%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 32px;
+  background: #f7f8f5;
+}
+
+.account-thanks-page .success-container {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+.account-thanks-page .success-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: #eaf5db;
+  display: grid;
+  place-items: center;
+}
+
+.account-thanks-page .success-icon svg {
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: #6fa62a;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.account-thanks-page .success-container h2 {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.account-thanks-page .lead {
+  margin: 0 0 12px;
+  color: #4b5563;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.account-thanks-page .lead strong {
+  color: #171b1f;
+}
+
+.account-thanks-page .hint {
+  margin: 0 0 28px;
+  color: #9a9aa2;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.account-thanks-page .thanks-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 28px;
+  border-radius: 999px;
+  background: #8bc53f;
+  color: #16210a;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.account-thanks-page .thanks-btn:hover {
+  background: #7ab534;
+}
+
+@media (max-width: 900px) {
+  .account-thanks-page {
+    flex-direction: column;
+  }
+
+  .account-thanks-page .left-panel,
+  .account-thanks-page .right-panel {
+    width: 100%;
+    min-height: auto;
+  }
+
+  .account-thanks-page .left-content {
+    margin-top: 40px;
+    margin-bottom: 40px;
+  }
+}

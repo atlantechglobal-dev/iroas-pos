@@ -23,6 +23,7 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     phone TEXT,
     password_hash TEXT NOT NULL,
+    google_id TEXT UNIQUE,
     role TEXT NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'admin')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -148,6 +149,16 @@ if (!restaurantColumns.some((col) => col.name === 'domain_suffix')) {
 }
 if (!restaurantColumns.some((col) => col.name === 'submitted_at')) {
   db.exec('ALTER TABLE restaurants ADD COLUMN submitted_at TEXT')
+}
+
+const userColumns = db.prepare('PRAGMA table_info(users)').all()
+if (!userColumns.some((col) => col.name === 'google_id')) {
+  db.exec('ALTER TABLE users ADD COLUMN google_id TEXT')
+  try {
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL')
+  } catch {
+    // ignore if index already exists / SQLite variant
+  }
 }
 
 const restaurantTableSql =

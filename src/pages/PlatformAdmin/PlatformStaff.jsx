@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -58,8 +57,6 @@ function PlatformStaff() {
           <p>Super admin accounts that can operate the IROAS console.</p>
         </div>
       </div>
-
-      <PlatformSubnav active="platform-staff" />
 
       <section className="tenants-card" style={{ marginBottom: 20, padding: 20 }}>
         <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Invite admin</h2>

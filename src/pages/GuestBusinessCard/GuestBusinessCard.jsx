@@ -9,8 +9,12 @@ import {
   guestSitePath,
   loadCardPreview,
 } from '../../utils/guestLinks.js'
+import {
+  BusinessCardVisual,
+} from '../../components/businessCard/BusinessCardVisual.jsx'
 import './GuestBusinessCard.css'
 import './BusinessIdProfile.css'
+import '../DigitalBusinessCard/DigitalBusinessCard.css'
 
 const FILL_MESSAGE = 'Please fill in the image and details.'
 
@@ -189,6 +193,7 @@ function GuestBusinessCard() {
   const toast = useToast()
   const saved = loadCardPreview(slug)
   const [remote, setRemote] = useState(null)
+  const [platformCard, setPlatformCard] = useState(null)
   const [brochureIndex, setBrochureIndex] = useState(0)
   const [showScanner, setShowScanner] = useState(false)
   const [form, setForm] = useState({
@@ -212,10 +217,74 @@ function GuestBusinessCard() {
       .catch(() => {
         if (!cancelled) setRemote(null)
       })
+    api
+      .getPublicPlatformCard(slug)
+      .then((data) => {
+        if (!cancelled) setPlatformCard(data)
+      })
+      .catch(() => {
+        if (!cancelled) setPlatformCard(null)
+      })
     return () => {
       cancelled = true
     }
   }, [slug])
+
+  if (platformCard?.card) {
+    const colors = {
+      lime: {
+        accent: '#8dc63f',
+        dark: '#7ab52f',
+        headerText: '#16311a',
+        panel: '#f0c12e',
+        ink: '#17171a',
+        muted: '#5a5a52',
+        hot: '#8dc63f',
+      },
+      charcoal: {
+        accent: '#26282a',
+        dark: '#141516',
+        headerText: '#f2f2ef',
+        panel: '#2a2c2e',
+        ink: '#f2f2ef',
+        muted: '#a7a5a0',
+        hot: '#f08a2a',
+      },
+      olive: {
+        accent: '#5f8f5a',
+        dark: '#4d7549',
+        headerText: '#f4f8f2',
+        panel: '#6a945f',
+        ink: '#f4f8f2',
+        muted: '#d5e2d2',
+        hot: '#c4e07a',
+      },
+    }[platformCard.theme] || {
+      accent: '#8dc63f',
+      dark: '#7ab52f',
+      headerText: '#16311a',
+      panel: '#f0c12e',
+      ink: '#17171a',
+      muted: '#5a5a52',
+      hot: '#8dc63f',
+    }
+
+    return (
+      <main className="guest-card-page platform-guest-card">
+        <div className="platform-guest-card-inner">
+          <p className="platform-guest-kicker">IROAS · Super admin</p>
+          <BusinessCardVisual
+            layout={platformCard.layout || 'split-gold'}
+            theme={platformCard.theme || 'lime'}
+            colors={colors}
+            displayRestaurant={platformCard.orgName || 'IROAS'}
+            card={platformCard.card}
+            interactive
+          />
+        </div>
+      </main>
+    )
+  }
 
   const restaurant =
     saved?.restaurantName || remote?.restaurant?.name || slug.replace(/-/g, ' ')

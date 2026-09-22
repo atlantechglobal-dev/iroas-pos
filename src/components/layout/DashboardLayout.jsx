@@ -112,6 +112,7 @@ export function DashboardLayout({
           <Topbar
             user={user}
             roleLabel={roleLabel}
+            isAdmin={isAdmin}
             searchPlaceholder={
               searchPlaceholder ||
               (isAdmin
@@ -122,24 +123,18 @@ export function DashboardLayout({
             onProfileToggle={() => setProfileOpen((prev) => !prev)}
             onProfileClose={() => setProfileOpen(false)}
             onMenuToggle={() => setSidebarOpen(true)}
+            onNavigate={(to) => navigate(to)}
             onSettings={() => {
               setProfileOpen(false)
               navigate(isAdmin ? ROUTES.PLATFORM_SETTINGS : ROUTES.SETTINGS)
             }}
             onLogout={logout}
-            onQuickAction={() =>
-              toast.info(
-                isAdmin
-                  ? 'Quick actions — create tenant coming soon.'
-                  : 'Quick actions — demo preview with sample data.',
-              )
-            }
             onNotifications={() => {
               if (isAdmin) {
                 navigate(ROUTES.PLATFORM_NOTIFICATIONS)
                 return
               }
-              toast.info('No new notifications.')
+              navigate(ROUTES.NOTIFICATIONS)
             }}
           />
 

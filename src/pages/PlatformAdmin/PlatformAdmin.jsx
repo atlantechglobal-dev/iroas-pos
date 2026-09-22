@@ -15,6 +15,7 @@ const EMPTY_STATS = {
   activeTenants: 0,
   onboardingTenants: 0,
   pendingApprovals: 0,
+  pendingAccountApprovals: 0,
   rejectedTenants: 0,
   totalTenants: 0,
   identityPending: 0,
@@ -64,7 +65,9 @@ function PlatformAdmin() {
         setStats(statsData)
         setHealth(healthData)
         setTenants(allTenants?.tenants || [])
-        setPending(pendingTenants?.tenants || [])
+        setPending(
+          (pendingTenants?.tenants || []).filter((t) => t.awaitingAccountApproval),
+        )
         setFeed(feedData?.items || [])
       })
       .catch(() => {
@@ -120,13 +123,13 @@ function PlatformAdmin() {
 
   const attention = useMemo(() => {
     const items = []
-    if ((displayStats.pendingApprovals || 0) > 0) {
+    if ((displayStats.pendingAccountApprovals || 0) > 0) {
       items.push({
-        name: 'Tenant approvals',
-        meta: `${displayStats.pendingApprovals} restaurants waiting to go live`,
+        name: 'Account approvals',
+        meta: `${displayStats.pendingAccountApprovals} new signups waiting`,
         level: 'Critical',
         levelClass: 'level-critical',
-        to: ROUTES.PLATFORM_APPROVE,
+        to: ROUTES.PLATFORM_ACCOUNT_APPROVE,
       })
     }
     if ((displayStats.identityPending || 0) > 0) {
@@ -220,10 +223,10 @@ function PlatformAdmin() {
           <Link className="btn btn-outline" to={ROUTES.PLATFORM_SETTINGS}>
             Settings
           </Link>
-          <Link className="btn btn-dark" to={ROUTES.PLATFORM_APPROVE}>
-            ✦ Approve
-            {(displayStats.pendingApprovals || 0) > 0
-              ? ` (${displayStats.pendingApprovals})`
+          <Link className="btn btn-dark" to={ROUTES.PLATFORM_ACCOUNT_APPROVE}>
+            ✦ Account approve
+            {(displayStats.pendingAccountApprovals || 0) > 0
+              ? ` (${displayStats.pendingAccountApprovals})`
               : ''}
           </Link>
         </div>
@@ -254,15 +257,17 @@ function PlatformAdmin() {
           type="button"
           className="stat-card"
           style={{ cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
-          onClick={() => navigate(ROUTES.PLATFORM_APPROVE)}
+          onClick={() => navigate(ROUTES.PLATFORM_ACCOUNT_APPROVE)}
         >
           <div className="stat-top">
-            <span className="stat-ico">◐</span>
-            <span className="trend up">Review</span>
+            <span className="stat-ico">◎</span>
+            <span className="trend up">Signups</span>
           </div>
-          <div className="stat-number">{loading ? '—' : displayStats.pendingApprovals ?? 0}</div>
-          <p className="stat-sub">Awaiting approval</p>
-          <p className="stat-foot">Click to open Approve</p>
+          <div className="stat-number">
+            {loading ? '—' : displayStats.pendingAccountApprovals ?? 0}
+          </div>
+          <p className="stat-sub">Account approve</p>
+          <p className="stat-foot">New Create Account requests</p>
         </button>
 
         <button
@@ -295,13 +300,13 @@ function PlatformAdmin() {
         <section className="card">
           <div className="card-head">
             <div>
-              <h2>Pending approvals</h2>
-              <span>Restaurants waiting for you to publish</span>
+              <h2>Account approvals</h2>
+              <span>New Create Account signups waiting for review</span>
             </div>
             <button
               className="link-btn"
               type="button"
-              onClick={() => navigate(ROUTES.PLATFORM_APPROVE)}
+              onClick={() => navigate(ROUTES.PLATFORM_ACCOUNT_APPROVE)}
             >
               View all
             </button>

@@ -1,6 +1,13 @@
 import { db } from '../db.js'
 import { createNotification, queueEmailAndWait } from './identityService.js'
-import { getAdminNotifyEmail, getEmailSettings, isEmailConfigured } from './emailService.js'
+import {
+  applyEmailTemplate,
+  getAdminNotifyEmail,
+  getEmailSettings,
+  getEmailTemplate,
+  isEmailConfigured,
+  textToSimpleHtml,
+} from './emailService.js'
 import { getPlanAmount } from './platformAdminService.js'
 
 function adminInbox() {
@@ -55,6 +62,42 @@ export function onboardingPlanAmount(plan) {
   return getPlanAmount(plan)
 }
 
+function formatMoney(amount) {
+  const n = Math.round(Number(amount) || 0)
+  return `R${n.toLocaleString('en-ZA')}`
+}
+
+function templateVars({
+  owner,
+  restaurant,
+  professionalEmail,
+  links,
+  payment,
+  reviewedByAdminEmail,
+}) {
+  return {
+    ownerName: owner?.name || 'there',
+    ownerEmail: owner?.email || '',
+    ownerPhone: owner?.phone || '',
+    businessName: restaurant?.name || 'your business',
+    city: restaurant?.city || '',
+    userId: formatUserId(owner?.id || restaurant?.owner_id),
+    professionalEmail: professionalEmail || '',
+    loginUrl: links?.loginUrl || '',
+    onboardingUrl: links?.onboardingUrl || '',
+    siteUrl: links?.siteUrl || '',
+    cardUrl: links?.cardUrl || '',
+    bookUrl: links?.bookUrl || '',
+    menuUrl: links?.menuUrl || '',
+    host: links?.host ? `https://${links.host}` : '',
+    plan: String(restaurant?.plan || 'starter'),
+    amount: payment ? formatMoney(payment.amount) : '',
+    method: payment ? String(payment.method || '').toUpperCase() : '',
+    reference: payment?.reference || '',
+    reviewedBy: reviewedByAdminEmail || '',
+  }
+}
+
 function ownerRow(ownerId) {
   return db.prepare('SELECT id, name, email, phone FROM users WHERE id = ?').get(ownerId)
 }
@@ -68,7 +111,8 @@ function publicLinks(restaurant) {
   const bookUrl = slug ? `${base}/s/${slug}/book` : ''
   const menuUrl = slug ? `${base}/s/${slug}/menu` : ''
   const loginUrl = `${base}/login`
-  return { base, slug, host, siteUrl, cardUrl, bookUrl, menuUrl, loginUrl }
+  const onboardingUrl = `${base}/restaurant-setup`
+  return { base, slug, host, siteUrl, cardUrl, bookUrl, menuUrl, loginUrl, onboardingUrl }
 }
 
 function detailsHtmlBlock({ userId, owner, professionalEmail, links, restaurant, payment }) {
@@ -122,6 +166,94 @@ function detailsHtmlBlock({ userId, owner, professionalEmail, links, restaurant,
 }
 
 /**
+ * After Create Account: thank-you / under-review to owner + notify admins.
+ */
+export async function sendSignupReviewEmails({ restaurant, owner }) {
+  const features = getEmailSettings().features || {}
+  const ownerRowData =
+    owner?.email
+      ? owner
+      : ownerRow(restaurant.owner_id)
+  if (!ownerRowData?.email) {
+    return { user: false, admin: false, configured: isEmailConfigured() }
+  }
+
+  const professionalEmail = professionalEmailForRestaurant(restaurant)
+  const links = publicLinks(restaurant)
+  const userId = formatUserId(ownerRowData.id || restaurant.owner_id)
+  const vars = templateVars({
+    owner: ownerRowData,
+    restaurant,
+    professionalEmail,
+    links,
+  })
+  const result = {
+    user: false,
+    admin: false,
+    adminNotified: 0,
+    configured: isEmailConfigured(),
+    errors: [],
+  }
+
+  createNotification({
+    userId: ownerRowData.id,
+    type: 'restaurant',
+    title: 'Account under review',
+    body: `Thank you — ${restaurant.name || 'your account'} is waiting for admin approval. We will email ${ownerRowData.email} when it is approved.`,
+    meta: { restaurantId: restaurant.id, status: 'pending_approval', userId },
+  })
+
+  const admins = db
+    .prepare(`SELECT id, email, name FROM users WHERE role = 'admin' ORDER BY id ASC`)
+    .all()
+  for (const admin of admins) {
+    createNotification({
+      userId: admin.id,
+      type: 'approval',
+      title: `${restaurant.name || 'New signup'} awaits Account approve`,
+      body: `${ownerRowData.name || 'Owner'} · ${ownerRowData.email}`,
+      meta: { tenantId: restaurant.id, restaurantId: restaurant.id },
+    })
+    result.adminNotified += 1
+  }
+
+  if (features.signupThankYouMail !== false) {
+    const rendered = applyEmailTemplate(getEmailTemplate('signupThankYouMail'), vars)
+    try {
+      await queueEmailAndWait({
+        to: ownerRowData.email,
+        subject: rendered.subject,
+        body: rendered.body,
+        html: textToSimpleHtml(rendered.body),
+      })
+      result.user = true
+    } catch (err) {
+      result.errors.push(`signup-thank-you: ${err.message || err}`)
+      console.error('[signup email] thank-you failed:', err.message || err)
+    }
+  }
+
+  const adminTo = adminInbox()
+  if (adminTo && features.signupAdminNotifyMail !== false) {
+    const rendered = applyEmailTemplate(getEmailTemplate('signupAdminNotifyMail'), vars)
+    try {
+      await queueEmailAndWait({
+        to: adminTo,
+        subject: rendered.subject,
+        body: rendered.body,
+        html: textToSimpleHtml(rendered.body),
+      })
+      result.admin = true
+    } catch (err) {
+      result.errors.push(`signup-admin: ${err.message || err}`)
+      console.error('[signup email] admin notify failed:', err.message || err)
+    }
+  }
+
+  return result
+}
+
+/**
  * After onboarding payment: welcome the owner + notify admin to review.
  */
 export async function sendOnboardingPaymentEmails({ restaurant, payment }) {
@@ -158,48 +290,29 @@ export async function sendOnboardingPaymentEmails({ restaurant, payment }) {
   })
 
   if (features.welcomeMail !== false) {
-    const text = [
-      `Hi ${owner.name || 'there'},`,
-      '',
-      `Thank you for your payment. Your IROAS digital store application is now in the review queue.`,
-      '',
-      'Your account details',
-      `• User ID: ${userId}`,
-      `• Sign-in email: ${owner.email}`,
-      `• Professional email: ${professionalEmail}`,
-      links.host ? `• Website: https://${links.host}` : null,
-      `• Login: ${links.loginUrl}`,
-      links.siteUrl ? `• Public site: ${links.siteUrl}` : null,
-      links.cardUrl ? `• Business card: ${links.cardUrl}` : null,
-      `• Plan: ${restaurant.plan || 'starter'}`,
-      `• Amount paid: ${formatMoney(amount)} (${String(method).toUpperCase()})`,
-      `• Payment reference: ${reference}`,
-      '',
-      'What happens next',
-      '1. Our team verifies your profile, domain, and branding.',
-      '2. When approved, your site goes live and your QR codes unlock.',
-      '3. You will receive a full approval email with login + QR details.',
-      '',
-      '— Team IROAS',
-    ]
-      .filter((line) => line !== null)
-      .join('\n')
-
+    const rendered = applyEmailTemplate(
+      getEmailTemplate('welcomeMail'),
+      templateVars({
+        owner,
+        restaurant,
+        professionalEmail,
+        links,
+        payment: { amount, method, reference },
+      }),
+    )
     try {
       await queueEmailAndWait({
         to: owner.email,
-        subject: `Welcome to IROAS — ${restaurant.name || 'your business'}`,
-        body: text,
-        html: `
-        <div style="font-family:Plus Jakarta Sans,Segoe UI,sans-serif;color:#17171a;line-height:1.5;max-width:640px;margin:0 auto;">
-          <h1 style="font-size:22px;">Welcome to IROAS</h1>
-          <p>Hi ${escapeHtml(owner.name || 'there')},</p>
-          <p>Thank you for your payment. Your application is in the review queue.</p>
-          ${detailsHtmlBlock({ userId, owner, professionalEmail, links, restaurant, payment: { amount, method, reference } })}
-          <p style="color:#6b6b73;font-size:13px;">QR codes unlock fully after admin approval. You will get another email with everything unlocked.</p>
-          <p>— Team IROAS</p>
-        </div>
-      `,
+        subject: rendered.subject,
+        body: rendered.body,
+        html: `${textToSimpleHtml(rendered.body)}${detailsHtmlBlock({
+          userId,
+          owner,
+          professionalEmail,
+          links,
+          restaurant,
+          payment: { amount, method, reference },
+        })}`,
       })
       result.user = true
     } catch (err) {
@@ -210,29 +323,22 @@ export async function sendOnboardingPaymentEmails({ restaurant, payment }) {
 
   const adminTo = adminInbox()
   if (adminTo && features.adminVerifyMail !== false) {
+    const rendered = applyEmailTemplate(
+      getEmailTemplate('adminVerifyMail'),
+      templateVars({
+        owner,
+        restaurant,
+        professionalEmail,
+        links,
+        payment: { amount, method, reference },
+      }),
+    )
     try {
       await queueEmailAndWait({
         to: adminTo,
-        subject: `[Review] ${restaurant.name || 'New business'} — User ${userId}`,
-        body: [
-          'A new business completed onboarding payment and awaits verification.',
-          '',
-          `• Name: ${restaurant.name || '—'}`,
-          `• City: ${restaurant.city || '—'}`,
-          `• Plan: ${restaurant.plan || 'starter'}`,
-          links.host ? `• Domain: ${links.host}` : null,
-          `• Professional email: ${professionalEmail}`,
-          `• User ID: ${userId}`,
-          `• Owner: ${owner.name || '—'} <${owner.email}>`,
-          `• Phone: ${owner.phone || '—'}`,
-          `• Amount: ${formatMoney(amount)} / ${String(method).toUpperCase()} / ${reference}`,
-          '',
-          'Action: Platform Admin → Review tenant → verify checklist → Approve or Reject.',
-          '',
-          '— IROAS system',
-        ]
-          .filter((line) => line !== null)
-          .join('\n'),
+        subject: rendered.subject,
+        body: rendered.body,
+        html: textToSimpleHtml(rendered.body),
       })
       result.admin = true
     } catch (err) {
@@ -245,14 +351,22 @@ export async function sendOnboardingPaymentEmails({ restaurant, payment }) {
 }
 
 /**
- * On approve: full details + QR + login to user; confirmation to admin.
+ * On approve: email the owner (signup form email) + confirmation to admin.
+ * accountApproval: new signup — unlock setup (no QR/live links yet).
  */
-export async function sendApprovalEmails({ restaurant, reviewedByAdminEmail }) {
+export async function sendApprovalEmails({
+  restaurant,
+  reviewedByAdminEmail,
+  accountApproval = false,
+}) {
   const features = getEmailSettings().features || {}
   const owner = ownerRow(restaurant.owner_id)
   const userId = formatUserId(restaurant.owner_id)
   const professionalEmail = professionalEmailForRestaurant(restaurant)
   const links = publicLinks(restaurant)
+  const ownerEmail = String(restaurant.email || owner?.email || '')
+    .trim()
+    .toLowerCase()
   const result = {
     user: false,
     admin: false,
@@ -260,75 +374,99 @@ export async function sendApprovalEmails({ restaurant, reviewedByAdminEmail }) {
     errors: [],
   }
 
-  if (owner?.email && features.approvalDetailsMail !== false) {
-    const text = [
-      `Hi ${owner.name || 'there'},`,
-      '',
-      `Great news — ${restaurant.name || 'your business'} has been verified and published.`,
-      '',
-      'Your live credentials',
-      `• User ID: ${userId}`,
-      `• Sign-in email: ${owner.email}`,
-      `• Professional email: ${professionalEmail}`,
-      `• Login: ${links.loginUrl}`,
-      links.siteUrl ? `• Live website: ${links.siteUrl}` : null,
-      links.cardUrl ? `• Business card: ${links.cardUrl}` : null,
-      links.bookUrl ? `• Reservations: ${links.bookUrl}` : null,
-      links.menuUrl ? `• Menu: ${links.menuUrl}` : null,
-      '',
-      'Your QR codes are unlocked (see images in this email). Sign in to manage menu, orders, and reservations.',
-      '',
-      '— Team IROAS',
-    ]
-      .filter((line) => line !== null)
-      .join('\n')
+  if (ownerEmail && (accountApproval ? features.accountApprovedMail !== false : features.approvalDetailsMail !== false)) {
+    const vars = templateVars({
+      owner: { ...owner, email: ownerEmail },
+      restaurant,
+      professionalEmail,
+      links,
+      reviewedByAdminEmail,
+    })
 
-    try {
-      await queueEmailAndWait({
-        to: owner.email,
-        subject: `${restaurant.name || 'Your business'} is approved — login, QR & details`,
-        body: text,
-        html: `
-        <div style="font-family:Plus Jakarta Sans,Segoe UI,sans-serif;color:#17171a;line-height:1.5;max-width:640px;margin:0 auto;">
-          <h1 style="font-size:22px;">You're approved and live</h1>
-          <p>Hi ${escapeHtml(owner.name || 'there')},</p>
-          <p><strong>${escapeHtml(restaurant.name || 'Your business')}</strong> has been verified and published. Below is everything you need — login, links, and QR codes.</p>
-          ${detailsHtmlBlock({ userId, owner, professionalEmail, links, restaurant })}
-          <p><a href="${escapeHtml(links.loginUrl)}" style="display:inline-block;background:#8bc53f;color:#16210a;text-decoration:none;font-weight:800;padding:12px 18px;border-radius:999px;">Open dashboard login</a></p>
-          <p>— Team IROAS</p>
-        </div>
-      `,
-      })
-      result.user = true
-    } catch (err) {
-      result.errors.push(`approval: ${err.message || err}`)
-      console.error('[approval email] user failed:', err.message || err)
+    if (accountApproval) {
+      const rendered = applyEmailTemplate(getEmailTemplate('accountApprovedMail'), vars)
+      try {
+        await queueEmailAndWait({
+          to: ownerEmail,
+          subject: rendered.subject,
+          body: rendered.body,
+          html: `
+          <div style="font-family:Plus Jakarta Sans,Segoe UI,sans-serif;color:#17171a;line-height:1.5;max-width:640px;margin:0 auto;">
+            ${textToSimpleHtml(rendered.body)}
+            <p><a href="${escapeHtml(links.onboardingUrl || links.loginUrl)}" style="display:inline-block;background:#8bc53f;color:#16210a;text-decoration:none;font-weight:800;padding:12px 18px;border-radius:999px;">Start onboarding</a></p>
+          </div>
+        `,
+        })
+        result.user = true
+      } catch (err) {
+        result.errors.push(`approval: ${err.message || err}`)
+        console.error('[approval email] user failed:', err.message || err)
+      }
+    } else {
+      const rendered = applyEmailTemplate(getEmailTemplate('approvalDetailsMail'), vars)
+      try {
+        await queueEmailAndWait({
+          to: ownerEmail,
+          subject: rendered.subject,
+          body: rendered.body,
+          html: `
+          <div style="font-family:Plus Jakarta Sans,Segoe UI,sans-serif;color:#17171a;line-height:1.5;max-width:640px;margin:0 auto;">
+            ${textToSimpleHtml(rendered.body)}
+            ${detailsHtmlBlock({
+              userId,
+              owner: { ...owner, email: ownerEmail },
+              professionalEmail,
+              links,
+              restaurant,
+            })}
+            <p><a href="${escapeHtml(links.loginUrl)}" style="display:inline-block;background:#8bc53f;color:#16210a;text-decoration:none;font-weight:800;padding:12px 18px;border-radius:999px;">Open dashboard login</a></p>
+          </div>
+        `,
+        })
+        result.user = true
+      } catch (err) {
+        result.errors.push(`approval: ${err.message || err}`)
+        console.error('[approval email] user failed:', err.message || err)
+      }
     }
   }
 
   const adminTo = adminInbox()
   if (adminTo && features.adminVerifyMail !== false) {
-    try {
-      await queueEmailAndWait({
-        to: adminTo,
-        subject: `[Approved] ${restaurant.name || 'Business'} — ${userId}`,
-        body: [
-          'Tenant approval confirmation',
+    const rendered = applyEmailTemplate(
+      getEmailTemplate('adminApprovedMail'),
+      templateVars({
+        owner: { ...owner, email: ownerEmail || owner?.email },
+        restaurant,
+        professionalEmail,
+        links,
+        reviewedByAdminEmail,
+      }),
+    )
+    const subject = accountApproval
+      ? `[Account approved] ${restaurant.name || 'Business'} — ${userId}`
+      : rendered.subject
+    const body = accountApproval
+      ? [
+          'New account approval confirmation',
           '',
           `• Business: ${restaurant.name || '—'}`,
           `• User ID: ${userId}`,
-          `• Owner: ${owner?.name || '—'} <${owner?.email || '—'}>`,
-          `• Professional email: ${professionalEmail}`,
-          links.siteUrl ? `• Live site: ${links.siteUrl}` : null,
-          reviewedByAdminEmail ? `• Approved by: ${reviewedByAdminEmail}` : null,
-          '• Status: live',
+          `• Owner: ${owner?.name || '—'} <${ownerEmail}>`,
+          `• Approved by: ${reviewedByAdminEmail || 'admin'}`,
+          '• Status: onboarding (setup unlocked)',
           '',
-          'Full account details and QR codes were emailed to the owner.',
+          'An approval email was sent to the owner.',
           '',
           '— IROAS system',
-        ]
-          .filter((line) => line !== null)
-          .join('\n'),
+        ].join('\n')
+      : rendered.body
+    try {
+      await queueEmailAndWait({
+        to: adminTo,
+        subject,
+        body,
+        html: textToSimpleHtml(body),
       })
       result.admin = true
     } catch (err) {

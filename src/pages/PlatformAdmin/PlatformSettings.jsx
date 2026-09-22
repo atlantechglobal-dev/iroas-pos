@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { ROUTES } from '../../constants/routes.js'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -15,6 +14,16 @@ const CARDS = [
     to: ROUTES.PLATFORM_SETTINGS_PAYMENT,
     title: 'Payment settings',
     desc: 'AddPay credentials for onboarding launch payment',
+  },
+  {
+    to: ROUTES.PLATFORM_SETTINGS_GOOGLE,
+    title: 'Google sign-in',
+    desc: 'OAuth Client ID for Login with Google',
+  },
+  {
+    to: ROUTES.PLATFORM_SETTINGS_CATEGORIES,
+    title: 'Business categories',
+    desc: 'Add, edit, or remove Create Account categories',
   },
   {
     to: ROUTES.PLATFORM_SETTINGS_FLAGS,
@@ -53,8 +62,6 @@ function PlatformSettings() {
           <p>Global configuration for email, payments, flags, and operator access.</p>
         </div>
       </div>
-
-      <PlatformSubnav active="platform-settings" />
 
       <div className="pa-quick-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
         {CARDS.map((card) => (

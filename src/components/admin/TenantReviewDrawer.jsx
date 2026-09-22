@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../lib/api'
 import { QrCodePreview } from '../QrCodePreview.jsx'
@@ -13,13 +13,6 @@ const TABS = [
   { id: 'brand', label: 'Brand' },
   { id: 'preview', label: 'Preview' },
   { id: 'activity', label: 'Activity' },
-]
-
-const CHECKS = [
-  { id: 'profile', label: 'Profile is complete and accurate' },
-  { id: 'domain', label: 'Domain / slug is acceptable' },
-  { id: 'brand', label: 'Branding is appropriate' },
-  { id: 'preview', label: 'Preview looks correct' },
 ]
 
 const STATUS_COPY = {
@@ -78,7 +71,6 @@ function Field({ label, value, name, editing, onChange, multiline }) {
 
 export function TenantReviewDrawer({
   tenantId,
-  focusApprove = false,
   variant = 'drawer',
   onClose,
   onChanged,
@@ -91,18 +83,11 @@ export function TenantReviewDrawer({
   const [events, setEvents] = useState([])
   const [form, setForm] = useState({})
   const [editing, setEditing] = useState(false)
-  const [checks, setChecks] = useState({
-    profile: false,
-    domain: false,
-    brand: false,
-    preview: false,
-  })
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteName, setDeleteName] = useState('')
   const [busy, setBusy] = useState('')
-  const checksRef = useRef(null)
 
   const load = async (id) => {
     const data = await api.adminTenant(id)
@@ -152,14 +137,6 @@ export function TenantReviewDrawer({
       .finally(() => setLoading(false))
   }, [tenantId])
 
-  useEffect(() => {
-    if (!focusApprove || loading || !tenant || tenant.status !== 'pending_approval') return
-    const timer = window.setTimeout(() => {
-      checksRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 120)
-    return () => window.clearTimeout(timer)
-  }, [focusApprove, loading, tenant])
-
   const hostname = useMemo(
     () =>
       tenant
@@ -186,7 +163,9 @@ export function TenantReviewDrawer({
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const canApprove = tenant?.status === 'pending_approval' && CHECKS.every((item) => checks[item.id])
+  const isAccountApproval = Boolean(tenant?.awaitingAccountApproval)
+  const canApprove =
+    tenant?.status === 'pending_approval' && isAccountApproval
 
   const reviewerLabel = useMemo(() => {
     if (!tenant?.reviewedBy) return ''
@@ -232,8 +211,8 @@ export function TenantReviewDrawer({
   const handleApprove = async () => {
     setBusy('approve')
     try {
-      await api.adminApproveTenant(tenantId, checks)
-      toast.success(`${form.name || 'Business'} approved and published`)
+      await api.adminApproveTenant(tenantId, {})
+      toast.success(`${form.name || 'Account'} approved — owner will get an email`)
       if (isPage) {
         await load(tenantId)
         onChanged?.()
@@ -314,11 +293,13 @@ export function TenantReviewDrawer({
               ) : null}
             </header>
 
-            {tenant.status === 'pending_approval' ? (
+            {tenant.status === 'pending_approval' && isAccountApproval ? (
               <div className="tenant-review-approve-banner">
                 <div>
-                  <strong>Ready to approve?</strong>
-                  <span>Tick all checklist items, then publish for customers.</span>
+                  <strong>New signup awaiting approval</strong>
+                  <span>
+                    Approve to email the owner and unlock setup. No checklist needed.
+                  </span>
                 </div>
                 <div className="tenant-review-approve-banner-actions">
                   <button type="button" onClick={() => setRejectOpen(true)}>
@@ -329,14 +310,22 @@ export function TenantReviewDrawer({
                     className="is-primary"
                     disabled={!canApprove || busy === 'approve'}
                     onClick={handleApprove}
-                    title={
-                      canApprove
-                        ? 'Publish this restaurant for customers'
-                        : 'Complete the checklist first'
-                    }
+                    title="Approve account and email the owner"
                   >
-                    {busy === 'approve' ? 'Publishing…' : 'Approve & publish'}
+                    {busy === 'approve' ? 'Approving…' : 'Approve account'}
                   </button>
+                </div>
+              </div>
+            ) : null}
+
+            {tenant.status === 'pending_approval' && !isAccountApproval ? (
+              <div className="tenant-review-approve-banner">
+                <div>
+                  <strong>No admin approval needed</strong>
+                  <span>
+                    Only Create Account signups are approved here. This store goes live after the
+                    owner completes payment.
+                  </span>
                 </div>
               </div>
             ) : null}
@@ -555,31 +544,6 @@ export function TenantReviewDrawer({
               )}
             </div>
 
-            {tenant.status === 'pending_approval' && (
-              <section className="tenant-review-checks" ref={checksRef}>
-                <p>Verify before publishing</p>
-                <div className="tenant-review-check-grid">
-                  {CHECKS.map((item) => (
-                    <label key={item.id} className={checks[item.id] ? 'is-on' : ''}>
-                      <input
-                        type="checkbox"
-                        checked={checks[item.id]}
-                        onChange={(event) =>
-                          setChecks((prev) => ({ ...prev, [item.id]: event.target.checked }))
-                        }
-                      />
-                      {item.label}
-                    </label>
-                  ))}
-                </div>
-                <p className="tenant-review-check-hint">
-                  {canApprove
-                    ? 'All checks done — use Approve & publish below.'
-                    : 'Tick every checkbox above to enable Approve & publish.'}
-                </p>
-              </section>
-            )}
-
             {rejectOpen && (
               <div className="tenant-review-modal" role="dialog" aria-label="Reject application">
                 <div className="tenant-review-modal-card">
@@ -640,7 +604,7 @@ export function TenantReviewDrawer({
                   </button>
                 )}
               </div>
-              {tenant.status === 'pending_approval' && (
+              {tenant.status === 'pending_approval' && isAccountApproval ? (
                 <div className="tenant-review-footer-right">
                   <button type="button" onClick={() => setRejectOpen(true)}>
                     Reject
@@ -650,16 +614,12 @@ export function TenantReviewDrawer({
                     className="is-primary"
                     disabled={!canApprove || busy === 'approve'}
                     onClick={handleApprove}
-                    title={
-                      canApprove
-                        ? 'Publish this restaurant for customers'
-                        : 'Complete the checklist above first'
-                    }
+                    title="Approve account and email the owner"
                   >
-                    {busy === 'approve' ? 'Publishing…' : 'Approve & publish'}
+                    {busy === 'approve' ? 'Approving…' : 'Approve account'}
                   </button>
                 </div>
-              )}
+              ) : null}
             </footer>
           </>
         )}

@@ -3,7 +3,6 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -104,8 +103,6 @@ function IdentityReview() {
           <p>Moderate Digital Identity submissions across all owners.</p>
         </div>
       </div>
-
-      <PlatformSubnav active="platform-identities" />
 
       <section className="tenants-card">
         <div className="card-header">

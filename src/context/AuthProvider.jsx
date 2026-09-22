@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { AuthContext } from './authContext.js'
 import { ROUTES } from '../constants/routes.js'
 import { isAdmin } from '../constants/roles.js'
-import { canUseDashboard } from '../constants/restaurantStatus.js'
+import {
+  canUseDashboard,
+  ownerHomePath,
+} from '../constants/restaurantStatus.js'
 import { authApi, setUnauthorizedHandler } from '../services/api/index.js'
 import { restaurantApi } from '../services/api/restaurantApi.js'
 import {
@@ -12,8 +15,21 @@ import {
   getToken,
   setSession,
 } from '../services/storage/authStorage.js'
+import { prefetchRoutes, prefetchWhenIdle } from '../lib/routePrefetch.js'
 
-function resolvePostLoginPath(status, redirectTo) {
+function readAwaiting(restaurant) {
+  return Boolean(restaurant?.settings?.awaitingAccountApproval)
+}
+
+function readOnboardingPaid(restaurant) {
+  return Boolean(restaurant?.settings?.onboardingPayment?.paid)
+}
+
+function resolvePostLoginPath(status, redirectTo, restaurant) {
+  const awaiting = readAwaiting(restaurant)
+  const onboardingPaid = readOnboardingPaid(restaurant)
+  if (awaiting) return ROUTES.ACCOUNT_THANKS
+
   if (redirectTo && typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
     if (canUseDashboard(status)) {
       if (redirectTo.startsWith('/c/') || redirectTo.startsWith('/s/') || redirectTo.startsWith('/l/')) {
@@ -21,8 +37,12 @@ function resolvePostLoginPath(status, redirectTo) {
       }
       return redirectTo
     }
+    if (redirectTo === ROUTES.DASHBOARD || redirectTo.startsWith('/settings')) {
+      return ownerHomePath(status, { awaitingAccountApproval: awaiting, onboardingPaid })
+    }
   }
-  return canUseDashboard(status) ? ROUTES.DASHBOARD : ROUTES.RESTAURANT_SETUP
+
+  return ownerHomePath(status, { awaitingAccountApproval: awaiting, onboardingPaid })
 }
 
 export function AuthProvider({ children }) {
@@ -31,11 +51,15 @@ export function AuthProvider({ children }) {
   const [initializing, setInitializing] = useState(Boolean(getToken()))
   // null = unknown/not fetched yet (e.g. admin, or not loaded).
   const [restaurantStatus, setRestaurantStatus] = useState(null)
+  const [awaitingAccountApproval, setAwaitingAccountApproval] = useState(false)
+  const [onboardingPaid, setOnboardingPaid] = useState(false)
 
   const logout = useCallback(() => {
     clearSession()
     setUser(null)
     setRestaurantStatus(null)
+    setAwaitingAccountApproval(false)
+    setOnboardingPaid(false)
     navigate(ROUTES.LOGIN, { replace: true })
   }, [navigate])
 
@@ -43,6 +67,8 @@ export function AuthProvider({ children }) {
     setUnauthorizedHandler(() => {
       clearSession()
       setUser(null)
+      setAwaitingAccountApproval(false)
+      setOnboardingPaid(false)
       navigate(ROUTES.LOGIN, { replace: true })
     })
   }, [navigate])
@@ -51,6 +77,7 @@ export function AuthProvider({ children }) {
     const token = getToken()
     if (!token) {
       setInitializing(false)
+      prefetchWhenIdle(['createAccount', 'accountThanks'])
       return
     }
 
@@ -66,10 +93,41 @@ export function AuthProvider({ children }) {
         if (!isAdmin(freshUser)) {
           try {
             const { restaurant } = await restaurantApi.get()
-            if (!cancelled) setRestaurantStatus(restaurant?.status || 'onboarding')
+            if (cancelled) return
+            const awaiting = readAwaiting(restaurant)
+            const paid = readOnboardingPaid(restaurant)
+            setRestaurantStatus(restaurant?.status || 'onboarding')
+            setAwaitingAccountApproval(awaiting)
+            setOnboardingPaid(paid)
+            if (awaiting) {
+              clearSession()
+              setUser(null)
+              setRestaurantStatus(null)
+              setAwaitingAccountApproval(false)
+              setOnboardingPaid(false)
+              try {
+                sessionStorage.setItem(
+                  'login_flash',
+                  'Your account is not approved yet. Once an admin approves it, you will be able to sign in.',
+                )
+              } catch {
+                /* ignore */
+              }
+              navigate(ROUTES.LOGIN, { replace: true })
+            } else if (paid || canUseDashboard(restaurant?.status)) {
+              prefetchWhenIdle(['dashboard'])
+            } else {
+              prefetchWhenIdle(['restaurantSetup', 'onboardingPayment', 'dashboard'])
+            }
           } catch {
-            if (!cancelled) setRestaurantStatus('onboarding')
+            if (!cancelled) {
+              setRestaurantStatus('onboarding')
+              setAwaitingAccountApproval(false)
+              setOnboardingPaid(false)
+            }
           }
+        } else {
+          prefetchWhenIdle(['platformAdmin'])
         }
       })
       .catch(() => {
@@ -84,15 +142,17 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [navigate])
 
-  const login = useCallback(
-    async (credentials, redirectTo) => {
-      const { token, user: loggedInUser } = await authApi.login(credentials)
+  const completeLogin = useCallback(
+    async (token, loggedInUser, redirectTo) => {
       setSession(token, loggedInUser)
       setUser(loggedInUser)
 
       if (isAdmin(loggedInUser)) {
+        setAwaitingAccountApproval(false)
+        setOnboardingPaid(false)
+        prefetchRoutes(['platformAdmin'])
         navigate(ROUTES.PLATFORM_ADMIN, { replace: true })
         return loggedInUser
       }
@@ -100,10 +160,40 @@ export function AuthProvider({ children }) {
       try {
         const { restaurant } = await restaurantApi.get()
         const status = restaurant?.status || 'onboarding'
+        const awaiting = readAwaiting(restaurant)
+        const paid = readOnboardingPaid(restaurant)
         setRestaurantStatus(status)
-        navigate(resolvePostLoginPath(status, redirectTo), { replace: true })
-      } catch {
+        setAwaitingAccountApproval(awaiting)
+        setOnboardingPaid(paid)
+        const path = resolvePostLoginPath(status, redirectTo, restaurant)
+        if (path === ROUTES.ACCOUNT_THANKS || awaiting) {
+          clearSession()
+          setUser(null)
+          setRestaurantStatus(null)
+          setAwaitingAccountApproval(false)
+          setOnboardingPaid(false)
+          const err = new Error(
+            'Your account is not approved yet. Once an admin approves it, you will be able to sign in.',
+          )
+          err.code = 'ACCOUNT_PENDING_APPROVAL'
+          throw err
+        }
+        if (path === ROUTES.DASHBOARD || paid || canUseDashboard(status)) {
+          prefetchRoutes(['dashboard'])
+        } else if (path === ROUTES.ONBOARDING_PAYMENT) {
+          prefetchRoutes(['onboardingPayment', 'dashboard'])
+        } else {
+          prefetchRoutes(['restaurantSetup', 'domain', 'brand', 'launch', 'onboardingPayment'])
+        }
+        navigate(path, { replace: true })
+      } catch (caught) {
+        if (caught?.code === 'ACCOUNT_PENDING_APPROVAL') {
+          throw caught
+        }
         setRestaurantStatus('onboarding')
+        setAwaitingAccountApproval(false)
+        setOnboardingPaid(false)
+        prefetchRoutes(['restaurantSetup'])
         navigate(ROUTES.RESTAURANT_SETUP, { replace: true })
       }
 
@@ -112,25 +202,56 @@ export function AuthProvider({ children }) {
     [navigate],
   )
 
+  const login = useCallback(
+    async (credentials, redirectTo) => {
+      const { token, user: loggedInUser } = await authApi.login(credentials)
+      return completeLogin(token, loggedInUser, redirectTo)
+    },
+    [completeLogin],
+  )
+
+  const loginWithGoogle = useCallback(
+    async (idToken, redirectTo) => {
+      const { token, user: loggedInUser } = await authApi.googleLogin(idToken)
+      return completeLogin(token, loggedInUser, redirectTo)
+    },
+    [completeLogin],
+  )
+
   const value = useMemo(
     () => ({
       user,
       isAuthenticated: Boolean(user && getToken()),
       isAdmin: isAdmin(user),
       restaurantStatus,
+      awaitingAccountApproval,
+      onboardingPaid,
       initializing,
       login,
+      loginWithGoogle,
       logout,
       setUser,
       setRestaurantStatus,
+      setAwaitingAccountApproval,
+      setOnboardingPaid,
     }),
-    [user, restaurantStatus, initializing, login, logout],
+    [
+      user,
+      restaurantStatus,
+      awaitingAccountApproval,
+      onboardingPaid,
+      initializing,
+      login,
+      loginWithGoogle,
+      logout,
+    ],
   )
 
   if (initializing) {
     return (
       <div className="app-loading" role="status" aria-live="polite">
-        Loading…
+        <span className="app-loading-spinner" aria-hidden="true" />
+        <p>Loading…</p>
       </div>
     )
   }

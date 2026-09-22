@@ -3,9 +3,200 @@ import { db } from '../db.js'
 const EMAIL_KEY = 'email'
 
 const DEFAULT_FEATURES = {
+  signupThankYouMail: true,
+  signupAdminNotifyMail: true,
+  accountApprovedMail: true,
   welcomeMail: true,
   adminVerifyMail: true,
   approvalDetailsMail: true,
+}
+
+export const DEFAULT_EMAIL_TEMPLATES = {
+  signupThankYouMail: {
+    subject: 'Thank you — {{businessName}} is under review',
+    body: [
+      'Hi {{ownerName}},',
+      '',
+      'Thank you for creating your IROAS account for {{businessName}}.',
+      '',
+      'Your account is now in review. Our team will approve it shortly.',
+      '',
+      '• Sign-in email: {{ownerEmail}}',
+      '• City: {{city}}',
+      '• User ID: {{userId}}',
+      '',
+      'We will email you again as soon as an admin approves your account so you can start onboarding.',
+      '',
+      'You can close this for now — no action is needed until you receive the approval email.',
+      '',
+      '— Team IROAS',
+    ].join('\n'),
+  },
+  signupAdminNotifyMail: {
+    subject: '[New signup] {{businessName}} awaits Account approve',
+    body: [
+      'A new Create Account signup is waiting for Account approve.',
+      '',
+      '• Business: {{businessName}}',
+      '• City: {{city}}',
+      '• Owner: {{ownerName}} <{{ownerEmail}}>',
+      '• Phone: {{ownerPhone}}',
+      '• User ID: {{userId}}',
+      '',
+      'Action: Platform Admin → Account approve → Approve & send email.',
+      '',
+      '— IROAS system',
+    ].join('\n'),
+  },
+  accountApprovedMail: {
+    subject: 'Welcome — {{businessName}} is approved. Start onboarding',
+    body: [
+      'Hi {{ownerName}},',
+      '',
+      'Welcome to IROAS! Your account for {{businessName}} has been approved.',
+      '',
+      'Please sign in and complete the onboarding process (profile, domain, brand, and launch).',
+      '',
+      '• Sign-in email: {{ownerEmail}}',
+      '• Login: {{loginUrl}}',
+      '• Onboarding: {{onboardingUrl}}',
+      '• User ID: {{userId}}',
+      '',
+      'Until onboarding is finished, you will only see the setup steps. The dashboard unlocks after you go live.',
+      '',
+      '— Team IROAS',
+    ].join('\n'),
+  },
+  welcomeMail: {
+    subject: 'Welcome to IROAS — {{businessName}}',
+    body: [
+      'Hi {{ownerName}},',
+      '',
+      'Thank you for your payment. Your IROAS digital store application is now in the review queue.',
+      '',
+      'Your account details',
+      '• User ID: {{userId}}',
+      '• Sign-in email: {{ownerEmail}}',
+      '• Professional email: {{professionalEmail}}',
+      '• Website: {{host}}',
+      '• Login: {{loginUrl}}',
+      '• Public site: {{siteUrl}}',
+      '• Business card: {{cardUrl}}',
+      '• Plan: {{plan}}',
+      '• Amount paid: {{amount}} ({{method}})',
+      '• Payment reference: {{reference}}',
+      '',
+      'What happens next',
+      '1. Our team verifies your profile, domain, and branding.',
+      '2. When approved, your site goes live and your QR codes unlock.',
+      '3. You will receive a full approval email with login + QR details.',
+      '',
+      '— Team IROAS',
+    ].join('\n'),
+  },
+  adminVerifyMail: {
+    subject: '[Review] {{businessName}} — User {{userId}}',
+    body: [
+      'A new business completed onboarding payment and awaits verification.',
+      '',
+      '• Name: {{businessName}}',
+      '• City: {{city}}',
+      '• Plan: {{plan}}',
+      '• Domain: {{host}}',
+      '• Professional email: {{professionalEmail}}',
+      '• User ID: {{userId}}',
+      '• Owner: {{ownerName}} <{{ownerEmail}}>',
+      '• Phone: {{ownerPhone}}',
+      '• Amount: {{amount}} / {{method}} / {{reference}}',
+      '',
+      'Action: Platform Admin → Account approve (if still needed).',
+      '',
+      '— IROAS system',
+    ].join('\n'),
+  },
+  approvalDetailsMail: {
+    subject: '{{businessName}} is approved — login, QR & details',
+    body: [
+      'Hi {{ownerName}},',
+      '',
+      'Great news — {{businessName}} has been verified and published.',
+      '',
+      'Your live credentials',
+      '• User ID: {{userId}}',
+      '• Sign-in email: {{ownerEmail}}',
+      '• Professional email: {{professionalEmail}}',
+      '• Login: {{loginUrl}}',
+      '• Live website: {{siteUrl}}',
+      '• Business card: {{cardUrl}}',
+      '• Reservations: {{bookUrl}}',
+      '• Menu: {{menuUrl}}',
+      '',
+      'Your QR codes are unlocked. Sign in to manage menu, orders, and reservations.',
+      '',
+      '— Team IROAS',
+    ].join('\n'),
+  },
+  adminApprovedMail: {
+    subject: '[Approved] {{businessName}} — {{userId}}',
+    body: [
+      'Tenant approval confirmation',
+      '',
+      '• Business: {{businessName}}',
+      '• User ID: {{userId}}',
+      '• Owner: {{ownerName}} <{{ownerEmail}}>',
+      '• Professional email: {{professionalEmail}}',
+      '• Live site: {{siteUrl}}',
+      '• Approved by: {{reviewedBy}}',
+      '• Status: live',
+      '',
+      'Full account details and QR codes were emailed to the owner.',
+      '',
+      '— IROAS system',
+    ].join('\n'),
+  },
+}
+
+function normalizeTemplate(input, fallback) {
+  const src = input && typeof input === 'object' ? input : {}
+  return {
+    subject: String(src.subject ?? fallback.subject ?? '').trim() || fallback.subject,
+    body: String(src.body ?? fallback.body ?? '').trim() || fallback.body,
+  }
+}
+
+function mergeTemplates(stored = {}) {
+  const out = {}
+  for (const [key, fallback] of Object.entries(DEFAULT_EMAIL_TEMPLATES)) {
+    out[key] = normalizeTemplate(stored[key], fallback)
+  }
+  return out
+}
+
+/** Replace {{placeholders}} in a template string. Missing values become empty. */
+export function applyEmailTemplate(template, vars = {}) {
+  const subjectTpl = String(template?.subject || '')
+  const bodyTpl = String(template?.body || '')
+  const replace = (text) =>
+    text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+      const value = vars[key]
+      return value == null ? '' : String(value)
+    })
+  return {
+    subject: replace(subjectTpl).replace(/\s+/g, ' ').trim(),
+    body: replace(bodyTpl).replace(/\n{3,}/g, '\n\n').trim(),
+  }
+}
+
+export function textToSimpleHtml(text) {
+  const escaped = String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  const withLinks = escaped.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" style="color:#2f5310;font-weight:700;">$1</a>',
+  )
+  return `<div style="font-family:Plus Jakarta Sans,Segoe UI,sans-serif;color:#17171a;line-height:1.55;max-width:640px;margin:0 auto;white-space:pre-wrap;">${withLinks}</div>`
 }
 
 let smtpTransporter = null
@@ -100,6 +291,7 @@ export function getEmailSettings() {
       ...DEFAULT_FEATURES,
       ...(stored.features && typeof stored.features === 'object' ? stored.features : {}),
     },
+    templates: mergeTemplates(stored.templates),
   }
 }
 
@@ -124,6 +316,28 @@ export function getPublicEmailSettings() {
     devCatcher: s.provider === 'ethereal',
     apiTokenMasked: s.apiToken ? maskToken(s.apiToken) : '',
     features: s.features,
+    templates: s.templates,
+    placeholders: [
+      'ownerName',
+      'ownerEmail',
+      'ownerPhone',
+      'businessName',
+      'city',
+      'userId',
+      'professionalEmail',
+      'loginUrl',
+      'onboardingUrl',
+      'siteUrl',
+      'cardUrl',
+      'bookUrl',
+      'menuUrl',
+      'host',
+      'plan',
+      'amount',
+      'method',
+      'reference',
+      'reviewedBy',
+    ],
   }
 }
 
@@ -131,6 +345,8 @@ export function saveEmailSettings(payload = {}) {
   const current = getEmailSettings()
   const nextToken = String(payload.apiToken ?? '').trim()
   const featuresIn = payload.features && typeof payload.features === 'object' ? payload.features : {}
+  const templatesIn =
+    payload.templates && typeof payload.templates === 'object' ? payload.templates : null
 
   const next = {
     provider: nextToken || current.apiToken ? 'zeptomail' : current.provider,
@@ -139,6 +355,18 @@ export function saveEmailSettings(payload = {}) {
     fromName: String(payload.fromName ?? current.fromName).trim() || 'IROAS',
     apiUrl: current.apiUrl,
     features: {
+      signupThankYouMail:
+        featuresIn.signupThankYouMail !== undefined
+          ? Boolean(featuresIn.signupThankYouMail)
+          : current.features.signupThankYouMail !== false,
+      signupAdminNotifyMail:
+        featuresIn.signupAdminNotifyMail !== undefined
+          ? Boolean(featuresIn.signupAdminNotifyMail)
+          : current.features.signupAdminNotifyMail !== false,
+      accountApprovedMail:
+        featuresIn.accountApprovedMail !== undefined
+          ? Boolean(featuresIn.accountApprovedMail)
+          : current.features.accountApprovedMail !== false,
       welcomeMail:
         featuresIn.welcomeMail !== undefined
           ? Boolean(featuresIn.welcomeMail)
@@ -152,6 +380,9 @@ export function saveEmailSettings(payload = {}) {
           ? Boolean(featuresIn.approvalDetailsMail)
           : current.features.approvalDetailsMail,
     },
+    templates: templatesIn
+      ? mergeTemplates({ ...current.templates, ...templatesIn })
+      : current.templates,
   }
 
   if (!next.fromEmail) {
@@ -169,6 +400,11 @@ export function saveEmailSettings(payload = {}) {
   return getPublicEmailSettings()
 }
 
+export function getEmailTemplate(key) {
+  const templates = getEmailSettings().templates || mergeTemplates()
+  return templates[key] || DEFAULT_EMAIL_TEMPLATES[key] || { subject: '', body: '' }
+}
+
 /** Bootstrap DB settings from .env so first boot has From email + features enabled. */
 export function ensureEmailSettingsBootstrapped() {
   const row = db.prepare('SELECT value_json FROM platform_settings WHERE key = ?').get(EMAIL_KEY)
@@ -181,6 +417,7 @@ export function ensureEmailSettingsBootstrapped() {
       fromEmail: env.fromEmail,
       fromName: env.fromName,
       features: { ...DEFAULT_FEATURES },
+      templates: mergeTemplates(),
     })
   } catch {
     return getPublicEmailSettings()

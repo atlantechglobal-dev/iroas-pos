@@ -38,4 +38,6 @@ export const publicApi = {
     ),
   listTables: (slug) =>
     apiRequest(`/public/${encodeURIComponent(slug)}/tables`, { auth: false }),
+  getPlatformCard: (slug) =>
+    apiRequest(`/public/platform-card/${encodeURIComponent(slug)}`, { auth: false }),
 }

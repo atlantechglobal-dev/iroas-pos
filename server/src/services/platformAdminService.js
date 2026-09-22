@@ -75,17 +75,31 @@ export function getPlan(id) {
 }
 
 export function getPlanAmount(plan) {
-  const key = String(plan || 'starter').toLowerCase()
+  const key = String(plan || 'starter')
+    .toLowerCase()
+    .trim()
   const row = db.prepare('SELECT price_zar FROM platform_plans WHERE id = ?').get(key)
-  if (row) return Math.round(Number(row.price_zar) || 0)
-  // legacy aliases
+  if (row) {
+    const amount = Math.round(Number(row.price_zar) || 0)
+    if (amount > 0) return amount
+  }
+  // legacy aliases / safe defaults when plan row missing or price is 0
   if (key === 'growth' || key === 'pro') return 2499
   if (key === 'enterprise') return 4999
   return 999
 }
 
+function slugifyPlanId(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-+|-+$)/g, '')
+    .slice(0, 48)
+}
+
 export function upsertPlan(payload) {
-  const id = String(payload.id || '').toLowerCase().trim()
+  const id = slugifyPlanId(payload.id)
   if (!id) {
     const err = new Error('Plan id is required.')
     err.status = 400
@@ -102,20 +116,62 @@ export function upsertPlan(payload) {
   const sortOrder = Number(payload.sortOrder) || 0
 
   const existing = db.prepare('SELECT id FROM platform_plans WHERE id = ?').get(id)
-  if (existing) {
-    db.prepare(
-      `UPDATE platform_plans
-       SET name = ?, tagline = ?, price_zar = ?, billing = ?, popular = ?, features_json = ?,
-           sort_order = ?, updated_at = datetime('now')
-       WHERE id = ?`,
-    ).run(name, tagline, priceZar, billing, popular, JSON.stringify(features), sortOrder, id)
-  } else {
-    db.prepare(
-      `INSERT INTO platform_plans (id, name, tagline, price_zar, billing, popular, features_json, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, name, tagline, priceZar, billing, popular, JSON.stringify(features), sortOrder)
-  }
+  const tx = db.transaction(() => {
+    if (popular) {
+      db.prepare('UPDATE platform_plans SET popular = 0 WHERE id != ?').run(id)
+    }
+    if (existing) {
+      db.prepare(
+        `UPDATE platform_plans
+         SET name = ?, tagline = ?, price_zar = ?, billing = ?, popular = ?, features_json = ?,
+             sort_order = ?, updated_at = datetime('now')
+         WHERE id = ?`,
+      ).run(name, tagline, priceZar, billing, popular, JSON.stringify(features), sortOrder, id)
+    } else {
+      db.prepare(
+        `INSERT INTO platform_plans (id, name, tagline, price_zar, billing, popular, features_json, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(id, name, tagline, priceZar, billing, popular, JSON.stringify(features), sortOrder)
+    }
+  })
+  tx()
   return getPlan(id)
+}
+
+export function deletePlan(id) {
+  const key = slugifyPlanId(id)
+  if (!key) {
+    const err = new Error('Plan id is required.')
+    err.status = 400
+    throw err
+  }
+  const existing = getPlan(key)
+  if (!existing) {
+    const err = new Error('Plan not found.')
+    err.status = 404
+    throw err
+  }
+  const total = db.prepare('SELECT COUNT(*) AS n FROM platform_plans').get().n
+  if (total <= 1) {
+    const err = new Error('Keep at least one plan.')
+    err.status = 400
+    throw err
+  }
+  const inUse = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM restaurants
+       WHERE lower(trim(plan)) = ? OR lower(trim(plan)) = ?`,
+    )
+    .get(key, existing.name.toLowerCase())
+  if (inUse?.n > 0) {
+    const err = new Error(
+      `Cannot delete “${existing.name}” — ${inUse.n} restaurant(s) still use this plan.`,
+    )
+    err.status = 409
+    throw err
+  }
+  db.prepare('DELETE FROM platform_plans WHERE id = ?').run(key)
+  return { ok: true, id: key }
 }
 
 export function listFeatureFlags() {
@@ -170,6 +226,145 @@ export function listPlatformStaff() {
       role: row.role,
       createdAt: row.created_at,
     }))
+}
+
+function readAdminCardsStore() {
+  const row = db.prepare('SELECT value_json FROM platform_settings WHERE key = ?').get('admin_business_cards')
+  try {
+    return row?.value_json ? JSON.parse(row.value_json) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeAdminCardsStore(store) {
+  db.prepare(
+    `INSERT INTO platform_settings (key, value_json, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET
+       value_json = excluded.value_json,
+       updated_at = datetime('now')`,
+  ).run('admin_business_cards', JSON.stringify(store))
+}
+
+function defaultAdminCard(user) {
+  return {
+    theme: 'lime',
+    layout: 'split-gold',
+    orgName: 'IROAS',
+    publicSlug: 'iroas',
+    published: true,
+    card: {
+      name: user?.name || 'IROAS Admin',
+      role: 'Super Admin',
+      phone: user?.phone || '',
+      email: user?.email || '',
+      website: 'iroas.com',
+      insta: '',
+      address: '',
+      city: '',
+      country: '',
+      tagline: 'Platform operations · Restaurant digital suite',
+      heroDataUrl: '',
+      circleDataUrl: '',
+      logoDataUrl: '',
+    },
+    updatedAt: null,
+  }
+}
+
+export function getAdminBusinessCard(user) {
+  const store = readAdminCardsStore()
+  const saved = store[String(user.id)]
+  const base = defaultAdminCard(user)
+  if (!saved) return base
+  return {
+    ...base,
+    ...saved,
+    card: { ...base.card, ...(saved.card || {}) },
+  }
+}
+
+export function saveAdminBusinessCard(user, payload = {}) {
+  const current = getAdminBusinessCard(user)
+  const nextCard = {
+    ...current.card,
+    ...(payload.card || {}),
+    name: String(payload.card?.name ?? current.card.name ?? '').trim() || user.name || 'IROAS Admin',
+    role: String(payload.card?.role ?? current.card.role ?? 'Super Admin').trim() || 'Super Admin',
+    email: String(payload.card?.email ?? current.card.email ?? user.email ?? '').trim(),
+    phone: String(payload.card?.phone ?? current.card.phone ?? '').trim(),
+    website: String(payload.card?.website ?? current.card.website ?? '').trim(),
+    insta: String(payload.card?.insta ?? current.card.insta ?? '').trim(),
+    address: String(payload.card?.address ?? current.card.address ?? '').trim(),
+    city: String(payload.card?.city ?? current.card.city ?? '').trim(),
+    country: String(payload.card?.country ?? current.card.country ?? '').trim(),
+    tagline: String(payload.card?.tagline ?? current.card.tagline ?? '').trim(),
+    heroDataUrl: payload.card?.heroDataUrl ?? current.card.heroDataUrl ?? '',
+    circleDataUrl: payload.card?.circleDataUrl ?? current.card.circleDataUrl ?? '',
+    logoDataUrl: payload.card?.logoDataUrl ?? current.card.logoDataUrl ?? '',
+  }
+  const publicSlug = String(payload.publicSlug ?? current.publicSlug ?? 'iroas')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/^-|-$/g, '') || 'iroas'
+
+  const next = {
+    theme: payload.theme || current.theme || 'lime',
+    layout: payload.layout || current.layout || 'split-gold',
+    orgName: String(payload.orgName ?? current.orgName ?? 'IROAS').trim() || 'IROAS',
+    publicSlug,
+    published: payload.published !== undefined ? Boolean(payload.published) : current.published !== false,
+    card: nextCard,
+    updatedAt: new Date().toISOString(),
+  }
+
+  const store = readAdminCardsStore()
+  // Keep public slug unique among published admin cards
+  for (const [id, entry] of Object.entries(store)) {
+    if (id === String(user.id)) continue
+    if (entry?.published && entry?.publicSlug === publicSlug) {
+      const err = new Error('That public card link is already used by another admin.')
+      err.status = 409
+      throw err
+    }
+  }
+  store[String(user.id)] = next
+  writeAdminCardsStore(store)
+  return next
+}
+
+/** Public lookup by slug for guest business card page. */
+export function getPublishedAdminCardBySlug(slug) {
+  const clean = String(slug || '')
+    .toLowerCase()
+    .trim()
+  if (!clean) return null
+  const store = readAdminCardsStore()
+  for (const [userId, entry] of Object.entries(store)) {
+    if (!entry?.published) continue
+    if (String(entry.publicSlug || '').toLowerCase() !== clean) continue
+    const admin = db.prepare('SELECT id, name, email, phone FROM users WHERE id = ? AND role = ?').get(
+      Number(userId),
+      'admin',
+    )
+    return {
+      ...entry,
+      admin: admin
+        ? { id: admin.id, name: admin.name, email: admin.email, phone: admin.phone || '' }
+        : null,
+    }
+  }
+  // Fallback: default IROAS card from first admin when slug is iroas and nothing saved
+  if (clean === 'iroas') {
+    const admin = db
+      .prepare(`SELECT id, name, email, phone FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1`)
+      .get()
+    if (!admin) return null
+    return { ...defaultAdminCard(admin), admin }
+  }
+  return null
 }
 
 export function createPlatformStaff({ name, email, password, phone }) {

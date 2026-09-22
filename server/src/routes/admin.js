@@ -22,7 +22,6 @@ import {
   mapTenant,
   notifyOwner,
   TENANT_STATUSES,
-  validateChecklist,
 } from '../services/tenantReview.js'
 import { sendApprovalEmails } from '../services/onboardingMessaging.js'
 import {
@@ -33,14 +32,28 @@ import {
 } from '../services/emailService.js'
 import { getPublicPaymentSettings, savePaymentSettings } from '../services/paymentSettings.js'
 import {
+  getPublicGoogleAuthSettings,
+  saveGoogleAuthSettings,
+} from '../services/googleAuthSettings.js'
+import {
+  addBusinessCategory,
+  listBusinessCategories,
+  removeBusinessCategory,
+  renameBusinessCategory,
+  saveBusinessCategories,
+} from '../services/businessCategories.js'
+import {
   appendPlatformAudit,
   createPlatformStaff,
+  getAdminBusinessCard,
   getPlatformHealth,
   listFeatureFlags,
+  deletePlan,
   listPlans,
   listPlatformAudit,
   listPlatformFeed,
   listPlatformStaff,
+  saveAdminBusinessCard,
   saveFeatureFlags,
   upsertPlan,
 } from '../services/platformAdminService.js'
@@ -79,9 +92,23 @@ router.get('/stats', (req, res) => {
     )
     .get().n
 
-  const pendingApprovals = db
-    .prepare("SELECT COUNT(*) AS n FROM restaurants WHERE status = 'pending_approval'")
-    .get().n
+  const pendingRows = db
+    .prepare(
+      `SELECT settings_json FROM restaurants WHERE status = 'pending_approval'`,
+    )
+    .all()
+  let pendingAccountApprovals = 0
+  let pendingApprovals = 0
+  for (const row of pendingRows) {
+    let awaiting = false
+    try {
+      awaiting = Boolean(JSON.parse(row.settings_json || '{}').awaitingAccountApproval)
+    } catch {
+      awaiting = false
+    }
+    if (awaiting) pendingAccountApprovals += 1
+    else pendingApprovals += 1
+  }
 
   const onboardingTenants = db
     .prepare("SELECT COUNT(*) AS n FROM restaurants WHERE status = 'onboarding'")
@@ -92,6 +119,7 @@ router.get('/stats', (req, res) => {
     totalTenants,
     onboardingTenants,
     pendingApprovals,
+    pendingAccountApprovals,
     rejectedTenants,
     identityPending,
   })
@@ -100,13 +128,15 @@ router.get('/stats', (req, res) => {
 router.get('/tenants', (req, res) => {
   const search = (req.query.search || '').toLowerCase()
   const status = req.query.status || ''
+  const kind = String(req.query.kind || '').trim().toLowerCase()
 
   let rows = db
     .prepare(
       `SELECT r.id, r.name, r.city, r.country, r.plan, r.status, r.launched_at,
               r.submitted_at, r.cuisine, r.subdomain, r.custom_domain, r.created_at,
               r.rejection_reason, r.rejected_at, r.reviewed_at, r.reviewed_by,
-              u.name AS owner_name, u.email AS owner_email,
+              r.email AS restaurant_email, r.phone AS restaurant_phone, r.settings_json,
+              u.name AS owner_name, u.email AS owner_email, u.phone AS owner_phone,
               reviewer.name AS reviewer_name, reviewer.email AS reviewer_email
        FROM restaurants r
        JOIN users u ON u.id = r.owner_id
@@ -123,17 +153,57 @@ router.get('/tenants', (req, res) => {
     )
     .all()
 
-  if (status && TENANT_STATUSES.includes(status) && status !== 'deleted') {
-    rows = rows.filter((r) => r.status === status)
+  const withFlags = rows.map((r) => {
+    let settings = {}
+    try {
+      settings = r.settings_json ? JSON.parse(r.settings_json) : {}
+    } catch {
+      settings = {}
+    }
+    const awaitingAccountApproval = Boolean(settings.awaitingAccountApproval)
+    const accountApprovedAt = settings.accountApprovedAt || null
+    const onboardingPaid = Boolean(settings?.onboardingPayment?.paid)
+    const businessCategory = settings.businessCategory || settings.category || ''
+    const { settings_json: _omit, ...rest } = r
+    return {
+      ...rest,
+      awaitingAccountApproval,
+      accountApprovedAt,
+      onboardingPaid,
+      businessCategory,
+    }
+  })
+
+  let filtered = withFlags
+
+  if (kind === 'account') {
+    // Only Create Account signup approvals (single approval gate)
+    filtered = filtered.filter(
+      (r) => r.awaitingAccountApproval || Boolean(r.accountApprovedAt),
+    )
   }
 
-  const filtered = search
-    ? rows.filter((r) =>
-        `${r.name} ${r.city} ${r.owner_name} ${r.owner_email}`.toLowerCase().includes(search),
-      )
-    : rows
+  if (kind === 'account' && status === 'waiting') {
+    filtered = filtered.filter(
+      (r) => r.awaitingAccountApproval && r.status === 'pending_approval',
+    )
+  } else if (kind === 'account' && status === 'approved') {
+    filtered = filtered.filter(
+      (r) => !r.awaitingAccountApproval && Boolean(r.accountApprovedAt),
+    )
+  } else if (status && TENANT_STATUSES.includes(status) && status !== 'deleted') {
+    filtered = filtered.filter((r) => r.status === status)
+  }
 
-  res.json({ tenants: filtered, total: rows.length })
+  if (search) {
+    filtered = filtered.filter((r) =>
+      `${r.name} ${r.city} ${r.owner_name} ${r.owner_email} ${r.businessCategory}`
+        .toLowerCase()
+        .includes(search),
+    )
+  }
+
+  res.json({ tenants: filtered, total: filtered.length })
 })
 
 router.get('/tenants/:id', (req, res) => {
@@ -239,48 +309,66 @@ router.post('/tenants/:id/approve', async (req, res) => {
   if (!restaurant || restaurant.status === 'deleted') {
     return res.status(404).json({ error: 'Tenant not found.' })
   }
+
+  let settings = {}
+  try {
+    settings = restaurant.settings_json ? JSON.parse(restaurant.settings_json) : {}
+  } catch {
+    settings = {}
+  }
+
+  // Only Create Account approval remains — no second publish/checklist approve
+  if (!settings.awaitingAccountApproval) {
+    return res.status(400).json({
+      error:
+        'This account does not need approval. Only new Create Account signups are approved here.',
+    })
+  }
   if (restaurant.status !== 'pending_approval') {
-    return res.status(400).json({ error: 'Only applications awaiting approval can be published.' })
+    return res.status(400).json({ error: 'Only new signups awaiting approval can be approved.' })
   }
-  if (!validateChecklist(req.body?.checks)) {
-    return res.status(400).json({ error: 'Verify profile, domain, brand, and preview before approving.' })
-  }
+
+  const nextStatus = 'onboarding'
+  const nextSettings = { ...settings }
+  delete nextSettings.awaitingAccountApproval
+  nextSettings.accountApprovedAt = new Date().toISOString()
 
   db.prepare(
     `UPDATE restaurants SET
-       status = 'live',
-       launched_at = COALESCE(launched_at, datetime('now')),
+       status = ?,
        reviewed_at = datetime('now'),
        reviewed_by = ?,
        rejection_reason = NULL,
        rejected_at = NULL,
+       settings_json = ?,
        updated_at = datetime('now')
      WHERE id = ?`,
-  ).run(req.user.id, restaurant.id)
+  ).run(nextStatus, req.user.id, JSON.stringify(nextSettings), restaurant.id)
 
   appendTenantEvent({
     restaurantId: restaurant.id,
     action: 'approve',
     previousStatus: restaurant.status,
-    newStatus: 'live',
-    note: 'Approved and published',
+    newStatus: nextStatus,
+    note: 'Account approved — owner can continue setup',
     changedBy: req.user.id,
   })
   auditFromReq(req, 'tenant.approve', 'tenant', restaurant.id, restaurant.name || '')
 
-  const updated = { ...restaurant, status: 'live' }
+  const updated = { ...restaurant, status: nextStatus, settings_json: JSON.stringify(nextSettings) }
   createNotification({
     userId: restaurant.owner_id,
     type: 'restaurant',
-    title: 'Your restaurant is approved',
-    body: `${restaurant.name || 'Your restaurant'} is now live. Customers can visit your public site.`,
-    meta: { restaurantId: restaurant.id, status: 'live' },
+    title: 'Your account is approved',
+    body: `${restaurant.name || 'Your account'} was approved. Sign in to continue setup.`,
+    meta: { restaurantId: restaurant.id, status: nextStatus },
   })
 
   const adminUser = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.id)
   const emails = await sendApprovalEmails({
     restaurant: updated,
     reviewedByAdminEmail: adminUser?.email || req.user.email || '',
+    accountApproval: true,
   })
 
   const row = getTenantRow(restaurant.id)
@@ -763,8 +851,121 @@ router.put('/payment-settings', (req, res) => {
   }
 })
 
+router.get('/google-auth-settings', (_req, res) => {
+  res.json({ settings: getPublicGoogleAuthSettings() })
+})
+
+router.put('/google-auth-settings', (req, res) => {
+  try {
+    const settings = saveGoogleAuthSettings(req.body || {})
+    auditFromReq(req, 'settings.google_auth', 'settings', 'google_auth', 'Updated Google sign-in settings')
+    res.json({ ok: true, settings })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to save Google sign-in settings.' })
+  }
+})
+
+router.get('/business-categories', (_req, res) => {
+  res.json({ categories: listBusinessCategories() })
+})
+
+router.put('/business-categories', (req, res) => {
+  try {
+    const categories = saveBusinessCategories(req.body?.categories || req.body || [])
+    auditFromReq(
+      req,
+      'settings.business_categories',
+      'settings',
+      'business_categories',
+      `Saved ${categories.length} categories`,
+    )
+    res.json({ ok: true, categories })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to save categories.' })
+  }
+})
+
+router.post('/business-categories', (req, res) => {
+  try {
+    const categories = addBusinessCategory(req.body?.name || req.body?.category)
+    auditFromReq(
+      req,
+      'settings.business_categories.create',
+      'settings',
+      'business_categories',
+      `Added category`,
+    )
+    res.status(201).json({ ok: true, categories })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to add category.' })
+  }
+})
+
+router.put('/business-categories/rename', (req, res) => {
+  try {
+    const categories = renameBusinessCategory(req.body?.oldName, req.body?.newName)
+    auditFromReq(
+      req,
+      'settings.business_categories.rename',
+      'settings',
+      'business_categories',
+      `Renamed category`,
+    )
+    res.json({ ok: true, categories })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to rename category.' })
+  }
+})
+
+router.delete('/business-categories', (req, res) => {
+  try {
+    const name = req.body?.name || req.query?.name
+    const categories = removeBusinessCategory(name)
+    auditFromReq(
+      req,
+      'settings.business_categories.delete',
+      'settings',
+      'business_categories',
+      `Removed category`,
+    )
+    res.json({ ok: true, categories })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to remove category.' })
+  }
+})
+
 router.get('/plans', (_req, res) => {
   res.json({ plans: listPlans() })
+})
+
+router.post('/plans', (req, res) => {
+  try {
+    const body = req.body || {}
+    const id =
+      String(body.id || '').trim() ||
+      String(body.name || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-+|-+$)/g, '')
+    if (!id) {
+      return res.status(400).json({ error: 'Plan name is required.' })
+    }
+    const existing = listPlans().find((p) => p.id === id)
+    if (existing) {
+      return res.status(409).json({ error: `Plan “${id}” already exists. Edit it instead.` })
+    }
+    const maxSort = listPlans().reduce((m, p) => Math.max(m, Number(p.sortOrder) || 0), 0)
+    const plan = upsertPlan({
+      ...body,
+      id,
+      sortOrder: body.sortOrder !== undefined ? body.sortOrder : maxSort + 1,
+    })
+    auditFromReq(req, 'plans.create', 'plan', plan.id, `${plan.name} · R${plan.priceZar}`)
+    res.status(201).json({ ok: true, plan, plans: listPlans() })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to create plan.' })
+  }
 })
 
 router.put('/plans/:id', (req, res) => {
@@ -774,6 +975,16 @@ router.put('/plans/:id', (req, res) => {
     res.json({ ok: true, plan, plans: listPlans() })
   } catch (err) {
     res.status(err.status || 400).json({ error: err.message || 'Unable to save plan.' })
+  }
+})
+
+router.delete('/plans/:id', (req, res) => {
+  try {
+    const result = deletePlan(req.params.id)
+    auditFromReq(req, 'plans.delete', 'plan', result.id, `Deleted plan ${result.id}`)
+    res.json({ ok: true, ...result, plans: listPlans() })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to delete plan.' })
   }
 })
 
@@ -816,6 +1027,20 @@ router.post('/staff', (req, res) => {
     res.status(201).json({ ok: true, user, staff: listPlatformStaff() })
   } catch (err) {
     res.status(err.status || 400).json({ error: err.message || 'Unable to create staff user.' })
+  }
+})
+
+router.get('/professional-card', (req, res) => {
+  res.json({ card: getAdminBusinessCard(req.user) })
+})
+
+router.put('/professional-card', (req, res) => {
+  try {
+    const card = saveAdminBusinessCard(req.user, req.body || {})
+    auditFromReq(req, 'admin.card.save', 'user', req.user.id, card.publicSlug || '')
+    res.json({ ok: true, card })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to save professional card.' })
   }
 })
 

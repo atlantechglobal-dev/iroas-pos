@@ -4,11 +4,12 @@ import { ROUTES } from '../../constants/routes.js'
 import { clearSession, getToken } from '../storage/authStorage.js'
 
 export class ApiError extends Error {
-  constructor(message, { status, data } = {}) {
+  constructor(message, { status, data, code } = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.data = data
+    this.code = code || data?.code || undefined
   }
 }
 
@@ -61,6 +62,7 @@ export async function apiRequest(path, { method = 'GET', body, auth = true, sign
     throw new ApiError(data.error || fallback, {
       status: response.status,
       data,
+      code: data.code,
     })
   }
 

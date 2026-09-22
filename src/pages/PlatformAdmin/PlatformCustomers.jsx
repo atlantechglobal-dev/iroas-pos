@@ -3,7 +3,6 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useDebounce } from '../../hooks/useDebounce.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -66,8 +65,6 @@ function PlatformCustomers() {
           </p>
         </div>
       </div>
-
-      <PlatformSubnav active="platform-customers" />
 
       <div className="stats-grid">
         <div className="stat-card">

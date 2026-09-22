@@ -4,9 +4,8 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout.jsx'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
 import { ROUTES } from '../../constants/routes.js'
-import { PlatformSubnav } from '../PlatformAdmin/PlatformSubnav.jsx'
 import './EmailSettings.css'
-import '../PlatformAdmin/PlatformAdminExtra.css'
+import './PaymentSettings.css'
 
 function PaymentSettings() {
   const toast = useToast()
@@ -26,6 +25,7 @@ function PaymentSettings() {
     privateKeyMasked: '',
     gatewayPublicKeySet: false,
     gatewayPublicKeyMasked: '',
+    useSandbox: true,
   })
 
   const applyMeta = (settings) => {
@@ -35,6 +35,7 @@ function PaymentSettings() {
       privateKeyMasked: settings.privateKeyMasked || '',
       gatewayPublicKeySet: Boolean(settings.gatewayPublicKeySet),
       gatewayPublicKeyMasked: settings.gatewayPublicKeyMasked || '',
+      useSandbox: settings.useSandbox !== false,
     })
   }
 
@@ -86,7 +87,7 @@ function PaymentSettings() {
 
   return (
     <DashboardLayout
-      pageClassName="email-settings-page"
+      pageClassName="email-settings-page payment-settings-page"
       activeNav="platform-settings-payment"
       variant="admin"
     >
@@ -98,9 +99,8 @@ function PaymentSettings() {
           <p className="eyebrow">Platform</p>
           <h1>Payment settings</h1>
           <p className="page-desc">
-            AddPay (PayCloud) credentials for the onboarding launch payment. Owners are
-            redirected to AddPay's own hosted checkout — card and UPI details are never
-            collected on IROAS.
+            Connect AddPay for launch checkout. Owners pay on AddPay’s hosted page — card and bank
+            details never touch IROAS.
           </p>
         </div>
         <div className="es-page-head-actions">
@@ -119,108 +119,156 @@ function PaymentSettings() {
         </div>
       </div>
 
-      <PlatformSubnav active="platform-settings-payment" />
-
       {loading ? (
         <p className="es-muted">Loading payment settings…</p>
       ) : (
-        <form id="payment-settings-form" className="es-layout is-single" onSubmit={save}>
-          <section className="es-panel">
-            <header className="es-panel-head">
+        <form id="payment-settings-form" className="ps-layout" onSubmit={save}>
+          <section className="ps-hero">
+            <div>
+              <p className="ps-hero-kicker">Launch payments</p>
+              <h2>AddPay gateway</h2>
+              <p>
+                Credentials from your PayCloud merchant dashboard. Sandbox for testing; turn it off
+                when you are ready for live charges.
+              </p>
+            </div>
+            <div className="ps-hero-meta">
               <div>
-                <h2>AddPay credentials</h2>
-                <p>From your AddPay / PayCloud merchant dashboard.</p>
+                <span>Mode</span>
+                <strong>{form.useSandbox ? 'Sandbox (UAT)' : 'Live production'}</strong>
               </div>
-            </header>
-
-            <div className="es-panel-body">
-              <div className="es-field-row">
-                <label className="es-field">
-                  <span>App ID</span>
-                  <input
-                    required
-                    placeholder="App ID"
-                    value={form.appId}
-                    onChange={(e) => setForm((f) => ({ ...f, appId: e.target.value }))}
-                  />
-                </label>
-                <label className="es-field">
-                  <span>Merchant No</span>
-                  <input
-                    required
-                    placeholder="Merchant number"
-                    value={form.merchantNo}
-                    onChange={(e) => setForm((f) => ({ ...f, merchantNo: e.target.value }))}
-                  />
-                </label>
-              </div>
-
-              <label className="es-field">
-                <span>Store No</span>
-                <input
-                  required
-                  placeholder="Store number"
-                  value={form.storeNo}
-                  onChange={(e) => setForm((f) => ({ ...f, storeNo: e.target.value }))}
-                />
-              </label>
-
-              <label className="es-field">
-                <span>
-                  Private key (yours — signs outgoing requests)
-                  {meta.privateKeySet ? (
-                    <em className="es-current">Current: {meta.privateKeyMasked}</em>
-                  ) : null}
-                </span>
-                <textarea
-                  autoComplete="off"
-                  placeholder={
-                    meta.privateKeySet
-                      ? 'Leave blank to keep the current key'
-                      : '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'
-                  }
-                  value={form.privateKey}
-                  onChange={(e) => setForm((f) => ({ ...f, privateKey: e.target.value }))}
-                />
-              </label>
-
-              <label className="es-field">
-                <span>
-                  Gateway public key (AddPay's — verifies incoming webhooks)
-                  {meta.gatewayPublicKeySet ? (
-                    <em className="es-current">Current: {meta.gatewayPublicKeyMasked}</em>
-                  ) : null}
-                </span>
-                <textarea
-                  autoComplete="off"
-                  placeholder={
-                    meta.gatewayPublicKeySet
-                      ? 'Leave blank to keep the current key'
-                      : '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----'
-                  }
-                  value={form.gatewayPublicKey}
-                  onChange={(e) => setForm((f) => ({ ...f, gatewayPublicKey: e.target.value }))}
-                />
-              </label>
-
-              <label className="es-inline-toggle">
-                <input
-                  type="checkbox"
-                  checked={form.useSandbox}
-                  onChange={(e) => setForm((f) => ({ ...f, useSandbox: e.target.checked }))}
-                />
-                Use AddPay sandbox (UAT) — turn off to go live with real charges
-              </label>
-
-              <div className="es-note">
-                <strong>How this is used</strong>
-                <p>
-                  Pasting a key here doesn't confirm it's correct — you can only verify it by
-                  running a real onboarding payment through the flow once saved. Keys can be
-                  pasted with or without the BEGIN/END lines; either works.
-                </p>
+              <div>
+                <span>Webhook</span>
+                <strong>/api/public/payments/addpay/webhook</strong>
               </div>
             </div>
+          </section>
+
+          <div className="ps-grid">
+            <section className="es-panel">
+              <header className="es-panel-head">
+                <div>
+                  <h2>Merchant credentials</h2>
+                  <p>App ID, merchant, and store identifiers.</p>
+                </div>
+              </header>
+              <div className="es-panel-body">
+                <div className="es-field-row">
+                  <label className="es-field">
+                    <span>App ID</span>
+                    <input
+                      required
+                      placeholder="Your AddPay App ID"
+                      value={form.appId}
+                      onChange={(e) => setForm((f) => ({ ...f, appId: e.target.value }))}
+                    />
+                  </label>
+                  <label className="es-field">
+                    <span>Merchant No</span>
+                    <input
+                      required
+                      placeholder="Merchant number"
+                      value={form.merchantNo}
+                      onChange={(e) => setForm((f) => ({ ...f, merchantNo: e.target.value }))}
+                    />
+                  </label>
+                </div>
+                <label className="es-field">
+                  <span>Store No</span>
+                  <input
+                    required
+                    placeholder="Store number"
+                    value={form.storeNo}
+                    onChange={(e) => setForm((f) => ({ ...f, storeNo: e.target.value }))}
+                  />
+                </label>
+
+                <label className={`ps-env-toggle${form.useSandbox ? ' is-sandbox' : ' is-live'}`}>
+                  <span className="ps-env-copy">
+                    <strong>{form.useSandbox ? 'Sandbox mode' : 'Live mode'}</strong>
+                    <small>
+                      {form.useSandbox
+                        ? 'Uses open-uat.paycloud.africa — safe for test payments.'
+                        : 'Uses api.paycloud.africa — real charges will be collected.'}
+                    </small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={form.useSandbox}
+                    onChange={(e) => setForm((f) => ({ ...f, useSandbox: e.target.checked }))}
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="es-panel">
+              <header className="es-panel-head">
+                <div>
+                  <h2>Security keys</h2>
+                  <p>RSA keys for signing checkouts and verifying webhooks.</p>
+                </div>
+              </header>
+              <div className="es-panel-body">
+                <label className="es-field">
+                  <span>
+                    Private key
+                    {meta.privateKeySet ? (
+                      <em className="es-current">Saved · {meta.privateKeyMasked}</em>
+                    ) : (
+                      <em className="es-current">Required</em>
+                    )}
+                  </span>
+                  <textarea
+                    autoComplete="off"
+                    rows={5}
+                    placeholder={
+                      meta.privateKeySet
+                        ? 'Leave blank to keep the current private key'
+                        : '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'
+                    }
+                    value={form.privateKey}
+                    onChange={(e) => setForm((f) => ({ ...f, privateKey: e.target.value }))}
+                  />
+                </label>
+
+                <label className="es-field">
+                  <span>
+                    Gateway public key
+                    {meta.gatewayPublicKeySet ? (
+                      <em className="es-current">Saved · {meta.gatewayPublicKeyMasked}</em>
+                    ) : (
+                      <em className="es-current">Required</em>
+                    )}
+                  </span>
+                  <textarea
+                    autoComplete="off"
+                    rows={5}
+                    placeholder={
+                      meta.gatewayPublicKeySet
+                        ? 'Leave blank to keep the current gateway public key'
+                        : '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----'
+                    }
+                    value={form.gatewayPublicKey}
+                    onChange={(e) => setForm((f) => ({ ...f, gatewayPublicKey: e.target.value }))}
+                  />
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <section className="ps-footnote">
+            <div>
+              <strong>Verify with a real checkout</strong>
+              <p>
+                Saving credentials does not validate them. Run one onboarding payment after save to
+                confirm signing and webhooks. Keys accept PEM with or without BEGIN/END lines.
+              </p>
+            </div>
+            <ul>
+              <li>Return URL → /onboarding/payment?paid=return</li>
+              <li>Notify URL → public AddPay webhook</li>
+              <li>Amount comes from Plans (ZAR)</li>
+            </ul>
           </section>
         </form>
       )}

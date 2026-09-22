@@ -1,20 +1,22 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { ProtectedRoute } from './ProtectedRoute.jsx'
 import { PublicRoute } from './PublicRoute.jsx'
-import { ROUTES } from '../../constants/routes.js'
+import { platformAccountApproveProfilePath, ROUTES } from '../../constants/routes.js'
 
-const Login = lazy(() => import('../../pages/Login/Login.jsx'))
+/* Eager entry pages — login ↔ signup ↔ thanks should not wait on Suspense */
+import Login from '../../pages/Login/Login.jsx'
+import CreateAccount from '../../pages/CreateAccount/CreateAccount.jsx'
+import AccountThanks from '../../pages/AccountThanks/AccountThanks.jsx'
+
 const ForgotPassword = lazy(() => import('../../pages/ForgotPassword/ForgotPassword.jsx'))
 const AccountRecovery = lazy(() => import('../../pages/AccountRecovery/AccountRecovery.jsx'))
 const NewPassword = lazy(() => import('../../pages/NewPassword/NewPassword.jsx'))
 const PasswordUpdated = lazy(() => import('../../pages/PasswordUpdated/PasswordUpdated.jsx'))
-const CreateAccount = lazy(() => import('../../pages/CreateAccount/CreateAccount.jsx'))
 const RestaurantSetup = lazy(() => import('../../pages/RestaurantSetup/RestaurantSetup.jsx'))
 const Domain = lazy(() => import('../../pages/Domain/Domain.jsx'))
 const Brand = lazy(() => import('../../pages/Brand/Brand.jsx'))
 const Launch = lazy(() => import('../../pages/Launch/Launch.jsx'))
-const SetupReview = lazy(() => import('../../pages/SetupReview/SetupReview.jsx'))
 const OnboardingPayment = lazy(() => import('../../pages/OnboardingPayment/OnboardingPayment.jsx'))
 const PaymentThanks = lazy(() => import('../../pages/OnboardingPayment/PaymentThanks.jsx'))
 const GoLive = lazy(() => import('../../pages/GoLive/GoLive.jsx'))
@@ -36,8 +38,15 @@ const PlatformCustomers = lazy(() => import('../../pages/PlatformAdmin/PlatformC
 const PlatformCustomerOnboarding = lazy(
   () => import('../../pages/PlatformAdmin/CustomerOnboarding.jsx'),
 )
-const PlatformApprove = lazy(() => import('../../pages/PlatformAdmin/Approve.jsx'))
-const PlatformApproveProfile = lazy(() => import('../../pages/PlatformAdmin/ApproveProfile.jsx'))
+const PlatformAccountApprove = lazy(() => import('../../pages/PlatformAdmin/AccountApprove.jsx'))
+const PlatformAccountApproveProfile = lazy(
+  () => import('../../pages/PlatformAdmin/AccountApproveProfile.jsx'),
+)
+
+function RedirectLegacyApproveProfile() {
+  const { tenantId } = useParams()
+  return <Navigate to={platformAccountApproveProfilePath(tenantId)} replace />
+}
 const PlatformIdentityReview = lazy(() => import('../../pages/PlatformAdmin/IdentityReview.jsx'))
 const PlatformProducts = lazy(() => import('../../pages/PlatformAdmin/ProductsAdmin.jsx'))
 const PlatformNotifications = lazy(
@@ -45,6 +54,9 @@ const PlatformNotifications = lazy(
 )
 const PlatformAudit = lazy(() => import('../../pages/PlatformAdmin/PlatformAudit.jsx'))
 const PlatformStaff = lazy(() => import('../../pages/PlatformAdmin/PlatformStaff.jsx'))
+const PlatformProfessional = lazy(
+  () => import('../../pages/PlatformAdmin/PlatformProfessional.jsx'),
+)
 const PlatformSettings = lazy(() => import('../../pages/PlatformAdmin/PlatformSettings.jsx'))
 const PlatformFeatureFlags = lazy(() => import('../../pages/PlatformAdmin/FeatureFlags.jsx'))
 const Menu = lazy(() => import('../../pages/Menu/Menu.jsx'))
@@ -63,6 +75,10 @@ const Notifications = lazy(() => import('../../pages/Notifications/Notifications
 const Settings = lazy(() => import('../../pages/Settings/Settings.jsx'))
 const EmailSettings = lazy(() => import('../../pages/Settings/EmailSettings.jsx'))
 const PaymentSettings = lazy(() => import('../../pages/Settings/PaymentSettings.jsx'))
+const GoogleAuthSettings = lazy(() => import('../../pages/Settings/GoogleAuthSettings.jsx'))
+const BusinessCategoriesSettings = lazy(
+  () => import('../../pages/PlatformAdmin/BusinessCategoriesSettings.jsx'),
+)
 const SettingsUsers = lazy(() =>
   import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsUsers })),
 )
@@ -90,14 +106,20 @@ const Unauthorized = lazy(() => import('../../pages/Unauthorized/Unauthorized.js
 function RouteFallback() {
   return (
     <div className="app-loading" role="status" aria-live="polite">
-      Loading…
+      <span className="app-loading-spinner" aria-hidden="true" />
+      <p>Loading…</p>
     </div>
   )
 }
 
 function withProtection(
   Component,
-  { adminOnly = false, requireLive = false, onboardingOnly = false, allowPending = false } = {},
+  {
+    adminOnly = false,
+    requireLive = false,
+    onboardingOnly = false,
+    allowPending = false,
+  } = {},
 ) {
   return (
     <ProtectedRoute
@@ -128,6 +150,7 @@ export function AppRoutes() {
         <Route path={ROUTES.NEW_PASSWORD} element={<PublicRoute><NewPassword /></PublicRoute>} />
         <Route path={ROUTES.PASSWORD_UPDATED} element={<PublicRoute><PasswordUpdated /></PublicRoute>} />
         <Route path={ROUTES.CREATE_ACCOUNT} element={<PublicRoute><CreateAccount /></PublicRoute>} />
+        <Route path={ROUTES.ACCOUNT_THANKS} element={<PublicRoute><AccountThanks /></PublicRoute>} />
 
         {/* Guest share pages — public, no auth redirect */}
         <Route path={ROUTES.GUEST_ONE_LINK} element={<GuestOneLink />} />
@@ -139,7 +162,7 @@ export function AppRoutes() {
 
         <Route path={ROUTES.RESTAURANT_SETUP} element={withProtection(RestaurantSetup, WIZARD_ONLY)} />
         <Route path={ROUTES.DOMAIN} element={withProtection(Domain, WIZARD_ONLY)} />
-        <Route path={ROUTES.BRAND} element={withProtection(Brand)} />
+        <Route path={ROUTES.BRAND} element={withProtection(Brand, WIZARD_ONLY)} />
         <Route path={ROUTES.LAUNCH} element={withProtection(Launch, WIZARD_ONLY)} />
         <Route
           path={ROUTES.ONBOARDING_PAYMENT}
@@ -150,8 +173,12 @@ export function AppRoutes() {
           element={withProtection(PaymentThanks, { onboardingOnly: true, allowPending: true })}
         />
         <Route
+          path={ROUTES.AWAITING_APPROVAL}
+          element={<Navigate to={ROUTES.DASHBOARD} replace />}
+        />
+        <Route
           path={ROUTES.SETUP_REVIEW}
-          element={withProtection(SetupReview, { onboardingOnly: true, allowPending: true })}
+          element={<Navigate to={ROUTES.DASHBOARD} replace />}
         />
         <Route path={ROUTES.GO_LIVE} element={withProtection(GoLive, WIZARD_ONLY)} />
         <Route path={ROUTES.DASHBOARD} element={withProtection(Dashboard, LIVE_ONLY)} />
@@ -159,9 +186,9 @@ export function AppRoutes() {
         <Route path={ROUTES.DIRECTORY_LISTINGS} element={withProtection(DirectoryListings, LIVE_ONLY)} />
         <Route path={ROUTES.DIGITAL_BUSINESS_CARD} element={withProtection(DigitalBusinessCard, LIVE_ONLY)} />
         <Route path={ROUTES.BUSINESS_ID} element={withProtection(BusinessId, LIVE_ONLY)} />
-        <Route path={ROUTES.DIGITAL_IDENTITY} element={withProtection(DigitalIdentity)} />
-        <Route path={ROUTES.DIGITAL_IDENTITY_FORM} element={withProtection(DigitalIdentityForm)} />
-        <Route path={ROUTES.MOBILE_APP} element={withProtection(MobileApplication)} />
+        <Route path={ROUTES.DIGITAL_IDENTITY} element={withProtection(DigitalIdentity, LIVE_ONLY)} />
+        <Route path={ROUTES.DIGITAL_IDENTITY_FORM} element={withProtection(DigitalIdentityForm, LIVE_ONLY)} />
+        <Route path={ROUTES.MOBILE_APP} element={withProtection(MobileApplication, LIVE_ONLY)} />
         <Route path={ROUTES.ONE_LINK} element={withProtection(OneLink, LIVE_ONLY)} />
         <Route path={ROUTES.MENU} element={withProtection(Menu, LIVE_ONLY)} />
         <Route path={ROUTES.ORDERS} element={withProtection(Orders, LIVE_ONLY)} />
@@ -204,16 +231,22 @@ export function AppRoutes() {
         />
         <Route
           path={ROUTES.PLATFORM_APPROVE}
-          element={withProtection(PlatformApprove, { adminOnly: true })}
+          element={<Navigate to={ROUTES.PLATFORM_ACCOUNT_APPROVE} replace />}
+        />
+        <Route path={ROUTES.PLATFORM_APPROVE_PROFILE} element={<RedirectLegacyApproveProfile />} />
+        <Route
+          path={ROUTES.PLATFORM_ACCOUNT_APPROVE}
+          element={withProtection(PlatformAccountApprove, { adminOnly: true })}
         />
         <Route
-          path={ROUTES.PLATFORM_APPROVE_PROFILE}
-          element={withProtection(PlatformApproveProfile, { adminOnly: true })}
+          path={ROUTES.PLATFORM_ACCOUNT_APPROVE_PROFILE}
+          element={withProtection(PlatformAccountApproveProfile, { adminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_IDENTITIES}
           element={withProtection(PlatformIdentityReview, { adminOnly: true })}
-        />        <Route
+        />
+        <Route
           path={ROUTES.PLATFORM_PRODUCTS}
           element={withProtection(PlatformProducts, { adminOnly: true })}
         />
@@ -223,6 +256,10 @@ export function AppRoutes() {
         />
         <Route path={ROUTES.PLATFORM_AUDIT} element={withProtection(PlatformAudit, { adminOnly: true })} />
         <Route path={ROUTES.PLATFORM_STAFF} element={withProtection(PlatformStaff, { adminOnly: true })} />
+        <Route
+          path={ROUTES.PLATFORM_PROFESSIONAL}
+          element={withProtection(PlatformProfessional, { adminOnly: true })}
+        />
         <Route
           path={ROUTES.PLATFORM_SETTINGS}
           element={withProtection(PlatformSettings, { adminOnly: true })}
@@ -234,6 +271,14 @@ export function AppRoutes() {
         <Route
           path={ROUTES.PLATFORM_SETTINGS_PAYMENT}
           element={withProtection(PaymentSettings, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_SETTINGS_GOOGLE}
+          element={withProtection(GoogleAuthSettings, { adminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_SETTINGS_CATEGORIES}
+          element={withProtection(BusinessCategoriesSettings, { adminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_FLAGS}

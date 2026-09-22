@@ -28,10 +28,17 @@ import {
   formatUserId,
   onboardingPlanAmount,
   professionalEmailForRestaurant,
-  sendOnboardingPaymentEmails,
 } from '../services/onboardingMessaging.js'
+import { listPlans, getPlan, getPlanAmount } from '../services/platformAdminService.js'
 import { addpayRequest } from '../services/addpayClient.js'
 import { getPaymentSettings, isPaymentConfigured } from '../services/paymentSettings.js'
+import {
+  apiPublicUrl,
+  appPublicUrl,
+  finalizeOnboardingPayment,
+  parseRestaurantSettings,
+  syncPendingOnboardingPayment,
+} from '../services/onboardingPayment.js'
 
 const router = Router()
 
@@ -42,12 +49,18 @@ function getOwnRestaurant(ownerId) {
 router.use(requireAuth)
 
 function parseSettings(restaurant) {
-  if (!restaurant.settings_json) return {}
-  try {
-    return JSON.parse(restaurant.settings_json)
-  } catch {
-    return {}
+  return parseRestaurantSettings(restaurant)
+}
+
+function assertNotAwaitingAccountApproval(restaurant, res) {
+  const settings = parseSettings(restaurant)
+  if (settings.awaitingAccountApproval) {
+    res.status(403).json({
+      error: 'Your account is still awaiting admin approval. You will receive an email when you can sign in.',
+    })
+    return false
   }
+  return true
 }
 
 router.get('/', (req, res) => {
@@ -62,6 +75,7 @@ router.get('/', (req, res) => {
 router.put('/profile', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  if (!assertNotAwaitingAccountApproval(restaurant, res)) return
 
   const {
     restaurantName,
@@ -219,42 +233,83 @@ router.post('/launch', (req, res) => {
   })
 })
 
-router.get('/onboarding-payment', (req, res) => {
+router.get('/onboarding-payment', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
   if (restaurant.status === 'deleted') {
     return res.status(403).json({ error: 'This account has been closed.' })
   }
 
-  const settings = parseSettings(restaurant)
+  // When returning from AddPay (or polling), actively query the gateway —
+  // webhooks cannot reach localhost and can be delayed in production.
+  let live = restaurant
+  try {
+    const sync = await syncPendingOnboardingPayment(restaurant)
+    if (sync.synced) {
+      live = getOwnRestaurant(req.user.id) || restaurant
+    }
+  } catch (err) {
+    console.warn('[onboarding-payment] sync failed:', err.message || err)
+  }
+
+  const settings = parseSettings(live)
   const paid = Boolean(settings?.onboardingPayment?.paid)
+
+  // Paid stores go live immediately — no post-payment review gate
+  if (paid && live.status !== 'live' && live.status !== 'deleted') {
+    db.prepare(
+      `UPDATE restaurants SET status = 'live', launched_at = COALESCE(launched_at, datetime('now')),
+       updated_at = datetime('now') WHERE id = ?`,
+    ).run(live.id)
+    live = { ...live, status: 'live' }
+  }
+
   const professionalEmail =
-    professionalEmailForRestaurant(restaurant) || String(restaurant.email || '').trim()
+    professionalEmailForRestaurant(live) || String(live.email || '').trim()
+  const planKey = String(live.plan || 'starter').toLowerCase()
+  const planAmount = onboardingPlanAmount(planKey)
+  const amount = Number(settings?.onboardingPayment?.amount) > 0
+    ? Number(settings.onboardingPayment.amount)
+    : planAmount
+
+  const owner = db
+    .prepare('SELECT name, email, phone FROM users WHERE id = ?')
+    .get(req.user.id)
+
+  const plans = listPlans().map((p) => ({
+    id: p.id,
+    name: p.name,
+    tagline: p.tagline,
+    priceZar: p.priceZar,
+    billing: p.billing,
+    popular: p.popular,
+    features: p.features,
+  }))
 
   res.json({
-    restaurantName: restaurant.name,
-    plan: restaurant.plan || 'starter',
-    status: restaurant.status,
-    amount: onboardingPlanAmount(restaurant.plan),
+    restaurantName: live.name,
+    plan: planKey,
+    status: live.status,
+    amount,
     currency: 'ZAR',
     userId: formatUserId(req.user.id),
     professionalEmail,
-    ownerEmail: req.user.email || '',
+    ownerEmail: owner?.email || req.user.email || '',
+    ownerName: owner?.name || '',
+    ownerPhone: owner?.phone || '',
+    city: live.city || '',
+    category: settings.businessCategory || settings.category || '',
+    plans,
     paid,
     payment: settings?.onboardingPayment || null,
     addpayConfigured: isPaymentConfigured(),
   })
 })
 
-function appBaseUrl() {
-  return String(process.env.PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:5173')
-    .trim()
-    .replace(/\/$/, '')
-}
-
 /**
  * Start a hosted AddPay checkout. When AddPay credentials are missing,
  * complete a local demo payment so onboarding can continue in development.
+ * Body: { planId?: string }
  */
 router.post('/onboarding-payment', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
@@ -281,54 +336,103 @@ router.post('/onboarding-payment', async (req, res) => {
     })
   }
 
-  const amount = onboardingPlanAmount(restaurant.plan)
+  // Re-check gateway in case the owner paid and webhook already landed
+  try {
+    const sync = await syncPendingOnboardingPayment(restaurant)
+    if (sync.paid) {
+      const professionalEmail =
+        professionalEmailForRestaurant(restaurant) || String(restaurant.email || '').trim()
+      return res.json({
+        ok: true,
+        alreadyPaid: true,
+        userId: formatUserId(req.user.id),
+        professionalEmail,
+        ownerEmail: req.user.email || '',
+        restaurantName: restaurant.name,
+        payment: sync.payment,
+      })
+    }
+  } catch {
+    /* continue to start a new checkout */
+  }
+
+  const requestedPlan = String(req.body?.planId || req.body?.plan || '').trim().toLowerCase()
+  let planId = String(restaurant.plan || 'starter').toLowerCase().trim()
+  if (requestedPlan) {
+    const catalog = listPlans()
+    const match = catalog.find((p) => p.id === requestedPlan)
+    if (!match) {
+      return res.status(400).json({ error: 'Choose a valid launch plan.' })
+    }
+    planId = match.id
+    if (planId !== String(restaurant.plan || '').toLowerCase()) {
+      db.prepare(
+        `UPDATE restaurants SET plan = ?, updated_at = datetime('now') WHERE id = ?`,
+      ).run(planId, restaurant.id)
+    }
+  }
+
+  const amount = getPlanAmount(planId)
+  if (!amount || amount < 1) {
+    return res.status(400).json({
+      error: 'This plan has no launch price. Ask an admin to set the plan amount first.',
+    })
+  }
   const professionalEmail = professionalEmailForRestaurant(restaurant)
+  const planMeta = getPlan(planId)
 
   // Demo path — AddPay not configured yet
   if (!isPaymentConfigured()) {
     const reference = `DEMO-${Date.now().toString(36).toUpperCase()}-${restaurant.id}`
-    const payment = {
-      paid: true,
-      paidAt: new Date().toISOString(),
-      method: 'demo',
-      amount,
-      currency: 'ZAR',
-      reference,
-      gateway: 'iroas_demo',
-    }
-    const nextSettings = {
+    // Seed professional email before finalize so emails use it
+    const seeded = {
       ...settings,
-      onboardingPayment: payment,
       professionalEmail,
+      onboardingPayment: {
+        paid: false,
+        pending: true,
+        reference,
+        amount,
+        currency: 'ZAR',
+        method: 'demo',
+        gateway: 'iroas_demo',
+        planId,
+        planName: planMeta?.name || planId,
+      },
     }
     db.prepare(
-      `UPDATE restaurants SET settings_json = ?, email = COALESCE(NULLIF(email, ''), ?),
+      `UPDATE restaurants SET settings_json = ?, plan = ?, email = COALESCE(NULLIF(email, ''), ?),
        status = CASE WHEN status = 'onboarding' THEN 'pending_approval' ELSE status END,
        updated_at = datetime('now') WHERE id = ?`,
-    ).run(JSON.stringify(nextSettings), professionalEmail || null, restaurant.id)
+    ).run(JSON.stringify(seeded), planId, professionalEmail || null, restaurant.id)
 
-    const updated = {
-      ...restaurant,
-      email: restaurant.email || professionalEmail,
-      status: restaurant.status === 'onboarding' ? 'pending_approval' : restaurant.status,
-    }
-    const emails = await sendOnboardingPaymentEmails({ restaurant: updated, payment })
+    const seededRow = getOwnRestaurant(req.user.id) || { ...restaurant, plan: planId, ...seeded }
+    const finalized = await finalizeOnboardingPayment(seededRow, {
+      reference,
+      amount,
+      currency: 'ZAR',
+      method: 'demo',
+      gateway: 'iroas_demo',
+    })
 
     return res.json({
       ok: true,
       alreadyPaid: true,
       demo: true,
+      status: 'live',
       userId: formatUserId(req.user.id),
       professionalEmail,
       ownerEmail: req.user.email || '',
       restaurantName: restaurant.name,
-      payment,
-      emails,
+      plan: planId,
+      payment: finalized.payment,
+      emails: finalized.emails,
     })
   }
 
   const reference = `ONB-${restaurant.id}-${Date.now().toString(36).toUpperCase()}`
-  const appBase = appBaseUrl()
+  const appBase = appPublicUrl()
+  const apiBase = apiPublicUrl()
 
   let checkout
   try {
@@ -339,9 +443,9 @@ router.post('/onboarding-payment', async (req, res) => {
         merchant_order_no: reference,
         order_amount: amount,
         price_currency: 'ZAR',
-        notify_url: `${appBase}/api/public/payments/addpay/webhook`,
+        notify_url: `${apiBase}/api/public/payments/addpay/webhook`,
         return_url: `${appBase}/onboarding/payment?paid=return`,
-        description: `IROAS launch — ${restaurant.name || 'your business'}`,
+        description: `IROAS ${planMeta?.name || planId} launch — ${restaurant.name || 'your business'}`,
         expires: 300,
         term_ip: '127.0.0.1',
       },
@@ -378,16 +482,19 @@ router.post('/onboarding-payment', async (req, res) => {
       amount,
       currency: 'ZAR',
       gateway: 'addpay',
+      method: 'addpay',
+      planId,
+      planName: planMeta?.name || planId,
       createdAt: new Date().toISOString(),
     },
     professionalEmail,
   }
 
   db.prepare(
-    `UPDATE restaurants SET settings_json = ?, updated_at = datetime('now') WHERE id = ?`,
-  ).run(JSON.stringify(nextSettings), restaurant.id)
+    `UPDATE restaurants SET settings_json = ?, plan = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(JSON.stringify(nextSettings), planId, restaurant.id)
 
-  res.json({ ok: true, payUrl, reference, amount, currency: 'ZAR' })
+  res.json({ ok: true, payUrl, reference, amount, currency: 'ZAR', plan: planId })
 })
 
 function mapReservation(row) {

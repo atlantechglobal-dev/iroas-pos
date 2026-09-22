@@ -16,7 +16,8 @@ function Brand() {
   if (!restaurantStatus) {
     return (
       <div className="app-loading" role="status" aria-live="polite">
-        Loading…
+        <span className="app-loading-spinner" aria-hidden="true" />
+        <p>Loading…</p>
       </div>
     )
   }

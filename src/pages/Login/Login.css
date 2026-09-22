@@ -463,6 +463,16 @@
   background: #eef6da;
 }
 
+.login-page .login-flash.is-warn {
+  border-color: #f0d4a8;
+  background: #fff7eb;
+}
+
+.login-page .login-flash.is-warn span {
+  background: #f0c36d;
+  color: #5c3d08;
+}
+
 .login-page .login-flash span {
   width: 22px;
   height: 22px;
@@ -574,6 +584,17 @@
   display: flex;
 
   gap: 12px;
+}
+
+.login-page .gis-button-host {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 280px;
+  height: 48px;
+  overflow: hidden;
+  opacity: 0.01;
+  pointer-events: auto;
 }
 
 .login-page .social-button {

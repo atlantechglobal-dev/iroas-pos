@@ -1,18 +1,45 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { isValidEmail } from '../../utils/validation.js'
 import { ROUTES } from '../../constants/routes.js'
 import { getBusinessCopy } from '../../constants/businessCopy.js'
+import { api } from '../../lib/api'
+import { prefetchRoute, prefetchWhenIdle } from '../../lib/routePrefetch.js'
 import './Login.css'
+
+const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
+
+function loadGoogleScript() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('No window'))
+  if (window.google?.accounts?.id) return Promise.resolve()
+  const existing = document.querySelector(`script[src="${GIS_SCRIPT_SRC}"]`)
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener('load', () => resolve())
+      existing.addEventListener('error', () => reject(new Error('Failed to load Google Sign-In')))
+      if (window.google?.accounts?.id) resolve()
+    })
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = GIS_SCRIPT_SRC
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load Google Sign-In'))
+    document.head.appendChild(script)
+  })
+}
 
 function Login() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login } = useAuth()
+  const { login, loginWithGoogle } = useAuth()
   const toast = useToast()
   const redirectTo = location.state?.from
+  const gisHostRef = useRef(null)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,16 +47,93 @@ function Login() {
   const [error, setError] = useState('')
   const [errors, setErrors] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [flash, setFlash] = useState('')
+  const [flashTone, setFlashTone] = useState('ok')
+  const [googleConfig, setGoogleConfig] = useState({ enabled: false, clientId: '' })
+  const [gisReady, setGisReady] = useState(false)
   const copy = getBusinessCopy('Other')
 
   useEffect(() => {
     const msg = sessionStorage.getItem('login_flash')
     if (msg) {
       setFlash(msg)
+      setFlashTone(/not approved/i.test(msg) ? 'warn' : 'ok')
       sessionStorage.removeItem('login_flash')
     }
+    prefetchWhenIdle(['createAccount', 'accountThanks', 'restaurantSetup', 'dashboard'])
   }, [])
+
+  const handleGoogleCredential = useCallback(
+    async (response) => {
+      const idToken = response?.credential
+      if (!idToken) {
+        toast.error('Google did not return a sign-in token.')
+        return
+      }
+      setGoogleLoading(true)
+      setError('')
+      try {
+        await loginWithGoogle(idToken, redirectTo)
+        toast.success('Signed in with Google.')
+      } catch (err) {
+        const message = err.message || 'Google sign-in failed.'
+        if (/not approved/i.test(message) || err.code === 'ACCOUNT_PENDING_APPROVAL') {
+          setError('')
+          setFlash(message)
+          setFlashTone('warn')
+        } else {
+          setFlash('')
+          setError(message)
+          toast.error(message)
+        }
+      } finally {
+        setGoogleLoading(false)
+      }
+    },
+    [loginWithGoogle, redirectTo, toast],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .googleConfig()
+      .then(async (cfg) => {
+        if (cancelled) return
+        const next = {
+          enabled: Boolean(cfg.configured || (cfg.enabled && cfg.clientId)),
+          clientId: cfg.clientId || '',
+        }
+        setGoogleConfig(next)
+        if (!next.enabled) return
+        await loadGoogleScript()
+        if (cancelled || !window.google?.accounts?.id) return
+        window.google.accounts.id.initialize({
+          client_id: next.clientId,
+          callback: handleGoogleCredential,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        })
+        if (gisHostRef.current) {
+          gisHostRef.current.innerHTML = ''
+          window.google.accounts.id.renderButton(gisHostRef.current, {
+            type: 'standard',
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'pill',
+            width: 280,
+          })
+        }
+        setGisReady(true)
+      })
+      .catch(() => {
+        if (!cancelled) setGoogleConfig({ enabled: false, clientId: '' })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [handleGoogleCredential])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -43,13 +147,22 @@ function Login() {
     if (nextErrors.email || nextErrors.password) return
 
     setLoading(true)
+    setFlash('')
 
     try {
       await login({ email: email.trim(), password }, redirectTo)
       toast.success('Signed in successfully.')
     } catch (err) {
-      setError(err.message)
-      toast.error(err.message)
+      const message = err.message || 'Unable to sign in.'
+      if (/not approved/i.test(message) || err.code === 'ACCOUNT_PENDING_APPROVAL') {
+        setError('')
+        setFlash(message)
+        setFlashTone('warn')
+      } else {
+        setFlash('')
+        setError(message)
+        toast.error(message)
+      }
     } finally {
       setLoading(false)
     }
@@ -71,7 +184,28 @@ function Login() {
     }
   }
 
+  const handleGoogleLogin = () => {
+    if (!googleConfig.enabled) {
+      toast.info('Google sign-in is not configured. Ask an admin to add the Client ID.')
+      return
+    }
+    if (!gisReady) {
+      toast.info('Google Sign-In is still loading. Try again in a moment.')
+      return
+    }
+    const btn = gisHostRef.current?.querySelector('div[role="button"]')
+    if (btn) {
+      btn.click()
+      return
+    }
+    window.google?.accounts?.id?.prompt()
+  }
+
   const handleSocialLogin = (provider) => {
+    if (provider === 'Google') {
+      handleGoogleLogin()
+      return
+    }
     toast.info(`${provider} sign-in is not available yet.`)
   }
 
@@ -137,8 +271,8 @@ function Login() {
           </div>
 
           {flash ? (
-            <div className="login-flash" role="status">
-              <span>✓</span>
+            <div className={`login-flash${flashTone === 'warn' ? ' is-warn' : ''}`} role="status">
+              <span>{flashTone === 'warn' ? '!' : '✓'}</span>
               <p>{flash}</p>
             </div>
           ) : null}
@@ -236,25 +370,38 @@ function Login() {
           <div className="social-buttons">
             <button
               className="social-button"
+              type="button"
+              disabled={googleLoading || loading}
               onClick={() => handleSocialLogin('Google')}
             >
               <span className="google-icon"></span>
-              Google
+              {googleLoading ? 'Signing in…' : 'Google'}
             </button>
 
             <button
               className="social-button"
+              type="button"
               onClick={() => handleSocialLogin('Apple')}
             >
               <span className="apple-icon"></span>
               Apple
             </button>
           </div>
+          <div
+            ref={gisHostRef}
+            className="gis-button-host"
+            aria-hidden="true"
+          />
 
           {/* SIGN UP */}
           <p className="signup">
             Don't have an account?
-            <button onClick={() => navigate(ROUTES.CREATE_ACCOUNT)}>
+            <button
+              type="button"
+              onMouseEnter={() => prefetchRoute('createAccount')}
+              onFocus={() => prefetchRoute('createAccount')}
+              onClick={() => navigate(ROUTES.CREATE_ACCOUNT)}
+            >
               Create one
             </button>
           </p>

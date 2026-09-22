@@ -5,7 +5,6 @@ import { useDebounce } from '../../hooks/useDebounce.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
 import { platformApproveProfilePath } from '../../constants/routes.js'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -47,7 +46,10 @@ function Approve() {
   const [loading, setLoading] = useState(true)
 
   const loadCounts = () => {
-    Promise.all([api.adminTenants('', 'pending_approval'), api.adminTenants('', 'live')])
+    Promise.all([
+      api.adminTenants('', 'pending_approval', 'publish'),
+      api.adminTenants('', 'live', 'publish'),
+    ])
       .then(([waitingRes, liveRes]) => {
         setCounts({
           waiting: (waitingRes.tenants || []).length,
@@ -60,7 +62,7 @@ function Approve() {
   const loadList = () => {
     setLoading(true)
     api
-      .adminTenants(debounced, tab)
+      .adminTenants(debounced, tab, 'publish')
       .then(({ tenants: rows }) => setTenants(rows || []))
       .catch((err) => {
         setTenants([])
@@ -95,12 +97,11 @@ function Approve() {
           <div className="page-label">PLATFORM</div>
           <h1>Approve</h1>
           <p>
-            Review waiting restaurants, or open already approved profiles to see who published them.
+            Publish restaurants that finished onboarding. New Create Account signups are on{' '}
+            <strong>Account approve</strong>.
           </p>
         </div>
       </div>
-
-      <PlatformSubnav active="platform-approve" />
 
       <div className="pa-pipeline-tabs" role="tablist" aria-label="Approve filters">
         {TABS.map((item) => {

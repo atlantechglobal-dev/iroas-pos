@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { ROUTES } from '../../constants/routes.js'
 import './AccountRecovery.css'
 
 function AccountRecovery() {
@@ -6,21 +7,15 @@ function AccountRecovery() {
   const location = useLocation()
 
   const email = location.state?.email || 'your email address'
-  const resetToken = location.state?.resetToken
+  const previewUrl = location.state?.previewUrl || null
 
-  const handleOpenResetLink = () => {
-    if (resetToken) {
-      navigate('/new-password', { state: { token: resetToken, email } })
-    } else {
-      alert(
-        "In a live environment this link arrives by email. This demo couldn't find an account for that address.",
-      )
-    }
+  const handleOpenPreview = () => {
+    if (!previewUrl) return
+    window.open(previewUrl, '_blank', 'noopener,noreferrer')
   }
 
   return (
     <div className="account-recovery-page">
-      {/* LEFT SIDE */}
       <div className="left-side">
         <div className="logo">
           <img src="/images/logo.svg.svg" alt="IROAS Logo" />
@@ -35,8 +30,7 @@ function AccountRecovery() {
           <h1>Back in, in one click.</h1>
 
           <p className="description">
-            We'll email you a secure link that signs you in and lets you
-            choose a new password.
+            We'll email you a secure link that lets you choose a new password.
           </p>
 
           <div className="features">
@@ -62,11 +56,10 @@ function AccountRecovery() {
           </div>
         </div>
 
-        {/* Testimonial */}
         <div className="testimonial">
           <p>
-            "IROAS cut our onboarding to a single afternoon. Orders, QR menus
-            and staff scheduling just work."
+            "IROAS cut our onboarding to a single afternoon. Orders, QR menus and staff scheduling
+            just work."
           </p>
 
           <div className="person">
@@ -80,7 +73,6 @@ function AccountRecovery() {
         </div>
       </div>
 
-      {/* RIGHT SIDE */}
       <div className="right-side">
         <div className="recovery-box">
           <div className="email-icon">
@@ -90,24 +82,25 @@ function AccountRecovery() {
           <h2>Check your inbox</h2>
 
           <p className="message">
-            We sent a reset link to <strong>{email}</strong>. The link
-            expires in 30
-            <br />
-            minutes.
+            If an account exists for <strong>{email}</strong>, we sent a reset link. The link
+            expires in 30 minutes.
           </p>
 
-          <button className="primary-button" onClick={handleOpenResetLink}>
-            Open reset link
-          </button>
+          {previewUrl ? (
+            <button className="primary-button" type="button" onClick={handleOpenPreview}>
+              Open email preview
+            </button>
+          ) : null}
 
           <button
-            className="secondary-button"
-            onClick={() => navigate('/forgot-password')}
+            className={previewUrl ? 'secondary-button' : 'primary-button'}
+            type="button"
+            onClick={() => navigate(ROUTES.FORGOT_PASSWORD)}
           >
             Use a different email
           </button>
 
-          <button className="back-button" onClick={() => navigate('/login')}>
+          <button className="back-button" type="button" onClick={() => navigate(ROUTES.LOGIN)}>
             <img src="/images/plain arrow.svg" alt="" />
             Back to sign in
           </button>

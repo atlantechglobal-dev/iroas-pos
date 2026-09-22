@@ -40,6 +40,257 @@
   padding: 28px 20px 56px;
 }
 
+.ob-pay-shell-wide {
+  width: min(1100px, 100%);
+}
+
+.ob-pay-kicker-light {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--green-text);
+}
+
+.ob-pay-account {
+  margin-bottom: 22px;
+  padding: 22px 24px;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.ob-pay-account h1 {
+  margin: 0 0 8px;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ob-pay-account-sub {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ob-pay-account-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 18px;
+  margin: 0;
+}
+
+.ob-pay-account-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ob-pay-account-grid dt {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9a9aa2;
+}
+
+.ob-pay-account-grid dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.ob-pay-plans-block {
+  margin-bottom: 22px;
+}
+
+.ob-pay-plans-head {
+  margin-bottom: 14px;
+}
+
+.ob-pay-plans-head h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.ob-pay-plans-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.ob-pay-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ob-pay-plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 16px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ob-pay-plan-card:hover {
+  border-color: #c9d9a0;
+}
+
+.ob-pay-plan-card.is-selected {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 3px rgba(165, 213, 38, 0.25);
+}
+
+.ob-pay-plan-card.is-popular {
+  border-color: #b7d86a;
+}
+
+.ob-pay-plan-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #16210a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ob-pay-plan-id {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9a9aa2;
+}
+
+.ob-pay-plan-card h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.ob-pay-plan-tag {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 2.6em;
+}
+
+.ob-pay-plan-price {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.ob-pay-plan-price strong {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ob-pay-plan-price span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ob-pay-plan-card ul {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  width: 100%;
+  flex: 1;
+}
+
+.ob-pay-plan-card li {
+  position: relative;
+  padding: 5px 0 5px 16px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #3a3a40;
+}
+
+.ob-pay-plan-card li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green-dark);
+}
+
+.ob-pay-plan-card li.is-muted {
+  color: #9a9aa2;
+}
+
+.ob-pay-plan-card li.is-muted::before {
+  background: #cfcfcf;
+}
+
+.ob-pay-plan-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #f3f5ef;
+  font-size: 12px;
+  font-weight: 800;
+  color: #3a3a40;
+}
+
+.ob-pay-plan-card.is-selected .ob-pay-plan-select {
+  background: var(--green);
+  color: #16210a;
+}
+
+.ob-pay-checkout {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.ob-pay-checkout-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  font-size: 14px;
+}
+
+.ob-pay-checkout-summary span {
+  color: var(--green-text);
+  font-weight: 700;
+}
+
 .ob-pay-brand {
   display: flex;
   align-items: center;
@@ -243,7 +494,7 @@
   margin: 0 auto;
   border-radius: 50%;
   border: 2.5px solid #e8e4dc;
-  border-top-color: var(--accent);
+  border-top-color: var(--green);
   animation: ob-pay-spin 0.7s linear infinite;
 }
 
@@ -498,6 +749,14 @@
     grid-template-columns: 1fr;
   }
 
+  .ob-pay-plans-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ob-pay-account-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .ob-pay-brand {
     flex-direction: column;
     align-items: flex-start;
@@ -515,6 +774,10 @@
 @media (max-width: 480px) {
   .ob-pay-shell {
     padding: 20px 14px 40px;
+  }
+
+  .ob-pay-account-grid {
+    grid-template-columns: 1fr;
   }
 
   .ob-pay-order,

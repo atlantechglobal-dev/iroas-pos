@@ -5,8 +5,7 @@ import { TenantReviewDrawer } from '../../components/admin/TenantReviewDrawer.js
 import { useDebounce } from '../../hooks/useDebounce.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { api } from '../../lib/api'
-import { platformApproveProfilePath } from '../../constants/routes.js'
-import { PlatformSubnav } from './PlatformSubnav.jsx'
+import { platformAccountApproveProfilePath } from '../../constants/routes.js'
 import './PlatformAdmin.css'
 import './PlatformAdminExtra.css'
 
@@ -14,7 +13,7 @@ const PIPELINE = [
   {
     id: 'pending_approval',
     label: 'Awaiting',
-    hint: 'Ready for Approve page',
+    hint: 'New signups on Account approve',
     tone: 'approve',
   },
   {
@@ -113,7 +112,7 @@ function CustomerOnboarding() {
   )
 
   const openApproveProfile = (id) => {
-    navigate(platformApproveProfilePath(id))
+    navigate(platformAccountApproveProfilePath(id))
   }
 
   const openReview = (id) => {
@@ -132,13 +131,11 @@ function CustomerOnboarding() {
           <div className="page-label">PLATFORM</div>
           <h1>Customer onboarding</h1>
           <p>
-            Track restaurants still <strong>In setup</strong> or <strong>Awaiting</strong> approval.
-            Use the <strong>Approve</strong> page to publish.
+            Track restaurants still <strong>In setup</strong> or <strong>Awaiting</strong> account
+            approval. Use <strong>Account approve</strong> for new Create Account signups.
           </p>
         </div>
       </div>
-
-      <PlatformSubnav active="platform-customer-onboarding" />
 
       <div className="pa-pipeline-tabs" role="tablist" aria-label="Onboarding filters">
         {PIPELINE.map((item) => {
@@ -195,7 +192,7 @@ function CustomerOnboarding() {
                     filter === 'onboarding'
                       ? 'still completing the wizard'
                       : filter === 'pending_approval'
-                        ? 'open Approve profile to publish'
+                        ? 'open Account approve profile'
                         : 'setup + awaiting mixed'
                   }`}
             </span>
@@ -220,7 +217,8 @@ function CustomerOnboarding() {
               </thead>
               <tbody>
                 {tenants.map((row) => {
-                  const canApprove = row.status === 'pending_approval'
+                  const canApprove =
+                    row.status === 'pending_approval' && row.awaitingAccountApproval
                   return (
                     <tr
                       key={row.id}
@@ -263,7 +261,7 @@ function CustomerOnboarding() {
                               className="pa-approve-btn"
                               onClick={() => openApproveProfile(row.id)}
                             >
-                              Open Approve profile
+                              Open Account approve
                             </button>
                           ) : (
                             <button
