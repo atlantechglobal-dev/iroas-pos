@@ -1,37 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
+import { useGoogleSignIn } from '../../hooks/useGoogleSignIn.js'
 import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { isValidEmail } from '../../utils/validation.js'
 import { ROUTES } from '../../constants/routes.js'
 import { getBusinessCopy } from '../../constants/businessCopy.js'
-import { api } from '../../lib/api'
 import { prefetchRoute, prefetchWhenIdle } from '../../lib/routePrefetch.js'
 import './Login.css'
-
-const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
-
-function loadGoogleScript() {
-  if (typeof window === 'undefined') return Promise.reject(new Error('No window'))
-  if (window.google?.accounts?.id) return Promise.resolve()
-  const existing = document.querySelector(`script[src="${GIS_SCRIPT_SRC}"]`)
-  if (existing) {
-    return new Promise((resolve, reject) => {
-      existing.addEventListener('load', () => resolve())
-      existing.addEventListener('error', () => reject(new Error('Failed to load Google Sign-In')))
-      if (window.google?.accounts?.id) resolve()
-    })
-  }
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = GIS_SCRIPT_SRC
-    script.async = true
-    script.defer = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load Google Sign-In'))
-    document.head.appendChild(script)
-  })
-}
 
 function Login() {
   const navigate = useNavigate()
@@ -39,7 +15,6 @@ function Login() {
   const { login, loginWithGoogle } = useAuth()
   const toast = useToast()
   const redirectTo = location.state?.from
-  const gisHostRef = useRef(null)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -50,8 +25,6 @@ function Login() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [flash, setFlash] = useState('')
   const [flashTone, setFlashTone] = useState('ok')
-  const [googleConfig, setGoogleConfig] = useState({ enabled: false, clientId: '' })
-  const [gisReady, setGisReady] = useState(false)
   const copy = getBusinessCopy('Other')
 
   useEffect(() => {
@@ -64,13 +37,8 @@ function Login() {
     prefetchWhenIdle(['createAccount', 'accountThanks', 'restaurantSetup', 'dashboard'])
   }, [])
 
-  const handleGoogleCredential = useCallback(
-    async (response) => {
-      const idToken = response?.credential
-      if (!idToken) {
-        toast.error('Google did not return a sign-in token.')
-        return
-      }
+  const handleGoogleIdToken = useCallback(
+    async (idToken) => {
       setGoogleLoading(true)
       setError('')
       try {
@@ -94,46 +62,7 @@ function Login() {
     [loginWithGoogle, redirectTo, toast],
   )
 
-  useEffect(() => {
-    let cancelled = false
-    api
-      .googleConfig()
-      .then(async (cfg) => {
-        if (cancelled) return
-        const next = {
-          enabled: Boolean(cfg.configured || (cfg.enabled && cfg.clientId)),
-          clientId: cfg.clientId || '',
-        }
-        setGoogleConfig(next)
-        if (!next.enabled) return
-        await loadGoogleScript()
-        if (cancelled || !window.google?.accounts?.id) return
-        window.google.accounts.id.initialize({
-          client_id: next.clientId,
-          callback: handleGoogleCredential,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        })
-        if (gisHostRef.current) {
-          gisHostRef.current.innerHTML = ''
-          window.google.accounts.id.renderButton(gisHostRef.current, {
-            type: 'standard',
-            theme: 'outline',
-            size: 'large',
-            text: 'signin_with',
-            shape: 'pill',
-            width: 280,
-          })
-        }
-        setGisReady(true)
-      })
-      .catch(() => {
-        if (!cancelled) setGoogleConfig({ enabled: false, clientId: '' })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [handleGoogleCredential])
+  const { gisHostRef, trigger: triggerGoogle } = useGoogleSignIn(handleGoogleIdToken)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -184,26 +113,9 @@ function Login() {
     }
   }
 
-  const handleGoogleLogin = () => {
-    if (!googleConfig.enabled) {
-      toast.info('Google sign-in is not configured. Ask an admin to add the Client ID.')
-      return
-    }
-    if (!gisReady) {
-      toast.info('Google Sign-In is still loading. Try again in a moment.')
-      return
-    }
-    const btn = gisHostRef.current?.querySelector('div[role="button"]')
-    if (btn) {
-      btn.click()
-      return
-    }
-    window.google?.accounts?.id?.prompt()
-  }
-
   const handleSocialLogin = (provider) => {
     if (provider === 'Google') {
-      handleGoogleLogin()
+      triggerGoogle((message) => toast.info(message))
       return
     }
     toast.info(`${provider} sign-in is not available yet.`)

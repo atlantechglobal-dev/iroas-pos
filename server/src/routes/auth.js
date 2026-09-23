@@ -60,6 +60,41 @@ function restaurantAwaitingAccountApproval(ownerId) {
 const ACCOUNT_NOT_APPROVED_MESSAGE =
   'Your account is not approved yet. Once an admin approves it, you will be able to sign in.'
 
+async function verifyGoogleIdToken(idToken) {
+  if (!isGoogleAuthConfigured()) {
+    const err = new Error(
+      'Google sign-in is not configured. Set Google Client ID in Platform Admin → Google sign-in, or GOOGLE_CLIENT_ID in server/.env.',
+    )
+    err.status = 503
+    throw err
+  }
+
+  const { clientId } = getGoogleAuthSettings()
+  let payload
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: clientId })
+    payload = ticket.getPayload()
+  } catch (err) {
+    console.error('[auth] Google token verify failed:', err.message || err)
+    const e = new Error('Invalid Google sign-in token.')
+    e.status = 401
+    throw e
+  }
+
+  const googleId = String(payload?.sub || '').trim()
+  const email = normalizeEmail(payload?.email)
+  const emailVerified = Boolean(payload?.email_verified)
+  const name = String(payload?.name || email.split('@')[0] || 'Google user').trim()
+
+  if (!googleId || !email || !emailVerified) {
+    const e = new Error('Google account email is missing or not verified.')
+    e.status = 401
+    throw e
+  }
+
+  return { googleId, email, name }
+}
+
 function createSubmittedIdentity(userId, user, identityPayload) {
   if (!identityPayload || typeof identityPayload !== 'object') return null
 
@@ -163,19 +198,37 @@ function createSubmittedIdentity(userId, user, identityPayload) {
 }
 
 router.post('/signup', async (req, res) => {
-  const { name, restaurant, category, city, email, phone, password, identity } = req.body || {}
-  const normalizedEmail = normalizeEmail(email)
+  const { name, restaurant, category, city, email, phone, password, identity, idToken } =
+    req.body || {}
+
+  let normalizedEmail = normalizeEmail(email)
+  let finalName = String(name || '').trim()
+  let googleId = null
+
+  // Google-assisted signup: same business-detail fields as the regular form,
+  // just no password — email/identity come from the verified Google token,
+  // not from the client, so they can't be spoofed.
+  if (idToken) {
+    try {
+      const google = await verifyGoogleIdToken(idToken)
+      googleId = google.googleId
+      normalizedEmail = google.email
+      finalName = finalName || google.name
+    } catch (err) {
+      return res.status(err.status || 401).json({ error: err.message })
+    }
+  }
 
   const businessName =
     restaurant || identity?.businessName || identity?.brandName || ''
   const businessCategory = String(category || identity?.category || '').trim()
   const cityName = String(city || identity?.city || '').trim()
 
-  if (!name || !businessName || !normalizedEmail || !phone || !password) {
+  if (!finalName || !businessName || !normalizedEmail || !phone || (!idToken && !password)) {
     return res.status(400).json({ error: 'All fields are required.' })
   }
 
-  if (!isValidPersonName(name)) {
+  if (!isValidPersonName(finalName)) {
     return res.status(400).json({ error: 'Enter a valid name using letters only.' })
   }
 
@@ -192,7 +245,7 @@ router.post('/signup', async (req, res) => {
     return res.status(400).json({ error: 'Enter a valid mobile number with country code.' })
   }
 
-  if (!isValidPassword(password)) {
+  if (!idToken && !isValidPassword(password)) {
     return res.status(400).json({ error: 'Use at least 8 characters, including uppercase, lowercase, and a number.' })
   }
 
@@ -201,11 +254,22 @@ router.post('/signup', async (req, res) => {
     return res.status(409).json({ error: 'An account with this email already exists.' })
   }
 
+  if (googleId) {
+    const linkedElsewhere = db.prepare('SELECT id FROM users WHERE google_id = ?').get(googleId)
+    if (linkedElsewhere) {
+      return res
+        .status(409)
+        .json({ error: 'This Google account is already linked to another IROAS account.' })
+    }
+  }
+
   try {
-    const passwordHash = bcrypt.hashSync(password, 10)
+    const passwordHash = idToken
+      ? bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10)
+      : bcrypt.hashSync(password, 10)
 
     const insertUser = db.prepare(
-      'INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO users (name, email, phone, password_hash, google_id, role) VALUES (?, ?, ?, ?, ?, ?)',
     )
     const insertRestaurant = db.prepare(
       `INSERT INTO restaurants (owner_id, name, city, email, status, submitted_at, settings_json)
@@ -221,7 +285,14 @@ router.post('/signup', async (req, res) => {
     // runs in one transaction so a validation failure there doesn't leave a
     // signed-up user with no way to retry (email already taken, no token issued).
     const { user, submittedIdentity, restaurant } = db.transaction(() => {
-      const userInfo = insertUser.run(name.trim(), normalizedEmail, mobileDigits, passwordHash, 'owner')
+      const userInfo = insertUser.run(
+        finalName,
+        normalizedEmail,
+        mobileDigits,
+        passwordHash,
+        googleId,
+        'owner',
+      )
       const restaurantInfo = insertRestaurant.run(
         userInfo.lastInsertRowid,
         String(businessName).trim(),
@@ -243,7 +314,7 @@ router.post('/signup', async (req, res) => {
         const payload = {
           ...identity,
           businessName: identity.businessName || businessName,
-          contactPerson: identity.contactPerson || name.trim(),
+          contactPerson: identity.contactPerson || finalName,
           email: identity.email || normalizedEmail,
           phone: identity.phone || mobileDigits,
           city: identity.city || cityName,
@@ -337,40 +408,18 @@ router.get('/business-categories', (_req, res) => {
 })
 
 router.post('/google', async (req, res) => {
-  if (!isGoogleAuthConfigured()) {
-    return res.status(503).json({
-      error:
-        'Google sign-in is not configured. Set Google Client ID in Platform Admin → Google sign-in, or GOOGLE_CLIENT_ID in server/.env.',
-    })
-  }
-
   const idToken = String(req.body?.idToken || req.body?.credential || '').trim()
   if (!idToken) {
     return res.status(400).json({ error: 'Google ID token is required.' })
   }
 
-  const { clientId } = getGoogleAuthSettings()
-
-  let payload
+  let google
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: clientId,
-    })
-    payload = ticket.getPayload()
+    google = await verifyGoogleIdToken(idToken)
   } catch (err) {
-    console.error('[auth] Google token verify failed:', err.message || err)
-    return res.status(401).json({ error: 'Invalid Google sign-in token.' })
+    return res.status(err.status || 401).json({ error: err.message })
   }
-
-  const googleId = String(payload?.sub || '').trim()
-  const email = normalizeEmail(payload?.email)
-  const emailVerified = Boolean(payload?.email_verified)
-  const name = String(payload?.name || email.split('@')[0] || 'Google user').trim()
-
-  if (!googleId || !email || !emailVerified) {
-    return res.status(401).json({ error: 'Google account email is missing or not verified.' })
-  }
+  const { googleId, email, name } = google
 
   let user = db.prepare('SELECT * FROM users WHERE google_id = ?').get(googleId)
 
@@ -388,58 +437,10 @@ router.post('/google', async (req, res) => {
   }
 
   if (!user) {
-    const passwordHash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10)
-    let createdRestaurant
-    try {
-      ;({ user, restaurant: createdRestaurant } = db.transaction(() => {
-        const info = db
-          .prepare(
-            'INSERT INTO users (name, email, phone, password_hash, google_id, role) VALUES (?, ?, ?, ?, ?, ?)',
-          )
-          .run(name, email, null, passwordHash, googleId, 'owner')
-        // Same account-approval gate as the regular signup form — Google
-        // verifying the email doesn't exempt anyone from admin review.
-        const restaurantInfo = db
-          .prepare(
-            `INSERT INTO restaurants (owner_id, name, status, submitted_at, settings_json)
-             VALUES (?, ?, 'pending_approval', datetime('now'), ?)`,
-          )
-          .run(
-            info.lastInsertRowid,
-            `${name}'s restaurant`,
-            JSON.stringify({ awaitingAccountApproval: true }),
-          )
-        return {
-          user: db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid),
-          restaurant: db.prepare('SELECT * FROM restaurants WHERE id = ?').get(restaurantInfo.lastInsertRowid),
-        }
-      })())
-    } catch (err) {
-      if (String(err.message || '').includes('UNIQUE')) {
-        return res.status(409).json({ error: 'An account with this email already exists.' })
-      }
-      console.error('[auth] Google signup failed:', err)
-      return res.status(500).json({ error: 'Unable to create account with Google.' })
-    }
-
-    let emails = null
-    try {
-      emails = await sendSignupReviewEmails({
-        restaurant: createdRestaurant,
-        owner: { id: user.id, name: user.name, email: user.email, phone: user.phone || '' },
-      })
-    } catch (err) {
-      console.error('[signup] Google review emails failed:', err.message || err)
-    }
-
-    return res.status(201).json({
-      pendingReview: true,
-      email,
-      user: publicUser(user),
-      emails,
-      message:
-        'Thank you — your account is in review for approval. We will email you once an admin approves it.',
-    })
+    // No account yet — hand the verified identity back so the client can
+    // collect the same business details (restaurant, category, city, phone)
+    // the signup form asks for, via POST /signup with this same idToken.
+    return res.json({ needsSignup: true, idToken, name, email })
   }
 
   if (user.role !== 'admin') {

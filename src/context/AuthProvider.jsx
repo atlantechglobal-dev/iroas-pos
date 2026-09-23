@@ -213,8 +213,19 @@ export function AuthProvider({ children }) {
   const loginWithGoogle = useCallback(
     async (idToken, redirectTo) => {
       const result = await authApi.googleLogin(idToken)
-      // A fresh Google signup goes through the same account-approval gate as
-      // the email form — no token yet, so don't try to log them in.
+      // No IROAS account for this Google identity yet — send them to Create
+      // account to fill in the same business details the signup form asks
+      // for (restaurant, category, city, phone). The verified idToken rides
+      // along so they don't have to click "Continue with Google" again.
+      if (result.needsSignup) {
+        navigate(ROUTES.CREATE_ACCOUNT, {
+          replace: true,
+          state: { googleIdToken: result.idToken, googleName: result.name, googleEmail: result.email },
+        })
+        return null
+      }
+      // A fresh signup (via CreateAccount's own Google button) goes through
+      // the same account-approval gate as the email form — no token yet.
       if (result.pendingReview) {
         navigate(ROUTES.ACCOUNT_THANKS, { replace: true, state: { email: result.email } })
         return null

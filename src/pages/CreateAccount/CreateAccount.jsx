@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { useGoogleSignIn } from '../../hooks/useGoogleSignIn.js'
+import { useToast } from '../../components/feedback/ToastProvider.jsx'
 import { visibleBusinessCategories } from '../../constants/digitalIdentity.js'
 import { getBusinessCopy } from '../../constants/businessCopy.js'
 import {
@@ -37,13 +39,15 @@ const initialErrors = {
 
 function CreateAccount() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const toast = useToast()
 
   const [form, setForm] = useState({
-    name: '',
+    name: location.state?.googleName || '',
     restaurant: '',
     city: '',
     category: '',
-    email: '',
+    email: location.state?.googleEmail || '',
     phone: '',
     dialIso: DEFAULT_SIGNUP_COUNTRY_ISO,
     password: '',
@@ -54,7 +58,42 @@ function CreateAccount() {
   const [serverError, setServerError] = useState('')
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState(() => visibleBusinessCategories())
+  const [googleIdToken, setGoogleIdToken] = useState(location.state?.googleIdToken || '')
+  const [googleLoading, setGoogleLoading] = useState(false)
   const copy = getBusinessCopy(ENABLE_CATEGORY_FLOW ? form.category : DEFAULT_CATEGORY)
+
+  const handleGoogleIdToken = async (idToken) => {
+    // Same idToken the Login page would have sent to POST /auth/google —
+    // resolve it the same way here just to read name/email back for the
+    // form; the actual account only gets created on submit, once the rest
+    // of the business details are filled in.
+    setGoogleLoading(true)
+    try {
+      const result = await api.googleLogin(idToken)
+      if (result.needsSignup) {
+        setGoogleIdToken(result.idToken)
+        setForm((prev) => ({
+          ...prev,
+          name: prev.name || result.name || '',
+          email: result.email || prev.email,
+        }))
+        toast.success('Google verified — finish your business details below.')
+      } else {
+        // An account already exists for this Google identity — that's a
+        // sign-in, not a signup. Send them to Login to complete it there.
+        toast.info('An account already exists for this Google account. Please sign in.')
+        navigate(ROUTES.LOGIN)
+      }
+    } catch (err) {
+      toast.error(err.message || 'Google sign-in failed.')
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
+
+  const { gisHostRef, trigger: triggerGoogle } = useGoogleSignIn(handleGoogleIdToken, {
+    text: 'signup_with',
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -123,7 +162,7 @@ function CreateAccount() {
       nextErrors.phone = 'Enter a valid mobile number for the selected country.'
     }
 
-    if (!isValidPassword(form.password)) {
+    if (!googleIdToken && !isValidPassword(form.password)) {
       nextErrors.password = passwordRequirements
     }
 
@@ -156,7 +195,7 @@ function CreateAccount() {
           CALLING_CODES.find((c) => c.iso === form.dialIso)?.dial || DEFAULT_DIAL_CODE,
           form.phone,
         ),
-        password: form.password,
+        ...(googleIdToken ? { idToken: googleIdToken } : { password: form.password }),
       })
 
       navigate(ROUTES.ACCOUNT_THANKS, {
@@ -222,6 +261,51 @@ function CreateAccount() {
           <h2>Create your account</h2>
 
           <p className="subtitle">Free 14-day trial · no card required.</p>
+
+          {!googleIdToken ? (
+            <>
+              <button
+                type="button"
+                className="google-signup-button"
+                disabled={googleLoading}
+                onClick={() => triggerGoogle((message) => toast.info(message))}
+              >
+                <span className="google-icon" aria-hidden="true">
+                  <svg viewBox="0 0 18 18" width="18" height="18">
+                    <path
+                      fill="#4285F4"
+                      d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
+                    />
+                  </svg>
+                </span>
+                {googleLoading ? 'Verifying…' : 'Continue with Google'}
+              </button>
+              <div ref={gisHostRef} className="gis-button-host" aria-hidden="true" />
+
+              <div className="divider">
+                <span></span>
+                <p>OR FILL IN YOUR DETAILS</p>
+                <span></span>
+              </div>
+            </>
+          ) : (
+            <div className="google-linked-note">
+              <span>✓</span>
+              <p>Google account verified. Just finish your business details below.</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="field-group">
@@ -315,8 +399,12 @@ function CreateAccount() {
                   placeholder={copy.emailPlaceholder.replace('hello@', 'you@')}
                   value={form.email}
                   onChange={updateField('email')}
+                  readOnly={Boolean(googleIdToken)}
                 />
               </div>
+              {googleIdToken ? (
+                <p className="field-hint">Locked to your verified Google account.</p>
+              ) : null}
               {errors.email && <p className="field-error">{errors.email}</p>}
             </div>
 
@@ -352,34 +440,36 @@ function CreateAccount() {
             </div>
 
             {/* PASSWORD */}
-            <div className="field-group">
-              <label htmlFor="password">PASSWORD</label>
+            {!googleIdToken ? (
+              <div className="field-group">
+                <label htmlFor="password">PASSWORD</label>
 
-              <div className={`input-wrapper ${errors.password ? 'error' : ''}`}>
-                <i className="fa-solid fa-lock"></i>
+                <div className={`input-wrapper ${errors.password ? 'error' : ''}`}>
+                  <i className="fa-solid fa-lock"></i>
 
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="password"
-                  placeholder="At least 8 characters"
-                  value={form.password}
-                  onChange={updateField('password')}
-                />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="password"
+                    placeholder="At least 8 characters"
+                    value={form.password}
+                    onChange={updateField('password')}
+                  />
 
-                <button
-                  type="button"
-                  className="eye-btn"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                >
-                  <i
-                    className={`fa-regular ${
-                      showPassword ? 'fa-eye-slash' : 'fa-eye'
-                    }`}
-                  ></i>
-                </button>
+                  <button
+                    type="button"
+                    className="eye-btn"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    <i
+                      className={`fa-regular ${
+                        showPassword ? 'fa-eye-slash' : 'fa-eye'
+                      }`}
+                    ></i>
+                  </button>
+                </div>
+                {errors.password && <p className="field-error">{errors.password}</p>}
               </div>
-              {errors.password && <p className="field-error">{errors.password}</p>}
-            </div>
+            ) : null}
 
             {/* TERMS */}
             <div className="terms">
