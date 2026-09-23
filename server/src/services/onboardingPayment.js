@@ -54,15 +54,14 @@ export async function queryAddPayOrder(reference) {
   if (!isPaymentConfigured() || !reference) return null
 
   const settings = getPaymentSettings()
-  // Two calling conventions seen in the wild for this gateway: a unified
-  // "/api/entry" endpoint dispatched via a `method` field (how our working
-  // checkout call works), and a per-operation URL with no `method` field
-  // (seen in a third-party SDK, unconfirmed against our actual gateway).
-  // Try both — this is a read-only query, safe to probe.
+  // Both return [E07303] "not authorized" — likely the right shape (same
+  // unified /api/entry + method field as our working checkout call) but
+  // this app_id may not be permissioned for order-query yet. A third
+  // attempt at /api/entry/checkout/status (guessed from an unofficial SDK
+  // targeting a different backend) returned SYS404 and was dropped.
   const attempts = [
     { endpoint: '/api/entry', body: { method: 'pay.paycloud.orderquery', merchant_order_no: reference } },
     { endpoint: '/api/entry', body: { method: 'pay.orderquery', merchant_order_no: reference } },
-    { endpoint: '/api/entry/checkout/status', body: { merchant_order_no: reference } },
   ]
 
   for (const { endpoint, body } of attempts) {
