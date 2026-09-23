@@ -17,7 +17,7 @@ import '@/features/onboarding/Launch/Launch.css'
 
 function Launch() {
   const navigate = useNavigate()
-  const { setRestaurantStatus: setAuthRestaurantStatus } = useAuth()
+  const { setRestaurantStatus: setAuthRestaurantStatus, onboardingPaid } = useAuth()
   const [continuing, setContinuing] = useState(false)
 
   const [toast, setToast] = useState('')
@@ -32,6 +32,7 @@ function Launch() {
   const [accentColor, setAccentColor] = useState('#BDB8A4')
   const [category, setCategory] = useState('')
   const [restaurantStatus, setRestaurantStatus] = useState('')
+  const [paidLocally, setPaidLocally] = useState(false)
   const qrCache = useRef('')
 
   const copy = getBusinessCopy(category)
@@ -49,6 +50,7 @@ function Launch() {
         if (restaurant.accent_color) setAccentColor(restaurant.accent_color)
         setCategory(businessCategoryFromRestaurant(restaurant))
         if (restaurant.status) setRestaurantStatus(restaurant.status)
+        setPaidLocally(Boolean(restaurant?.settings?.onboardingPayment?.paid))
 
         const host = restaurantHostname(restaurant)
         if (host) setDomain(host)
@@ -61,8 +63,8 @@ function Launch() {
   const previewInitial = restaurantName.trim()
     ? restaurantName.trim().charAt(0).toUpperCase()
     : 'R'
-  const qrUnlocked = isRestaurantLive(restaurantStatus)
-  const qrBlurMessage = 'Unlocks after admin approval'
+  const qrUnlocked = isRestaurantLive(restaurantStatus) || Boolean(onboardingPaid) || paidLocally
+  const qrBlurMessage = 'Make a payment first'
 
   const hasDomain = Boolean(domain)
   const hostname = domain || 'yourbusiness.iroas.com'
@@ -113,7 +115,7 @@ function Launch() {
 
   const handleDownloadQR = async (qrUrl = LIVE_LINK, fileName = `${hostname.split('.')[0]}-QR.png`) => {
     if (!qrUnlocked) {
-      showMessage('QR unlocks after admin approval')
+      showMessage('Make a payment first to unlock QR')
       return
     }
     if (!qrUrl) {
@@ -138,7 +140,7 @@ function Launch() {
 
   const handlePrintQR = async (qrUrl = LIVE_LINK, label = displayName, linkLabel = hostname) => {
     if (!qrUnlocked) {
-      showMessage('QR unlocks after admin approval')
+      showMessage('Make a payment first to unlock QR')
       return
     }
     if (!qrUrl) {
@@ -202,7 +204,7 @@ function Launch() {
 
   const handleShareQR = async (qrUrl = LIVE_LINK, label = displayName) => {
     if (!qrUnlocked) {
-      showMessage('QR unlocks after admin approval')
+      showMessage('Make a payment first to unlock QR')
       return
     }
     if (!qrUrl) {
@@ -549,7 +551,7 @@ function Launch() {
               <div className="qr-bottom-content">
                 <div className="qr-link">{hostname}</div>
                 <p className="preview-note">
-                  {qrUnlocked ? 'Live · QR ready to share' : 'Preview · QR unlocks after admin approval'}
+                  {qrUnlocked ? 'Live · QR ready to share' : 'Preview · Make a payment first to unlock QR'}
                 </p>
               </div>
             </div>

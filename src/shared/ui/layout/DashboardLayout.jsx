@@ -25,7 +25,7 @@ export function DashboardLayout({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout, isAdmin, restaurantStatus: authRestaurantStatus } = useAuth()
+  const { user, logout, isAdmin, restaurantStatus: authRestaurantStatus, businessCategory } = useAuth()
   const toast = useToast()
   const { displayRestaurant, restaurantStatus } = useRestaurant({
     enabled: !isAdmin && variant === 'owner',
@@ -95,6 +95,7 @@ export function DashboardLayout({
           activeNav={activeNav}
           pathname={location.pathname}
           isAdmin={isAdmin}
+          businessCategory={businessCategory}
           workspaceName={workspaceName}
           workspaceStatus={workspaceStatus}
           onNavClick={handleNavClick}

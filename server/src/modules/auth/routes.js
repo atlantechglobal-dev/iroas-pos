@@ -228,6 +228,10 @@ router.post('/signup', async (req, res) => {
     return res.status(400).json({ error: 'All fields are required.' })
   }
 
+  if (!businessCategory) {
+    return res.status(400).json({ error: 'Business category is required.' })
+  }
+
   if (!isValidPersonName(finalName)) {
     return res.status(400).json({ error: 'Enter a valid name using letters only.' })
   }

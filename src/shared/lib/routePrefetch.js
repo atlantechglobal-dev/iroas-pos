@@ -10,6 +10,7 @@ const loaders = {
   launch: () => import('@/features/onboarding/Launch/Launch'),
   onboardingPayment: () => import('@/features/onboarding/OnboardingPayment/OnboardingPayment'),
   dashboard: () => import('@/features/dashboard/Dashboard/Dashboard'),
+  digitalBusinessCard: () => import('@/features/dashboard/DigitalBusinessCard/DigitalBusinessCard'),
   platformAdmin: () => import('@/features/platform-admin/PlatformAdmin/PlatformAdmin'),
 }
 

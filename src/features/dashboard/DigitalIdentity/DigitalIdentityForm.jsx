@@ -18,13 +18,14 @@ import '@/features/dashboard/DigitalIdentity/DigitalIdentity.css'
 function DigitalIdentityForm() {
   const navigate = useNavigate()
   const toast = useToast()
-  const { user } = useAuth()
+  const { user, businessCategory } = useAuth()
   const [form, setForm] = useState(emptyIdentityForm)
   const [status, setStatus] = useState(null)
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [categories, setCategories] = useState(() => visibleBusinessCategories())
+  const categoryLocked = Boolean(String(businessCategory || form.category || '').trim())
 
   useEffect(() => {
     let cancelled = false
@@ -47,19 +48,22 @@ function DigitalIdentityForm() {
       .getIdentity()
       .then((data) => {
         if (data.identity) {
-          setForm(identityToForm(data.identity))
+          const next = identityToForm(data.identity)
+          if (!next.category && businessCategory) next.category = businessCategory
+          setForm(next)
           setStatus(data.identity.status)
         } else if (user) {
           setForm((prev) => ({
             ...prev,
             contactPerson: user.name || '',
             email: user.email || '',
+            category: businessCategory || prev.category,
           }))
         }
       })
       .catch((err) => toast.error(err.message || 'Unable to load form.'))
       .finally(() => setLoading(false))
-  }, [user])
+  }, [user, businessCategory])
 
   const editable = isIdentityEditable(status)
 
@@ -129,6 +133,7 @@ function DigitalIdentityForm() {
 
   const category = form.category
   const categoryFields = getCategoryFieldConfig(category)
+  const showOther = String(category || '').toLowerCase() === 'other'
 
   if (loading) {
     return (
@@ -178,23 +183,40 @@ function DigitalIdentityForm() {
             </label>
             <label>
               Business category *
-              <select value={form.category} onChange={setField('category')}>
+              <select
+                value={form.category}
+                onChange={setField('category')}
+                disabled={categoryLocked}
+                title={
+                  categoryLocked
+                    ? 'Category was set at signup and cannot be changed. Delete the account to choose a different category.'
+                    : undefined
+                }
+              >
                 <option value="">Select category</option>
                 {categories.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
-                {/* Keep a previously saved category selectable if it was removed from the catalog */}
                 {form.category && !categories.includes(form.category) ? (
                   <option value={form.category}>{form.category}</option>
                 ) : null}
               </select>
+              {categoryLocked ? (
+                <span className="field-hint">
+                  Fixed at signup. To change category, delete this account and create a new one.
+                </span>
+              ) : null}
             </label>
             {showOther ? (
               <label>
                 Specify category *
-                <input value={form.categoryOther} onChange={setField('categoryOther')} />
+                <input
+                  value={form.categoryOther}
+                  onChange={setField('categoryOther')}
+                  disabled={categoryLocked}
+                />
               </label>
             ) : null}
             <label>

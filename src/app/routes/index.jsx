@@ -25,8 +25,6 @@ const RestaurantProfile = lazy(() => import('@/features/dashboard/RestaurantProf
 const DirectoryListings = lazy(() => import('@/features/dashboard/DirectoryListings/DirectoryListings'))
 const DigitalBusinessCard = lazy(() => import('@/features/dashboard/DigitalBusinessCard/DigitalBusinessCard'))
 const BusinessId = lazy(() => import('@/features/dashboard/BusinessId/BusinessId'))
-const DigitalIdentity = lazy(() => import('@/features/dashboard/DigitalIdentity/DigitalIdentity'))
-const DigitalIdentityForm = lazy(() => import('@/features/dashboard/DigitalIdentity/DigitalIdentityForm'))
 const MobileApplication = lazy(() => import('@/features/dashboard/MobileApplication/MobileApplication'))
 const OneLink = lazy(() => import('@/features/dashboard/OneLink/OneLink'))
 const GuestOneLink = lazy(() => import('@/features/guest/GuestOneLink/GuestOneLink'))
@@ -119,6 +117,7 @@ function withProtection(
     requireLive = false,
     onboardingOnly = false,
     allowPending = false,
+    restaurantOnly = false,
   } = {},
 ) {
   return (
@@ -127,6 +126,7 @@ function withProtection(
       requireLive={requireLive}
       onboardingOnly={onboardingOnly}
       allowPending={allowPending}
+      restaurantOnly={restaurantOnly}
     >
       <Component />
     </ProtectedRoute>
@@ -136,6 +136,7 @@ function withProtection(
 // Pages that assume setup is submitted or live. The onboarding wizard itself
 // stays reachable only while status is still `onboarding`.
 const LIVE_ONLY = { requireLive: true }
+const RESTAURANT_LIVE = { requireLive: true, restaurantOnly: true }
 const WIZARD_ONLY = { onboardingOnly: true }
 
 export function AppRoutes() {
@@ -181,13 +182,19 @@ export function AppRoutes() {
           element={<Navigate to={ROUTES.DASHBOARD} replace />}
         />
         <Route path={ROUTES.GO_LIVE} element={withProtection(GoLive, WIZARD_ONLY)} />
-        <Route path={ROUTES.DASHBOARD} element={withProtection(Dashboard, LIVE_ONLY)} />
+        <Route path={ROUTES.DASHBOARD} element={withProtection(Dashboard, RESTAURANT_LIVE)} />
         <Route path={ROUTES.RESTAURANT_PROFILE} element={withProtection(RestaurantProfile, LIVE_ONLY)} />
         <Route path={ROUTES.DIRECTORY_LISTINGS} element={withProtection(DirectoryListings, LIVE_ONLY)} />
         <Route path={ROUTES.DIGITAL_BUSINESS_CARD} element={withProtection(DigitalBusinessCard, LIVE_ONLY)} />
         <Route path={ROUTES.BUSINESS_ID} element={withProtection(BusinessId, LIVE_ONLY)} />
-        <Route path={ROUTES.DIGITAL_IDENTITY} element={withProtection(DigitalIdentity, LIVE_ONLY)} />
-        <Route path={ROUTES.DIGITAL_IDENTITY_FORM} element={withProtection(DigitalIdentityForm, LIVE_ONLY)} />
+        <Route
+          path={ROUTES.DIGITAL_IDENTITY}
+          element={<Navigate to={ROUTES.DIGITAL_BUSINESS_CARD} replace />}
+        />
+        <Route
+          path={ROUTES.DIGITAL_IDENTITY_FORM}
+          element={<Navigate to={ROUTES.DIGITAL_BUSINESS_CARD} replace />}
+        />
         <Route path={ROUTES.MOBILE_APP} element={withProtection(MobileApplication, LIVE_ONLY)} />
         <Route path={ROUTES.ONE_LINK} element={withProtection(OneLink, LIVE_ONLY)} />
         <Route path={ROUTES.MENU} element={withProtection(Menu, LIVE_ONLY)} />

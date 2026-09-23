@@ -68,8 +68,8 @@ function MobileApplication() {
             reviews and progresses development.
           </p>
         </div>
-        <button type="button" className="btn btn-outline" onClick={() => navigate(ROUTES.DIGITAL_IDENTITY)}>
-          Back to Digital Identity
+        <button type="button" className="btn btn-outline" onClick={() => navigate(ROUTES.DIGITAL_BUSINESS_CARD)}>
+          Back to Digital Business Card
         </button>
       </div>
 
@@ -78,10 +78,10 @@ function MobileApplication() {
       ) : !unlocked ? (
         <div className="card">
           <p className="di-lock-note">
-            Your Digital Identity must be approved before you can request a Mobile Application.
+            Complete onboarding and get your account live before requesting a Mobile Application.
           </p>
-          <button type="button" className="btn btn-primary" onClick={() => navigate(ROUTES.DIGITAL_IDENTITY)}>
-            Go to Digital Identity
+          <button type="button" className="btn btn-primary" onClick={() => navigate(ROUTES.DIGITAL_BUSINESS_CARD)}>
+            Go to Digital Business Card
           </button>
         </div>
       ) : (

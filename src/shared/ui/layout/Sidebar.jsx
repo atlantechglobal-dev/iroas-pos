@@ -4,6 +4,7 @@ export function Sidebar({
   activeNav,
   pathname = '',
   isAdmin = false,
+  businessCategory = '',
   workspaceName,
   workspaceStatus,
   onNavClick,
@@ -11,7 +12,7 @@ export function Sidebar({
   onClose,
 }) {
   const resolvedActive = activeNav || getActiveNavKey(pathname, { isAdmin })
-  const groups = getNavGroupsForUser({ isAdmin })
+  const groups = getNavGroupsForUser({ isAdmin, businessCategory })
 
   return (
     <aside className="sidebar" aria-label={isAdmin ? 'Platform sidebar' : 'Sidebar'}>

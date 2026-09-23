@@ -1,11 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { ROUTES } from '@/shared/constants/routes'
+import { isRestaurantCategory, normalizeBusinessCategory } from '@/shared/constants/businessCategory'
 import {
   canAccessOnboarding,
   canUseDashboard,
   isPendingApproval,
   ownerHomePath,
+  ownerLiveHomePath,
 } from '@/shared/constants/restaurantStatus'
 
 export function ProtectedRoute({
@@ -13,6 +15,7 @@ export function ProtectedRoute({
   requireLive = false,
   onboardingOnly = false,
   allowPending = false,
+  restaurantOnly = false,
   children,
 }) {
   const {
@@ -21,15 +24,21 @@ export function ProtectedRoute({
     restaurantStatus,
     awaitingAccountApproval,
     onboardingPaid,
+    businessCategory,
     initializing,
   } = useAuth()
   const location = useLocation()
   const awaiting = Boolean(awaitingAccountApproval)
   const paid = Boolean(onboardingPaid)
+  const categoryOpts = { businessCategory }
   const home = ownerHomePath(restaurantStatus, {
     awaitingAccountApproval: awaiting,
     onboardingPaid: paid,
+    ...categoryOpts,
   })
+  const liveHome = ownerLiveHomePath(businessCategory)
+  const cat = normalizeBusinessCategory(businessCategory)
+  const isRestaurant = !cat || isRestaurantCategory(cat)
 
   if (initializing) {
     return (
@@ -52,13 +61,11 @@ export function ProtectedRoute({
     return children
   }
 
-  // Signup still waiting for first admin approval
   if (awaiting) {
     return <Navigate to={ROUTES.ACCOUNT_THANKS} replace />
   }
 
-  // Avoid a wrong-page flash while owner status is still unknown
-  if (restaurantStatus == null && (requireLive || onboardingOnly)) {
+  if (restaurantStatus == null && (requireLive || onboardingOnly || restaurantOnly)) {
     return (
       <div className="app-loading" role="status" aria-live="polite">
         <span className="app-loading-spinner" aria-hidden="true" />
@@ -67,16 +74,25 @@ export function ProtectedRoute({
     )
   }
 
+  // Only the Dashboard page is Restaurant-exclusive.
+  if (restaurantOnly && !isRestaurant) {
+    return <Navigate to={liveHome} replace />
+  }
+
   if (requireLive) {
-    if (restaurantStatus && !canUseDashboard(restaurantStatus) && !paid) {
+    const allowed =
+      restaurantStatus === 'live' ||
+      paid ||
+      canUseDashboard(restaurantStatus, categoryOpts)
+    if (restaurantStatus && !allowed) {
       return <Navigate to={home} replace />
     }
     return children
   }
 
   if (onboardingOnly) {
-    if (restaurantStatus && (canUseDashboard(restaurantStatus) || paid)) {
-      return <Navigate to={ROUTES.DASHBOARD} replace />
+    if (restaurantStatus && (restaurantStatus === 'live' || paid)) {
+      return <Navigate to={liveHome} replace />
     }
     if (
       restaurantStatus &&

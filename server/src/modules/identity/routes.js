@@ -17,6 +17,40 @@ import {
 const router = Router()
 router.use(requireAuth)
 
+function signupCategoryForUser(userId) {
+  const restaurant = db
+    .prepare('SELECT settings_json FROM restaurants WHERE owner_id = ? ORDER BY id DESC LIMIT 1')
+    .get(userId)
+  if (!restaurant?.settings_json) return { category: '', categoryOther: '' }
+  try {
+    const settings = JSON.parse(restaurant.settings_json)
+    return {
+      category: String(settings.businessCategory || settings.category || '').trim(),
+      categoryOther: String(settings.categoryOther || '').trim(),
+    }
+  } catch {
+    return { category: '', categoryOther: '' }
+  }
+}
+
+function withLockedCategory(userId, payload, existing) {
+  const fromSignup = signupCategoryForUser(userId)
+  const lockedCategory =
+    (existing?.category && String(existing.category).trim()) ||
+    fromSignup.category ||
+    String(payload.category || '').trim()
+  const lockedOther =
+    existing?.category_other != null && String(existing.category_other).trim() !== ''
+      ? existing.category_other
+      : fromSignup.categoryOther || payload.categoryOther || ''
+
+  return {
+    ...payload,
+    category: lockedCategory,
+    categoryOther: lockedCategory.toLowerCase() === 'other' ? lockedOther : '',
+  }
+}
+
 function payloadFromBody(body = {}) {
   return {
     businessName: body.businessName ?? '',
@@ -45,9 +79,10 @@ function payloadFromBody(body = {}) {
 
 function upsertDraft(userId, payload, { keepStatus } = {}) {
   const existing = getIdentityByUser(userId)
-  const socialJson = JSON.stringify(payload.social || {})
-  const onlineJson = JSON.stringify(payload.onlinePresence || {})
-  const verticalJson = JSON.stringify(payload.verticalFields || {})
+  const locked = withLockedCategory(userId, payload, existing)
+  const socialJson = JSON.stringify(locked.social || {})
+  const onlineJson = JSON.stringify(locked.onlinePresence || {})
+  const verticalJson = JSON.stringify(locked.verticalFields || {})
 
   if (!existing) {
     const referenceId = nextReferenceId()
@@ -65,24 +100,24 @@ function upsertDraft(userId, payload, { keepStatus } = {}) {
       .run(
         userId,
         referenceId,
-        payload.businessName || null,
-        payload.category || null,
-        payload.categoryOther || null,
-        payload.businessType || null,
-        payload.description || null,
-        payload.yearEstablished || null,
-        payload.contactPerson || null,
-        payload.phone || null,
-        payload.email || null,
-        payload.website || null,
-        payload.address || null,
-        payload.city || null,
-        payload.state || null,
-        payload.country || null,
-        payload.postalCode || null,
-        payload.brandName || null,
-        payload.primaryBrandInfo || null,
-        payload.logoDataUrl || null,
+        locked.businessName || null,
+        locked.category || null,
+        locked.categoryOther || null,
+        locked.businessType || null,
+        locked.description || null,
+        locked.yearEstablished || null,
+        locked.contactPerson || null,
+        locked.phone || null,
+        locked.email || null,
+        locked.website || null,
+        locked.address || null,
+        locked.city || null,
+        locked.state || null,
+        locked.country || null,
+        locked.postalCode || null,
+        locked.brandName || null,
+        locked.primaryBrandInfo || null,
+        locked.logoDataUrl || null,
         socialJson,
         onlineJson,
         verticalJson,
@@ -99,11 +134,11 @@ function upsertDraft(userId, payload, { keepStatus } = {}) {
     return getIdentityByUser(userId)
   }
 
-  const locked =
+  const statusLocked =
     !keepStatus &&
     ['submitted', 'under_review', 'approved', 'completed'].includes(existing.status)
 
-  if (locked && existing.status !== 'needs_info' && existing.status !== 'rejected') {
+  if (statusLocked && existing.status !== 'needs_info' && existing.status !== 'rejected') {
     // Allow edits only for draft / needs_info / rejected; otherwise just return current
     return existing
   }
@@ -126,24 +161,24 @@ function upsertDraft(userId, payload, { keepStatus } = {}) {
       status = ?, updated_at = datetime('now')
      WHERE user_id = ?`,
   ).run(
-    payload.businessName || null,
-    payload.category || null,
-    payload.categoryOther || null,
-    payload.businessType || null,
-    payload.description || null,
-    payload.yearEstablished || null,
-    payload.contactPerson || null,
-    payload.phone || null,
-    payload.email || null,
-    payload.website || null,
-    payload.address || null,
-    payload.city || null,
-    payload.state || null,
-    payload.country || null,
-    payload.postalCode || null,
-    payload.brandName || null,
-    payload.primaryBrandInfo || null,
-    payload.logoDataUrl || null,
+    locked.businessName || null,
+    locked.category || null,
+    locked.categoryOther || null,
+    locked.businessType || null,
+    locked.description || null,
+    locked.yearEstablished || null,
+    locked.contactPerson || null,
+    locked.phone || null,
+    locked.email || null,
+    locked.website || null,
+    locked.address || null,
+    locked.city || null,
+    locked.state || null,
+    locked.country || null,
+    locked.postalCode || null,
+    locked.brandName || null,
+    locked.primaryBrandInfo || null,
+    locked.logoDataUrl || null,
     socialJson,
     onlineJson,
     verticalJson,

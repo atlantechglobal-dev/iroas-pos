@@ -177,7 +177,7 @@ function SetupReview() {
               alt={`${displayName} QR code`}
               emptyMessage="Set your web address to preview the QR code."
               blurred
-              blurMessage="Unlocks after admin approval"
+              blurMessage="Make a payment first"
             />
             {hostname ? <p className="setup-review-host">{hostname}</p> : null}
           </section>

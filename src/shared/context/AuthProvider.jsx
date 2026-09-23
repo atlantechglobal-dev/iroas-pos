@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '@/shared/context/authContext'
 import { ROUTES } from '@/shared/constants/routes'
 import { isAdmin } from '@/shared/constants/roles'
+import { businessCategoryFromRestaurant } from '@/shared/constants/businessCategory'
 import {
   canUseDashboard,
   ownerHomePath,
@@ -28,21 +29,23 @@ function readOnboardingPaid(restaurant) {
 function resolvePostLoginPath(status, redirectTo, restaurant) {
   const awaiting = readAwaiting(restaurant)
   const onboardingPaid = readOnboardingPaid(restaurant)
+  const businessCategory = businessCategoryFromRestaurant(restaurant)
+  const pathOpts = { awaitingAccountApproval: awaiting, onboardingPaid, businessCategory }
   if (awaiting) return ROUTES.ACCOUNT_THANKS
 
   if (redirectTo && typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
-    if (canUseDashboard(status)) {
+    if (canUseDashboard(status, { businessCategory })) {
       if (redirectTo.startsWith('/c/') || redirectTo.startsWith('/s/') || redirectTo.startsWith('/l/')) {
         return ROUTES.BUSINESS_ID
       }
       return redirectTo
     }
     if (redirectTo === ROUTES.DASHBOARD || redirectTo.startsWith('/settings')) {
-      return ownerHomePath(status, { awaitingAccountApproval: awaiting, onboardingPaid })
+      return ownerHomePath(status, pathOpts)
     }
   }
 
-  return ownerHomePath(status, { awaitingAccountApproval: awaiting, onboardingPaid })
+  return ownerHomePath(status, pathOpts)
 }
 
 export function AuthProvider({ children }) {
@@ -53,6 +56,7 @@ export function AuthProvider({ children }) {
   const [restaurantStatus, setRestaurantStatus] = useState(null)
   const [awaitingAccountApproval, setAwaitingAccountApproval] = useState(false)
   const [onboardingPaid, setOnboardingPaid] = useState(false)
+  const [businessCategory, setBusinessCategory] = useState('')
 
   const logout = useCallback(() => {
     clearSession()
@@ -60,6 +64,7 @@ export function AuthProvider({ children }) {
     setRestaurantStatus(null)
     setAwaitingAccountApproval(false)
     setOnboardingPaid(false)
+    setBusinessCategory('')
     navigate(ROUTES.LOGIN, { replace: true })
   }, [navigate])
 
@@ -69,6 +74,7 @@ export function AuthProvider({ children }) {
       setUser(null)
       setAwaitingAccountApproval(false)
       setOnboardingPaid(false)
+      setBusinessCategory('')
       navigate(ROUTES.LOGIN, { replace: true })
     })
   }, [navigate])
@@ -96,15 +102,18 @@ export function AuthProvider({ children }) {
             if (cancelled) return
             const awaiting = readAwaiting(restaurant)
             const paid = readOnboardingPaid(restaurant)
+            const category = businessCategoryFromRestaurant(restaurant)
             setRestaurantStatus(restaurant?.status || 'onboarding')
             setAwaitingAccountApproval(awaiting)
             setOnboardingPaid(paid)
+            setBusinessCategory(category)
             if (awaiting) {
               clearSession()
               setUser(null)
               setRestaurantStatus(null)
               setAwaitingAccountApproval(false)
               setOnboardingPaid(false)
+              setBusinessCategory('')
               try {
                 sessionStorage.setItem(
                   'login_flash',
@@ -114,16 +123,17 @@ export function AuthProvider({ children }) {
                 /* ignore */
               }
               navigate(ROUTES.LOGIN, { replace: true })
-            } else if (paid || canUseDashboard(restaurant?.status)) {
+            } else if (paid || canUseDashboard(restaurant?.status, { businessCategory: category })) {
               prefetchWhenIdle(['dashboard'])
             } else {
-              prefetchWhenIdle(['restaurantSetup', 'onboardingPayment', 'dashboard'])
+              prefetchWhenIdle(['restaurantSetup', 'onboardingPayment', 'dashboard', 'digitalBusinessCard'])
             }
           } catch {
             if (!cancelled) {
               setRestaurantStatus('onboarding')
               setAwaitingAccountApproval(false)
               setOnboardingPaid(false)
+              setBusinessCategory('')
             }
           }
         } else {
@@ -152,6 +162,7 @@ export function AuthProvider({ children }) {
       if (isAdmin(loggedInUser)) {
         setAwaitingAccountApproval(false)
         setOnboardingPaid(false)
+        setBusinessCategory('')
         prefetchRoutes(['platformAdmin'])
         navigate(ROUTES.PLATFORM_ADMIN, { replace: true })
         return loggedInUser
@@ -162,9 +173,11 @@ export function AuthProvider({ children }) {
         const status = restaurant?.status || 'onboarding'
         const awaiting = readAwaiting(restaurant)
         const paid = readOnboardingPaid(restaurant)
+        const category = businessCategoryFromRestaurant(restaurant)
         setRestaurantStatus(status)
         setAwaitingAccountApproval(awaiting)
         setOnboardingPaid(paid)
+        setBusinessCategory(category)
         const path = resolvePostLoginPath(status, redirectTo, restaurant)
         if (path === ROUTES.ACCOUNT_THANKS || awaiting) {
           clearSession()
@@ -172,14 +185,17 @@ export function AuthProvider({ children }) {
           setRestaurantStatus(null)
           setAwaitingAccountApproval(false)
           setOnboardingPaid(false)
+          setBusinessCategory('')
           const err = new Error(
             'Your account is not approved yet. Once an admin approves it, you will be able to sign in.',
           )
           err.code = 'ACCOUNT_PENDING_APPROVAL'
           throw err
         }
-        if (path === ROUTES.DASHBOARD || paid || canUseDashboard(status)) {
+        if (path === ROUTES.DASHBOARD || paid || canUseDashboard(status, { businessCategory: category })) {
           prefetchRoutes(['dashboard'])
+        } else if (path === ROUTES.DIGITAL_BUSINESS_CARD) {
+          prefetchRoutes(['digitalBusinessCard'])
         } else if (path === ROUTES.ONBOARDING_PAYMENT) {
           prefetchRoutes(['onboardingPayment', 'dashboard'])
         } else {
@@ -193,6 +209,7 @@ export function AuthProvider({ children }) {
         setRestaurantStatus('onboarding')
         setAwaitingAccountApproval(false)
         setOnboardingPaid(false)
+        setBusinessCategory('')
         prefetchRoutes(['restaurantSetup'])
         navigate(ROUTES.RESTAURANT_SETUP, { replace: true })
       }
@@ -243,6 +260,7 @@ export function AuthProvider({ children }) {
       restaurantStatus,
       awaitingAccountApproval,
       onboardingPaid,
+      businessCategory,
       initializing,
       login,
       loginWithGoogle,
@@ -251,12 +269,14 @@ export function AuthProvider({ children }) {
       setRestaurantStatus,
       setAwaitingAccountApproval,
       setOnboardingPaid,
+      setBusinessCategory,
     }),
     [
       user,
       restaurantStatus,
       awaitingAccountApproval,
       onboardingPaid,
+      businessCategory,
       initializing,
       login,
       loginWithGoogle,

@@ -35,7 +35,7 @@ export async function downloadQrPng(value, filename = 'qr-code.png', options) {
 /**
  * Renders a client-generated QR image for `value`.
  * Shows emptyMessage when value is missing.
- * When `blurred`, the code is visually obscured until unlocked (e.g. after admin approval).
+ * When `blurred`, the code is visually obscured until unlocked (e.g. after onboarding payment).
  */
 export function QrCodePreview({
   value,
@@ -45,7 +45,7 @@ export function QrCodePreview({
   emptyMessage = 'Set your web address to preview the QR code.',
   style,
   blurred = false,
-  blurMessage = 'Unlocks after approval',
+  blurMessage = 'Make a payment first',
 }) {
   const [src, setSrc] = useState('')
   const [error, setError] = useState('')
@@ -143,7 +143,7 @@ export function QrCodePreview({
     >
       <img
         src={src}
-        alt={blurred ? `${alt} (locked until approval)` : alt}
+        alt={blurred ? `${alt} (locked — make a payment first)` : alt}
         width={size}
         height={size}
         style={{

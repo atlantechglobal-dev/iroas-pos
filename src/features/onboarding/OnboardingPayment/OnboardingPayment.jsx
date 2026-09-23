@@ -4,6 +4,7 @@ import { api } from '@/shared/lib/api'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { ROUTES } from '@/shared/constants/routes'
 import { formatPlanPrice } from '@/shared/constants/plans'
+import { ownerLiveHomePath } from '@/shared/constants/restaurantStatus'
 import { prefetchRoutes } from '@/shared/lib/routePrefetch'
 import '@/features/onboarding/OnboardingPayment/OnboardingPayment.css'
 
@@ -22,7 +23,7 @@ function formatPhone(value) {
 
 function OnboardingPayment() {
   const navigate = useNavigate()
-  const { setRestaurantStatus, setOnboardingPaid } = useAuth()
+  const { setRestaurantStatus, setOnboardingPaid, businessCategory, setBusinessCategory } = useAuth()
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
   const [error, setError] = useState('')
@@ -34,12 +35,15 @@ function OnboardingPayment() {
 
   const isReturning = new URLSearchParams(window.location.search).get('paid') === 'return'
 
-  const goToDashboard = (data) => {
+  const goAfterPayment = (data) => {
     if (data?.status) setRestaurantStatus(data.status)
     else setRestaurantStatus('live')
     setOnboardingPaid(true)
-    prefetchRoutes(['dashboard'])
-    navigate(ROUTES.DASHBOARD, { replace: true })
+    const category = data?.category || businessCategory || ''
+    if (category && setBusinessCategory) setBusinessCategory(category)
+    const home = ownerLiveHomePath(category)
+    prefetchRoutes([home === ROUTES.DASHBOARD ? 'dashboard' : 'digitalBusinessCard'])
+    navigate(home, { replace: true })
   }
 
   const applyInfo = (data) => {
@@ -62,7 +66,7 @@ function OnboardingPayment() {
         applyInfo(data)
         if (data.paid) {
           if (pollTimer.current) clearTimeout(pollTimer.current)
-          goToDashboard(data)
+          goAfterPayment(data)
           return true
         }
         if (isPoll && Date.now() < pollDeadline.current) {
@@ -115,9 +119,10 @@ function OnboardingPayment() {
     try {
       const result = await api.completeOnboardingPayment({ planId: selected.id })
       if (result.alreadyPaid || result.payment?.paid || result.demo) {
-        goToDashboard({
+        goAfterPayment({
           ...result,
           status: result.status || 'live',
+          category: result.category || info?.category || businessCategory,
         })
         return
       }
@@ -307,7 +312,7 @@ function OnboardingPayment() {
                   : `Continue with ${money} (demo)`}
             </button>
             <p className="ob-pay-fine">
-              After payment you’ll go straight to your dashboard.
+              After payment your QRs unlock and you can open your workspace.
             </p>
           </form>
         </section>

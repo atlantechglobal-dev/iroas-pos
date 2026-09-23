@@ -346,6 +346,10 @@ function CreateAccount() {
                     ))}
                   </select>
                 </div>
+                <p className="field-hint">
+                  Choose carefully — category cannot be changed later. Only a new account can pick a
+                  different category.
+                </p>
                 {errors.category && <p className="field-error">{errors.category}</p>}
               </div>
             ) : null}

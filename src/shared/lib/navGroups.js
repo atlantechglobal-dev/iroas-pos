@@ -1,11 +1,18 @@
 import { ROUTES } from '@/shared/constants/routes'
+import { isRestaurantCategory } from '@/shared/constants/businessCategory'
 
 /** Restaurant owner / tenant sidebar */
 export const NAV_GROUPS = [
   {
     label: 'Overview',
     items: [
-      { key: 'dashboard', label: 'Dashboard', icon: '/images/dashboard.svg', route: ROUTES.DASHBOARD },
+      {
+        key: 'dashboard',
+        label: 'Dashboard',
+        icon: '/images/dashboard.svg',
+        route: ROUTES.DASHBOARD,
+        restaurantOnly: true,
+      },
       {
         key: 'digital-business-card',
         label: 'Digital Business Card',
@@ -24,7 +31,12 @@ export const NAV_GROUPS = [
         icon: '/images/rest.svg',
         route: ROUTES.RESTAURANT_PROFILE,
       },
-      { key: 'branding', label: 'Branding', icon: '/images/black.branding.svg', route: ROUTES.BRAND },
+      {
+        key: 'branding',
+        label: 'Branding',
+        icon: '/images/black.branding.svg',
+        route: ROUTES.BRAND,
+      },
     ],
   },
   {
@@ -290,7 +302,7 @@ export function getActiveNavKey(pathname, { isAdmin = false } = {}) {
   return prefixed[0]?.key || null
 }
 
-export function getNavGroupsForUser({ isAdmin = false } = {}) {
+export function getNavGroupsForUser({ isAdmin = false, businessCategory = '' } = {}) {
   if (isAdmin) {
     return ADMIN_NAV_GROUPS.map((group) => ({
       ...group,
@@ -298,8 +310,14 @@ export function getNavGroupsForUser({ isAdmin = false } = {}) {
     })).filter((group) => group.items.length > 0)
   }
 
+  const restaurant = !businessCategory || isRestaurantCategory(businessCategory)
+
   return NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.hidden && !item.adminOnly),
+    items: group.items.filter((item) => {
+      if (item.hidden || item.adminOnly) return false
+      if (item.restaurantOnly && !restaurant) return false
+      return true
+    }),
   })).filter((group) => group.items.length > 0)
 }

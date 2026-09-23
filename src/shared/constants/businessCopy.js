@@ -399,10 +399,7 @@ export function getBusinessCopy(category) {
   return { ...DEFAULT_COPY, ...specific }
 }
 
-export function businessCategoryFromRestaurant(restaurant) {
-  const settings = restaurant?.settings || {}
-  return settings.businessCategory || settings.category || ''
-}
+export { businessCategoryFromRestaurant } from '@/shared/constants/businessCategory'
 
 export function locationPreviewLine(copy, specialty, city) {
   const parts = [specialty?.trim(), city?.trim()].filter(Boolean)

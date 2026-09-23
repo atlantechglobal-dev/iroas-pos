@@ -175,8 +175,14 @@ router.put('/settings', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
 
-  const patch = req.body || {}
-  const merged = { ...parseSettings(restaurant), ...patch }
+  const current = parseSettings(restaurant)
+  const patch = { ...(req.body || {}) }
+  // Business category is fixed at Create Account — change requires deleting the account.
+  delete patch.businessCategory
+  delete patch.category
+  const merged = { ...current, ...patch }
+  if (current.businessCategory) merged.businessCategory = current.businessCategory
+  else if (current.category) merged.category = current.category
 
   db.prepare(
     `UPDATE restaurants SET settings_json = ?, updated_at = datetime('now') WHERE id = ?`,
