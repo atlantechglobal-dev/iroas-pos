@@ -50,9 +50,8 @@ function AccountApproveProfile() {
     load()
   }, [tenantId])
 
-  const isWaiting = Boolean(
-    tenant?.awaitingAccountApproval && tenant?.status === 'pending_approval',
-  )
+  const isSignupWaiting = Boolean(tenant?.awaitingAccountApproval)
+  const isWaiting = Boolean(isSignupWaiting && tenant?.status === 'pending_approval')
 
   const approve = async () => {
     setBusy('approve')
