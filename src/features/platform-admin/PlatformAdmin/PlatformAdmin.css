@@ -1,0 +1,900 @@
+/* Platform Admin page content only — shell sidebar/topbar live in DashboardShell.css */
+
+.platform-admin-page {
+  --bg: #f7f6f2;
+  --panel: #ffffff;
+  --border: #ece8df;
+  --ink: #17171a;
+  --muted: #8b8b8f;
+  --muted-2: #a7a5a0;
+  --green: #8bc53f;
+  --green-dark: #6fa62a;
+  --green-soft: #eaf5db;
+  --green-text: #4c8a1a;
+  --yellow-soft: #fbf3d3;
+  --yellow-text: #a9821a;
+  --red-soft: #fbe4e2;
+  --red-text: #d3453b;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+}
+
+.platform-admin-page .page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.platform-admin-page .page-label {
+  color: var(--green-dark);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.platform-admin-page .content > .page-header h1,
+.platform-admin-page .page-header h1 {
+  margin: 0 0 10px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.platform-admin-page .page-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.55;
+  max-width: 640px;
+}
+
+.platform-admin-page .platform-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.platform-admin-page .email-settings-link {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.platform-admin-page .email-settings-link:hover {
+  border-color: var(--green);
+}
+
+.platform-admin-page .new-tenant {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--green);
+  color: #16210a;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(139, 197, 63, 0.3);
+}
+
+.platform-admin-page .new-tenant:hover {
+  background: var(--green-dark);
+}
+
+.platform-admin-page .new-tenant img {
+  width: 15px;
+  height: 15px;
+}
+
+.platform-admin-page .pa-attention {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  border: 1px solid color-mix(in srgb, var(--yellow-text) 28%, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--yellow-soft);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--ink);
+}
+
+.platform-admin-page .pa-attention-badge {
+  min-width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: var(--yellow-text);
+  font-weight: 800;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.platform-admin-page .pa-attention span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+
+.platform-admin-page .pa-attention strong {
+  display: block;
+  font-size: 14px;
+}
+
+.platform-admin-page .pa-attention small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.platform-admin-page .pa-attention-cta {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--yellow-text);
+  white-space: nowrap;
+}
+
+.platform-admin-page .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.platform-admin-page .stat-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+.platform-admin-page .stat-card.is-clickable {
+  cursor: pointer;
+}
+
+.platform-admin-page .stat-card.is-clickable:hover {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border));
+  box-shadow: 0 4px 14px rgba(30, 25, 15, 0.06);
+}
+
+.platform-admin-page .stat-card:disabled {
+  opacity: 1;
+}
+
+.platform-admin-page .stat-card.tone-pending {
+  border-color: color-mix(in srgb, var(--yellow-text) 30%, var(--border));
+  background: linear-gradient(180deg, #fffdf5 0%, #fff 100%);
+}
+
+.platform-admin-page .stat-title {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.platform-admin-page .stat-number {
+  margin-top: 12px;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.platform-admin-page .stat-small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.platform-admin-page .pa-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.platform-admin-page .pa-quick-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.platform-admin-page .pa-quick-card:hover {
+  border-color: color-mix(in srgb, var(--green) 50%, var(--border));
+  box-shadow: 0 4px 14px rgba(30, 25, 15, 0.06);
+}
+
+.platform-admin-page .pa-quick-card strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.platform-admin-page .pa-quick-card span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.platform-admin-page .tenants-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 20px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.platform-admin-page .card-header {
+  padding: 18px 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.platform-admin-page .card-header h2,
+.platform-admin-page .small-card h2,
+.platform-admin-page .feature-card h2,
+.platform-admin-page .side-card h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.platform-admin-page .card-header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.platform-admin-page .card-header input,
+.platform-admin-page .tenant-toolbar input {
+  width: 200px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 14px;
+  outline: none;
+  font-size: 12.5px;
+  font-family: inherit;
+  background: var(--bg);
+}
+
+.platform-admin-page .tenant-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.platform-admin-page .tenant-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.platform-admin-page .tenant-filter {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.platform-admin-page .tenant-filter.is-active {
+  background: #17171a;
+  border-color: #17171a;
+  color: #fff;
+}
+
+.platform-admin-page .tenant-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.platform-admin-page .tenant-row {
+  cursor: pointer;
+}
+
+.platform-admin-page .tenant-business {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.platform-admin-page .tenant-avatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 12px;
+  background: #f4f8ec;
+  color: #4c8a1a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.platform-admin-page .table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.platform-admin-page table {
+  width: max(100%, 920px);
+  min-width: 920px;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.platform-admin-page thead {
+  background: #faf9f6;
+}
+
+.platform-admin-page th {
+  text-align: left;
+  padding: 12px 22px;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.platform-admin-page td {
+  border-top: 1px solid var(--border);
+  padding: 14px 22px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.platform-admin-page td strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.platform-admin-page td small {
+  display: block;
+  color: var(--muted-2);
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.platform-admin-page .status {
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.platform-admin-page .active-status {
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+
+.platform-admin-page .trial-status {
+  background: #e8f3fb;
+  color: #4083b3;
+}
+
+.platform-admin-page .past-status {
+  background: var(--yellow-soft);
+  color: var(--yellow-text);
+}
+
+.platform-admin-page .suspended-status {
+  background: var(--red-soft);
+  color: var(--red-text);
+}
+
+.platform-admin-page .impersonate {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.platform-admin-page .impersonate:hover {
+  background: #fafafa;
+}
+
+.platform-admin-page .pa-review-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--green);
+  color: #16210a;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(139, 197, 63, 0.28);
+}
+
+.platform-admin-page .pa-review-btn:hover {
+  background: var(--green-dark);
+}
+
+.platform-admin-page .pa-approve-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--green);
+  color: #16210a;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(139, 197, 63, 0.28);
+}
+
+.platform-admin-page .pa-approve-btn:hover {
+  background: var(--green-dark);
+}
+
+.platform-admin-page .pa-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.platform-admin-page .pa-view-btn:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+
+.platform-admin-page .review-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--green);
+  color: #16210a;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(139, 197, 63, 0.28);
+}
+
+.platform-admin-page .table-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.platform-admin-page tbody tr:hover td {
+  background: #faf9f6;
+}
+
+.platform-admin-page td:last-child,
+.platform-admin-page th:last-child {
+  position: sticky;
+  right: 0;
+  background: #fff;
+  box-shadow: -8px 0 12px rgba(23, 23, 26, 0.04);
+}
+
+.platform-admin-page tbody tr:hover td:last-child {
+  background: #faf9f6;
+}
+
+.platform-admin-page .bottom-grid {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 18px;
+}
+
+.platform-admin-page .feature-card,
+.platform-admin-page .small-card,
+.platform-admin-page .side-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.platform-admin-page .feature-header {
+  padding: 20px 22px;
+}
+
+.platform-admin-page .feature-header span {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-top: 4px;
+}
+
+.platform-admin-page .feature-row {
+  min-height: 62px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 22px;
+}
+
+.platform-admin-page .flag-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--green-soft);
+  color: var(--green-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.platform-admin-page .feature-info {
+  flex: 1;
+}
+
+.platform-admin-page .feature-info strong {
+  display: block;
+  font-size: 13px;
+}
+
+.platform-admin-page .feature-info small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.platform-admin-page .switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.platform-admin-page .switch input {
+  display: none;
+}
+
+.platform-admin-page .switch span {
+  position: absolute;
+  inset: 0;
+  background: #e9e9e6;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.platform-admin-page .switch span::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  top: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.platform-admin-page .switch input:checked + span {
+  background: var(--green);
+}
+
+.platform-admin-page .switch input:checked + span::after {
+  transform: translateX(18px);
+}
+
+.platform-admin-page .right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.platform-admin-page .side-card {
+  padding: 20px 22px;
+}
+
+.platform-admin-page .small-card {
+  padding: 20px 22px;
+}
+
+.platform-admin-page .health-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.platform-admin-page .health-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.platform-admin-page .health-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.platform-admin-page .health-left strong {
+  display: block;
+  font-size: 13px;
+}
+
+.platform-admin-page .health-left p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.platform-admin-page .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.platform-admin-page .status-dot.green {
+  background: #4dbd78;
+}
+
+.platform-admin-page .status-dot.yellow {
+  background: #e5b526;
+}
+
+.platform-admin-page .audit-card > p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 4px 0 4px;
+}
+
+.platform-admin-page .audit-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.platform-admin-page .audit-item img {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.platform-admin-page .audit-item strong {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.platform-admin-page .audit-item small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--muted-2);
+}
+
+@media (max-width: 1280px) {
+  .platform-admin-page .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .platform-admin-page .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .platform-admin-page .pa-quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-admin-page .bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .platform-admin-page .page-header {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .platform-admin-page .page-header h1 {
+    font-size: 28px;
+  }
+
+  .platform-admin-page .pa-attention {
+    flex-wrap: wrap;
+  }
+
+  .platform-admin-page .pa-attention-cta {
+    width: 100%;
+  }
+
+  .platform-admin-page .tenants-card {
+    border-radius: 16px;
+  }
+
+  .platform-admin-page .card-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 16px;
+  }
+
+  .platform-admin-page .tenant-filters {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .platform-admin-page .tenant-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .platform-admin-page .tenant-filter {
+    flex-shrink: 0;
+  }
+
+  .platform-admin-page .card-header input,
+  .platform-admin-page .tenant-toolbar input {
+    width: 100%;
+  }
+
+  .platform-admin-page th,
+  .platform-admin-page td {
+    padding-left: 14px;
+    padding-right: 14px;
+    white-space: nowrap;
+  }
+
+  .platform-admin-page table {
+    width: max(100%, 760px);
+    min-width: 760px;
+  }
+
+  .platform-admin-page td select {
+    max-width: 200px;
+  }
+
+  .platform-admin-page .pa-invite-form {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .platform-admin-page .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-admin-page .stat-card {
+    padding: 18px 16px;
+  }
+
+  .platform-admin-page .page-header h1 {
+    font-size: 24px;
+  }
+
+  .platform-admin-page .platform-admin-actions {
+    width: 100%;
+  }
+
+  .platform-admin-page .platform-admin-actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .platform-admin-page .new-tenant,
+  .platform-admin-page .email-settings-link {
+    width: 100%;
+  }
+
+  .platform-admin-page table {
+    width: max(100%, 680px);
+    min-width: 680px;
+  }
+
+  .platform-admin-page .tenant-actions {
+    flex-direction: column;
+  }
+
+  .platform-admin-page .tenant-actions .pa-approve-btn,
+  .platform-admin-page .tenant-actions .pa-view-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .platform-admin-page .page-header h1 {
+    font-size: 22px;
+  }
+
+  .platform-admin-page .pa-attention {
+    padding: 12px 14px;
+  }
+}

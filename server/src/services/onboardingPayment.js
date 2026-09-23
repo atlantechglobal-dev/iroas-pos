@@ -2,7 +2,7 @@
  * Shared helpers for onboarding AddPay payment finalization
  * (webhook + owner return sync).
  */
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 import { addpayRequest } from './addpayClient.js'
 import { getPaymentSettings, isPaymentConfigured } from './paymentSettings.js'
 import { sendOnboardingPaymentEmails } from './onboardingMessaging.js'

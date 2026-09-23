@@ -1,4 +1,4 @@
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 import { queueEmail, createNotification } from './identityService.js'
 import { isSmtpConfigured, sendEmail } from './emailService.js'
 import { parseTimeToMinutes } from './reservationAvailability.js'

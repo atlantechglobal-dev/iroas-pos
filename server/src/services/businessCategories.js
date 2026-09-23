@@ -1,4 +1,4 @@
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 
 const KEY = 'business_categories'
 

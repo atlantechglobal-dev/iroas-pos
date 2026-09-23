@@ -1,12 +1,12 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth.js'
-import { ROUTES } from '../../constants/routes.js'
+import { useAuth } from '@/shared/hooks/useAuth'
+import { ROUTES } from '@/shared/constants/routes'
 import {
   canAccessOnboarding,
   canUseDashboard,
   isPendingApproval,
   ownerHomePath,
-} from '../../constants/restaurantStatus.js'
+} from '@/shared/constants/restaurantStatus'
 
 export function ProtectedRoute({
   adminOnly = false,

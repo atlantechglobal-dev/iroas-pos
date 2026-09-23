@@ -1,4 +1,4 @@
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 import { DEFAULT_DWELL_MINUTES, parseTimeToMinutes } from './reservationAvailability.js'
 
 export function listDiningTables(restaurantId) {

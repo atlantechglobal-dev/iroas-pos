@@ -1,4 +1,4 @@
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 import { maskToken } from './emailService.js'
 
 const PAYMENT_KEY = 'addpay'

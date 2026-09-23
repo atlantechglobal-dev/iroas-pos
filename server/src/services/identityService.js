@@ -1,4 +1,4 @@
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 import { isSmtpConfigured, sendEmail } from './emailService.js'
 
 export const IDENTITY_STATUSES = [

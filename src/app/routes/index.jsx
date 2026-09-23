@@ -1,107 +1,107 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
-import { ProtectedRoute } from './ProtectedRoute.jsx'
-import { PublicRoute } from './PublicRoute.jsx'
-import { platformAccountApproveProfilePath, ROUTES } from '../../constants/routes.js'
+import { ProtectedRoute } from '@/app/routes/ProtectedRoute'
+import { PublicRoute } from '@/app/routes/PublicRoute'
+import { platformAccountApproveProfilePath, ROUTES } from '@/shared/constants/routes'
 
 /* Eager entry pages — login ↔ signup ↔ thanks should not wait on Suspense */
-import Login from '../../pages/Login/Login.jsx'
-import CreateAccount from '../../pages/CreateAccount/CreateAccount.jsx'
-import AccountThanks from '../../pages/AccountThanks/AccountThanks.jsx'
+import Login from '@/features/auth/Login/Login'
+import CreateAccount from '@/features/auth/CreateAccount/CreateAccount'
+import AccountThanks from '@/features/auth/AccountThanks/AccountThanks'
 
-const ForgotPassword = lazy(() => import('../../pages/ForgotPassword/ForgotPassword.jsx'))
-const AccountRecovery = lazy(() => import('../../pages/AccountRecovery/AccountRecovery.jsx'))
-const NewPassword = lazy(() => import('../../pages/NewPassword/NewPassword.jsx'))
-const PasswordUpdated = lazy(() => import('../../pages/PasswordUpdated/PasswordUpdated.jsx'))
-const RestaurantSetup = lazy(() => import('../../pages/RestaurantSetup/RestaurantSetup.jsx'))
-const Domain = lazy(() => import('../../pages/Domain/Domain.jsx'))
-const Brand = lazy(() => import('../../pages/Brand/Brand.jsx'))
-const Launch = lazy(() => import('../../pages/Launch/Launch.jsx'))
-const OnboardingPayment = lazy(() => import('../../pages/OnboardingPayment/OnboardingPayment.jsx'))
-const PaymentThanks = lazy(() => import('../../pages/OnboardingPayment/PaymentThanks.jsx'))
-const GoLive = lazy(() => import('../../pages/GoLive/GoLive.jsx'))
-const Dashboard = lazy(() => import('../../pages/Dashboard/Dashboard.jsx'))
-const RestaurantProfile = lazy(() => import('../../pages/RestaurantProfile/RestaurantProfile.jsx'))
-const DirectoryListings = lazy(() => import('../../pages/DirectoryListings/DirectoryListings.jsx'))
-const DigitalBusinessCard = lazy(() => import('../../pages/DigitalBusinessCard/DigitalBusinessCard.jsx'))
-const BusinessId = lazy(() => import('../../pages/BusinessId/BusinessId.jsx'))
-const DigitalIdentity = lazy(() => import('../../pages/DigitalIdentity/DigitalIdentity.jsx'))
-const DigitalIdentityForm = lazy(() => import('../../pages/DigitalIdentity/DigitalIdentityForm.jsx'))
-const MobileApplication = lazy(() => import('../../pages/MobileApplication/MobileApplication.jsx'))
-const OneLink = lazy(() => import('../../pages/OneLink/OneLink.jsx'))
-const GuestOneLink = lazy(() => import('../../pages/GuestOneLink/GuestOneLink.jsx'))
-const GuestBusinessCard = lazy(() => import('../../pages/GuestBusinessCard/GuestBusinessCard.jsx'))
-const GuestSite = lazy(() => import('../../pages/GuestSite/GuestSite.jsx'))
-const PlatformAdmin = lazy(() => import('../../pages/PlatformAdmin/PlatformAdmin.jsx'))
-const PlatformPlans = lazy(() => import('../../pages/PlatformAdmin/Plans.jsx'))
-const PlatformCustomers = lazy(() => import('../../pages/PlatformAdmin/PlatformCustomers.jsx'))
+const ForgotPassword = lazy(() => import('@/features/auth/ForgotPassword/ForgotPassword'))
+const AccountRecovery = lazy(() => import('@/features/auth/AccountRecovery/AccountRecovery'))
+const NewPassword = lazy(() => import('@/features/auth/NewPassword/NewPassword'))
+const PasswordUpdated = lazy(() => import('@/features/auth/PasswordUpdated/PasswordUpdated'))
+const RestaurantSetup = lazy(() => import('@/features/onboarding/RestaurantSetup/RestaurantSetup'))
+const Domain = lazy(() => import('@/features/onboarding/Domain/Domain'))
+const Brand = lazy(() => import('@/features/onboarding/Brand/Brand'))
+const Launch = lazy(() => import('@/features/onboarding/Launch/Launch'))
+const OnboardingPayment = lazy(() => import('@/features/onboarding/OnboardingPayment/OnboardingPayment'))
+const PaymentThanks = lazy(() => import('@/features/onboarding/OnboardingPayment/PaymentThanks'))
+const GoLive = lazy(() => import('@/features/onboarding/GoLive/GoLive'))
+const Dashboard = lazy(() => import('@/features/dashboard/Dashboard/Dashboard'))
+const RestaurantProfile = lazy(() => import('@/features/dashboard/RestaurantProfile/RestaurantProfile'))
+const DirectoryListings = lazy(() => import('@/features/dashboard/DirectoryListings/DirectoryListings'))
+const DigitalBusinessCard = lazy(() => import('@/features/dashboard/DigitalBusinessCard/DigitalBusinessCard'))
+const BusinessId = lazy(() => import('@/features/dashboard/BusinessId/BusinessId'))
+const DigitalIdentity = lazy(() => import('@/features/dashboard/DigitalIdentity/DigitalIdentity'))
+const DigitalIdentityForm = lazy(() => import('@/features/dashboard/DigitalIdentity/DigitalIdentityForm'))
+const MobileApplication = lazy(() => import('@/features/dashboard/MobileApplication/MobileApplication'))
+const OneLink = lazy(() => import('@/features/dashboard/OneLink/OneLink'))
+const GuestOneLink = lazy(() => import('@/features/guest/GuestOneLink/GuestOneLink'))
+const GuestBusinessCard = lazy(() => import('@/features/guest/GuestBusinessCard/GuestBusinessCard'))
+const GuestSite = lazy(() => import('@/features/guest/GuestSite/GuestSite'))
+const PlatformAdmin = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformAdmin'))
+const PlatformPlans = lazy(() => import('@/features/platform-admin/PlatformAdmin/Plans'))
+const PlatformCustomers = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformCustomers'))
 const PlatformCustomerOnboarding = lazy(
-  () => import('../../pages/PlatformAdmin/CustomerOnboarding.jsx'),
+  () => import('@/features/platform-admin/PlatformAdmin/CustomerOnboarding'),
 )
-const PlatformAccountApprove = lazy(() => import('../../pages/PlatformAdmin/AccountApprove.jsx'))
+const PlatformAccountApprove = lazy(() => import('@/features/platform-admin/PlatformAdmin/AccountApprove'))
 const PlatformAccountApproveProfile = lazy(
-  () => import('../../pages/PlatformAdmin/AccountApproveProfile.jsx'),
+  () => import('@/features/platform-admin/PlatformAdmin/AccountApproveProfile'),
 )
 
 function RedirectLegacyApproveProfile() {
   const { tenantId } = useParams()
   return <Navigate to={platformAccountApproveProfilePath(tenantId)} replace />
 }
-const PlatformIdentityReview = lazy(() => import('../../pages/PlatformAdmin/IdentityReview.jsx'))
-const PlatformProducts = lazy(() => import('../../pages/PlatformAdmin/ProductsAdmin.jsx'))
+const PlatformIdentityReview = lazy(() => import('@/features/platform-admin/PlatformAdmin/IdentityReview'))
+const PlatformProducts = lazy(() => import('@/features/platform-admin/PlatformAdmin/ProductsAdmin'))
 const PlatformNotifications = lazy(
-  () => import('../../pages/PlatformAdmin/PlatformNotifications.jsx'),
+  () => import('@/features/platform-admin/PlatformAdmin/PlatformNotifications'),
 )
-const PlatformAudit = lazy(() => import('../../pages/PlatformAdmin/PlatformAudit.jsx'))
-const PlatformStaff = lazy(() => import('../../pages/PlatformAdmin/PlatformStaff.jsx'))
+const PlatformAudit = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformAudit'))
+const PlatformStaff = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformStaff'))
 const PlatformProfessional = lazy(
-  () => import('../../pages/PlatformAdmin/PlatformProfessional.jsx'),
+  () => import('@/features/platform-admin/PlatformAdmin/PlatformProfessional'),
 )
-const PlatformSettings = lazy(() => import('../../pages/PlatformAdmin/PlatformSettings.jsx'))
-const PlatformFeatureFlags = lazy(() => import('../../pages/PlatformAdmin/FeatureFlags.jsx'))
-const Menu = lazy(() => import('../../pages/Menu/Menu.jsx'))
-const Orders = lazy(() => import('../../pages/Orders/Orders.jsx'))
-const Reservations = lazy(() => import('../../pages/Reservations/Reservations.jsx'))
-const Tables = lazy(() => import('../../pages/Tables/Tables.jsx'))
-const Staff = lazy(() => import('../../pages/Staff/Staff.jsx'))
-const Customers = lazy(() => import('../../pages/Customers/Customers.jsx'))
-const RolePermissions = lazy(() => import('../../pages/RolePermissions/RolePermissions.jsx'))
-const Analytics = lazy(() => import('../../pages/Analytics/Analytics.jsx'))
-const Payments = lazy(() => import('../../pages/Payments/Payments.jsx'))
-const Marketing = lazy(() => import('../../pages/Marketing/Marketing.jsx'))
-const Reviews = lazy(() => import('../../pages/Reviews/Reviews.jsx'))
-const PosIntegration = lazy(() => import('../../pages/PosIntegration/PosIntegration.jsx'))
-const Notifications = lazy(() => import('../../pages/Notifications/Notifications.jsx'))
-const Settings = lazy(() => import('../../pages/Settings/Settings.jsx'))
-const EmailSettings = lazy(() => import('../../pages/Settings/EmailSettings.jsx'))
-const PaymentSettings = lazy(() => import('../../pages/Settings/PaymentSettings.jsx'))
-const GoogleAuthSettings = lazy(() => import('../../pages/Settings/GoogleAuthSettings.jsx'))
+const PlatformSettings = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformSettings'))
+const PlatformFeatureFlags = lazy(() => import('@/features/platform-admin/PlatformAdmin/FeatureFlags'))
+const Menu = lazy(() => import('@/features/dashboard/Menu/Menu'))
+const Orders = lazy(() => import('@/features/dashboard/Orders/Orders'))
+const Reservations = lazy(() => import('@/features/dashboard/Reservations/Reservations'))
+const Tables = lazy(() => import('@/features/dashboard/Tables/Tables'))
+const Staff = lazy(() => import('@/features/dashboard/Staff/Staff'))
+const Customers = lazy(() => import('@/features/dashboard/Customers/Customers'))
+const RolePermissions = lazy(() => import('@/features/dashboard/RolePermissions/RolePermissions'))
+const Analytics = lazy(() => import('@/features/dashboard/Analytics/Analytics'))
+const Payments = lazy(() => import('@/features/dashboard/Payments/Payments'))
+const Marketing = lazy(() => import('@/features/dashboard/Marketing/Marketing'))
+const Reviews = lazy(() => import('@/features/dashboard/Reviews/Reviews'))
+const PosIntegration = lazy(() => import('@/features/dashboard/PosIntegration/PosIntegration'))
+const Notifications = lazy(() => import('@/features/dashboard/Notifications/Notifications'))
+const Settings = lazy(() => import('@/features/dashboard/Settings/Settings'))
+const EmailSettings = lazy(() => import('@/features/dashboard/Settings/EmailSettings'))
+const PaymentSettings = lazy(() => import('@/features/dashboard/Settings/PaymentSettings'))
+const GoogleAuthSettings = lazy(() => import('@/features/dashboard/Settings/GoogleAuthSettings'))
 const BusinessCategoriesSettings = lazy(
-  () => import('../../pages/PlatformAdmin/BusinessCategoriesSettings.jsx'),
+  () => import('@/features/platform-admin/PlatformAdmin/BusinessCategoriesSettings'),
 )
 const SettingsUsers = lazy(() =>
-  import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsUsers })),
+  import('@/features/dashboard/Settings/SettingsPreview').then((m) => ({ default: m.SettingsUsers })),
 )
 const SettingsBilling = lazy(() =>
-  import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsBilling })),
+  import('@/features/dashboard/Settings/SettingsPreview').then((m) => ({ default: m.SettingsBilling })),
 )
 const SettingsSecurity = lazy(() =>
-  import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsSecurity })),
+  import('@/features/dashboard/Settings/SettingsPreview').then((m) => ({ default: m.SettingsSecurity })),
 )
 const SettingsApiKeys = lazy(() =>
-  import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsApiKeys })),
+  import('@/features/dashboard/Settings/SettingsPreview').then((m) => ({ default: m.SettingsApiKeys })),
 )
 const SettingsBackup = lazy(() =>
-  import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsBackup })),
+  import('@/features/dashboard/Settings/SettingsPreview').then((m) => ({ default: m.SettingsBackup })),
 )
 const SettingsAudit = lazy(() =>
-  import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsAudit })),
+  import('@/features/dashboard/Settings/SettingsPreview').then((m) => ({ default: m.SettingsAudit })),
 )
 const SettingsPrivacy = lazy(() =>
-  import('../../pages/Settings/SettingsPreview.jsx').then((m) => ({ default: m.SettingsPrivacy })),
+  import('@/features/dashboard/Settings/SettingsPreview').then((m) => ({ default: m.SettingsPrivacy })),
 )
-const NotFound = lazy(() => import('../../pages/NotFound/NotFound.jsx'))
-const Unauthorized = lazy(() => import('../../pages/Unauthorized/Unauthorized.jsx'))
+const NotFound = lazy(() => import('@/features/system/NotFound/NotFound'))
+const Unauthorized = lazy(() => import('@/features/system/Unauthorized/Unauthorized'))
 
 function RouteFallback() {
   return (

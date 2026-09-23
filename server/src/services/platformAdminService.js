@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 import { isEmailConfigured } from './emailService.js'
 import { getPublicPaymentSettings } from './paymentSettings.js'
 
@@ -273,15 +273,47 @@ function defaultAdminCard(user) {
   }
 }
 
+/** Keep only usable image URL strings (unwrap accidental { dataUrl } objects). */
+function normalizeStoredImage(value) {
+  if (!value) return ''
+  if (typeof value === 'object' && value.dataUrl) return normalizeStoredImage(value.dataUrl)
+  if (typeof value !== 'string') return ''
+  const raw = value.trim()
+  if (!raw || raw === '[object Object]') return ''
+  if (
+    raw.startsWith('data:') ||
+    raw.startsWith('http://') ||
+    raw.startsWith('https://') ||
+    raw.startsWith('/')
+  ) {
+    return raw
+  }
+  if (raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw)
+      return normalizeStoredImage(parsed?.dataUrl || '')
+    } catch {
+      return ''
+    }
+  }
+  return ''
+}
+
 export function getAdminBusinessCard(user) {
   const store = readAdminCardsStore()
   const saved = store[String(user.id)]
   const base = defaultAdminCard(user)
   if (!saved) return base
+  const mergedCard = { ...base.card, ...(saved.card || {}) }
   return {
     ...base,
     ...saved,
-    card: { ...base.card, ...(saved.card || {}) },
+    card: {
+      ...mergedCard,
+      heroDataUrl: normalizeStoredImage(mergedCard.heroDataUrl),
+      circleDataUrl: normalizeStoredImage(mergedCard.circleDataUrl),
+      logoDataUrl: normalizeStoredImage(mergedCard.logoDataUrl),
+    },
   }
 }
 
@@ -300,9 +332,9 @@ export function saveAdminBusinessCard(user, payload = {}) {
     city: String(payload.card?.city ?? current.card.city ?? '').trim(),
     country: String(payload.card?.country ?? current.card.country ?? '').trim(),
     tagline: String(payload.card?.tagline ?? current.card.tagline ?? '').trim(),
-    heroDataUrl: payload.card?.heroDataUrl ?? current.card.heroDataUrl ?? '',
-    circleDataUrl: payload.card?.circleDataUrl ?? current.card.circleDataUrl ?? '',
-    logoDataUrl: payload.card?.logoDataUrl ?? current.card.logoDataUrl ?? '',
+    heroDataUrl: normalizeStoredImage(payload.card?.heroDataUrl ?? current.card.heroDataUrl),
+    circleDataUrl: normalizeStoredImage(payload.card?.circleDataUrl ?? current.card.circleDataUrl),
+    logoDataUrl: normalizeStoredImage(payload.card?.logoDataUrl ?? current.card.logoDataUrl),
   }
   const publicSlug = String(payload.publicSlug ?? current.publicSlug ?? 'iroas')
     .toLowerCase()

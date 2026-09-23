@@ -1,8 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth.js'
-import { ROUTES } from '../../constants/routes.js'
-import { isAdmin } from '../../constants/roles.js'
-import { ownerHomePath } from '../../constants/restaurantStatus.js'
+import { useAuth } from '@/shared/hooks/useAuth'
+import { ROUTES } from '@/shared/constants/routes'
+import { isAdmin } from '@/shared/constants/roles'
+import { ownerHomePath } from '@/shared/constants/restaurantStatus'
 
 export function PublicRoute({ children }) {
   const { isAuthenticated, user, restaurantStatus, awaitingAccountApproval, onboardingPaid } =

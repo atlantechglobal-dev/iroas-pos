@@ -1,7 +1,7 @@
 import { BrowserRouter } from 'react-router-dom'
-import { AuthProvider } from '../../context/AuthProvider.jsx'
-import { ToastProvider } from '../../components/feedback/ToastProvider.jsx'
-import { ErrorBoundary } from '../../components/feedback/ErrorBoundary.jsx'
+import { AuthProvider } from '@/shared/context/AuthProvider'
+import { ToastProvider } from '@/shared/ui/feedback/ToastProvider'
+import { ErrorBoundary } from '@/shared/ui/feedback/ErrorBoundary'
 
 export function AppProviders({ children }) {
   return (

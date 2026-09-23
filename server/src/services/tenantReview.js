@@ -1,4 +1,4 @@
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 import { createNotification, queueEmail } from './identityService.js'
 
 export const TENANT_STATUSES = [

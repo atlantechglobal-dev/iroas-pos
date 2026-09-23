@@ -1,4 +1,4 @@
-import { db } from '../db.js'
+import { db } from '../infra/db.js'
 
 const STATUS_FLOW = ['new', 'accepted', 'preparing', 'ready', 'completed']
 
