@@ -631,14 +631,19 @@
   border-color: #d6d6d6;
 }
 
-.login-page .google-icon {
-  font-weight: 700;
-
-  font-size: 15px;
+.login-page .google-icon,
+.login-page .apple-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
-.login-page .apple-icon {
-  font-size: 13px;
+.login-page .google-icon svg,
+.login-page .apple-icon svg {
+  display: block;
 }
 
 /* SIGN UP */

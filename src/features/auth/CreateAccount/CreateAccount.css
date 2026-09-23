@@ -219,6 +219,116 @@
     margin-bottom: 26px;
   }
 
+  /* GOOGLE SIGNUP */
+
+  .google-signup-button {
+    width: 100%;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 1px solid #e6e6e6;
+    border-radius: 24px;
+    background: white;
+    color: #27292c;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .google-signup-button:hover {
+    background: #fafafa;
+    border-color: #d6d6d6;
+  }
+
+  .google-signup-button:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+
+  .google-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .gis-button-host {
+    position: fixed;
+    left: -9999px;
+    top: 0;
+    width: 280px;
+    height: 48px;
+    overflow: hidden;
+    opacity: 0.01;
+    pointer-events: auto;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 20px 0;
+  }
+
+  .divider span {
+    flex: 1;
+    height: 1px;
+    background: #e7e7e5;
+  }
+
+  .divider p {
+    color: #96999c;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .google-linked-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 22px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #dcecb8;
+    background: #eef6da;
+  }
+
+  .google-linked-note span {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #8dbd18;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  .google-linked-note p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    font-weight: 650;
+    color: #3d5a1a;
+  }
+
+  .field-hint {
+    margin: 6px 0 0;
+    color: #82858a;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
   /* FIELDS */
 
   .two-fields {

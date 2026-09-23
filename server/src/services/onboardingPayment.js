@@ -54,18 +54,20 @@ export async function queryAddPayOrder(reference) {
   if (!isPaymentConfigured() || !reference) return null
 
   const settings = getPaymentSettings()
-  const attempts = ['pay.paycloud.orderquery', 'pay.orderquery']
+  // Both return [E07303] "not authorized" — likely the right shape (same
+  // unified /api/entry + method field as our working checkout call) but
+  // this app_id may not be permissioned for order-query yet. A third
+  // attempt at /api/entry/checkout/status (guessed from an unofficial SDK
+  // targeting a different backend) returned SYS404 and was dropped.
+  const attempts = [
+    { endpoint: '/api/entry', body: { method: 'pay.paycloud.orderquery', merchant_order_no: reference } },
+    { endpoint: '/api/entry', body: { method: 'pay.orderquery', merchant_order_no: reference } },
+  ]
 
-  for (const method of attempts) {
+  for (const { endpoint, body } of attempts) {
+    const label = body.method || endpoint
     try {
-      const checkout = await addpayRequest(
-        '/api/entry',
-        {
-          method,
-          merchant_order_no: reference,
-        },
-        settings,
-      )
+      const checkout = await addpayRequest(endpoint, body, settings)
       const data = parseCheckoutData(checkout)
       const transStatus = Number(
         data.trans_status ?? data.transStatus ?? checkout.trans_status ?? NaN,
@@ -76,14 +78,14 @@ export async function queryAddPayOrder(reference) {
           data.paid === true ||
           data.paid === 'true' ||
           String(data.trade_status || data.status || '').toLowerCase() === 'success'
-        if (paidFlag) return { paid: true, cancelled: false, raw: data, method }
+        if (paidFlag) return { paid: true, cancelled: false, raw: data, method: label }
         continue
       }
-      if (transStatus === 2) return { paid: true, cancelled: false, raw: data, method }
-      if (transStatus === 3) return { paid: false, cancelled: true, raw: data, method }
-      return { paid: false, cancelled: false, raw: data, method, transStatus }
+      if (transStatus === 2) return { paid: true, cancelled: false, raw: data, method: label }
+      if (transStatus === 3) return { paid: false, cancelled: true, raw: data, method: label }
+      return { paid: false, cancelled: false, raw: data, method: label, transStatus }
     } catch (err) {
-      console.warn(`[addpay] order query via ${method} failed:`, err.message || err)
+      console.warn(`[addpay] order query via ${label} failed:`, err.message || err)
     }
   }
   return null
