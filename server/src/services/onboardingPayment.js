@@ -54,18 +54,21 @@ export async function queryAddPayOrder(reference) {
   if (!isPaymentConfigured() || !reference) return null
 
   const settings = getPaymentSettings()
-  const attempts = ['pay.paycloud.orderquery', 'pay.orderquery']
+  // Two calling conventions seen in the wild for this gateway: a unified
+  // "/api/entry" endpoint dispatched via a `method` field (how our working
+  // checkout call works), and a per-operation URL with no `method` field
+  // (seen in a third-party SDK, unconfirmed against our actual gateway).
+  // Try both — this is a read-only query, safe to probe.
+  const attempts = [
+    { endpoint: '/api/entry', body: { method: 'pay.paycloud.orderquery', merchant_order_no: reference } },
+    { endpoint: '/api/entry', body: { method: 'pay.orderquery', merchant_order_no: reference } },
+    { endpoint: '/api/entry/checkout/status', body: { merchant_order_no: reference } },
+  ]
 
-  for (const method of attempts) {
+  for (const { endpoint, body } of attempts) {
+    const label = body.method || endpoint
     try {
-      const checkout = await addpayRequest(
-        '/api/entry',
-        {
-          method,
-          merchant_order_no: reference,
-        },
-        settings,
-      )
+      const checkout = await addpayRequest(endpoint, body, settings)
       const data = parseCheckoutData(checkout)
       const transStatus = Number(
         data.trans_status ?? data.transStatus ?? checkout.trans_status ?? NaN,
@@ -76,14 +79,14 @@ export async function queryAddPayOrder(reference) {
           data.paid === true ||
           data.paid === 'true' ||
           String(data.trade_status || data.status || '').toLowerCase() === 'success'
-        if (paidFlag) return { paid: true, cancelled: false, raw: data, method }
+        if (paidFlag) return { paid: true, cancelled: false, raw: data, method: label }
         continue
       }
-      if (transStatus === 2) return { paid: true, cancelled: false, raw: data, method }
-      if (transStatus === 3) return { paid: false, cancelled: true, raw: data, method }
-      return { paid: false, cancelled: false, raw: data, method, transStatus }
+      if (transStatus === 2) return { paid: true, cancelled: false, raw: data, method: label }
+      if (transStatus === 3) return { paid: false, cancelled: true, raw: data, method: label }
+      return { paid: false, cancelled: false, raw: data, method: label, transStatus }
     } catch (err) {
-      console.warn(`[addpay] order query via ${method} failed:`, err.message || err)
+      console.warn(`[addpay] order query via ${label} failed:`, err.message || err)
     }
   }
   return null
