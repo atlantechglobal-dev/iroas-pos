@@ -212,10 +212,16 @@ export function AuthProvider({ children }) {
 
   const loginWithGoogle = useCallback(
     async (idToken, redirectTo) => {
-      const { token, user: loggedInUser } = await authApi.googleLogin(idToken)
-      return completeLogin(token, loggedInUser, redirectTo)
+      const result = await authApi.googleLogin(idToken)
+      // A fresh Google signup goes through the same account-approval gate as
+      // the email form — no token yet, so don't try to log them in.
+      if (result.pendingReview) {
+        navigate(ROUTES.ACCOUNT_THANKS, { replace: true, state: { email: result.email } })
+        return null
+      }
+      return completeLogin(result.token, result.user, redirectTo)
     },
-    [completeLogin],
+    [completeLogin, navigate],
   )
 
   const value = useMemo(

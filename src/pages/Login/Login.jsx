@@ -74,8 +74,8 @@ function Login() {
       setGoogleLoading(true)
       setError('')
       try {
-        await loginWithGoogle(idToken, redirectTo)
-        toast.success('Signed in with Google.')
+        const loggedInUser = await loginWithGoogle(idToken, redirectTo)
+        if (loggedInUser) toast.success('Signed in with Google.')
       } catch (err) {
         const message = err.message || 'Google sign-in failed.'
         if (/not approved/i.test(message) || err.code === 'ACCOUNT_PENDING_APPROVAL') {

@@ -389,18 +389,31 @@ router.post('/google', async (req, res) => {
 
   if (!user) {
     const passwordHash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10)
+    let createdRestaurant
     try {
-      user = db.transaction(() => {
+      ;({ user, restaurant: createdRestaurant } = db.transaction(() => {
         const info = db
           .prepare(
             'INSERT INTO users (name, email, phone, password_hash, google_id, role) VALUES (?, ?, ?, ?, ?, ?)',
           )
           .run(name, email, null, passwordHash, googleId, 'owner')
-        db.prepare(
-          'INSERT INTO restaurants (owner_id, name, settings_json) VALUES (?, ?, ?)',
-        ).run(info.lastInsertRowid, `${name}'s restaurant`, null)
-        return db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid)
-      })()
+        // Same account-approval gate as the regular signup form — Google
+        // verifying the email doesn't exempt anyone from admin review.
+        const restaurantInfo = db
+          .prepare(
+            `INSERT INTO restaurants (owner_id, name, status, submitted_at, settings_json)
+             VALUES (?, ?, 'pending_approval', datetime('now'), ?)`,
+          )
+          .run(
+            info.lastInsertRowid,
+            `${name}'s restaurant`,
+            JSON.stringify({ awaitingAccountApproval: true }),
+          )
+        return {
+          user: db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid),
+          restaurant: db.prepare('SELECT * FROM restaurants WHERE id = ?').get(restaurantInfo.lastInsertRowid),
+        }
+      })())
     } catch (err) {
       if (String(err.message || '').includes('UNIQUE')) {
         return res.status(409).json({ error: 'An account with this email already exists.' })
@@ -408,6 +421,25 @@ router.post('/google', async (req, res) => {
       console.error('[auth] Google signup failed:', err)
       return res.status(500).json({ error: 'Unable to create account with Google.' })
     }
+
+    let emails = null
+    try {
+      emails = await sendSignupReviewEmails({
+        restaurant: createdRestaurant,
+        owner: { id: user.id, name: user.name, email: user.email, phone: user.phone || '' },
+      })
+    } catch (err) {
+      console.error('[signup] Google review emails failed:', err.message || err)
+    }
+
+    return res.status(201).json({
+      pendingReview: true,
+      email,
+      user: publicUser(user),
+      emails,
+      message:
+        'Thank you — your account is in review for approval. We will email you once an admin approves it.',
+    })
   }
 
   if (user.role !== 'admin') {
