@@ -11,8 +11,6 @@ const LINKS = [
     key: 'platform-customer-onboarding',
   },
   { to: ROUTES.PLATFORM_PLANS, label: 'Plans', key: 'platform-plans' },
-  { to: ROUTES.PLATFORM_IDENTITIES, label: 'Identities', key: 'platform-identities' },
-  { to: ROUTES.PLATFORM_PRODUCTS, label: 'Products', key: 'platform-products' },
   { to: ROUTES.PLATFORM_PROFESSIONAL, label: 'Professional', key: 'platform-professional' },
   { to: ROUTES.PLATFORM_SETTINGS, label: 'Settings', key: 'platform-settings' },
 ]

@@ -28,6 +28,16 @@ export const restaurantApi = {
   updateTable: (id, payload) =>
     apiRequest(`/restaurant/tables/${id}`, { method: 'PATCH', body: payload }),
   deleteTable: (id) => apiRequest(`/restaurant/tables/${id}`, { method: 'DELETE' }),
+  listPosTables: () => apiRequest('/restaurant/pos-tables'),
+  getPosMenu: () => apiRequest('/restaurant/pos-menu'),
+  listPosOrders: () => apiRequest('/restaurant/pos-orders'),
+  listPosCustomers: () => apiRequest('/restaurant/pos-customers'),
+  listPosStaff: () => apiRequest('/restaurant/pos-staff'),
+  getPosOrderMenu: (table) =>
+    apiRequest(`/restaurant/pos-order-menu?table=${encodeURIComponent(table)}`),
+  createPosOrder: (payload) => apiRequest('/restaurant/pos-orders', { method: 'POST', body: payload }),
+  upsertPosCustomer: (payload) =>
+    apiRequest('/restaurant/pos-customers', { method: 'POST', body: payload }),
   listOrders: (params = {}) => {
     const q = new URLSearchParams()
     if (params.status) q.set('status', params.status)

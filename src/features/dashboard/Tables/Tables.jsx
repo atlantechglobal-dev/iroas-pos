@@ -4,6 +4,7 @@ import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { QrCodePreview, downloadQrPng } from '@/shared/ui/QrCodePreview'
 import { api } from '@/shared/lib/api'
 import { guestTableUrl, restaurantPublicSlug } from '@/shared/utils/guestLinks'
+import PosTablesPanel from '@/features/dashboard/Tables/PosTablesPanel'
 import '@/features/dashboard/Tables/Tables.css'
 
 function Tables() {
@@ -133,6 +134,8 @@ function Tables() {
           </button>
         </div>
       </div>
+
+      <PosTablesPanel />
 
       <div className="table-qr-layout">
         <section className="table-qr-list-card">

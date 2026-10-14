@@ -17,6 +17,8 @@ import {
   GuestPlacedPage,
   GuestTrackingPage,
 } from './GuestCommerce.jsx'
+import UryCheckout from './UryCheckout.jsx'
+import { formatPosDate, formatPosPrice } from './posFormat.js'
 
 const FALLBACK_PHOTOS = [
   'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
@@ -72,6 +74,8 @@ function matchedDishPhoto(name = '', index = 0) {
 function dishPhotoSrc(item, index = 0) {
   const uploaded = resolveMediaUrl(item?.imageDataUrl)
   if (uploaded) return uploaded
+  // POS menu items never get stock photos.
+  if (item?.source === 'ury') return ''
   return matchedDishPhoto(item?.name, index)
 }
 
@@ -168,6 +172,7 @@ function todayHoursLabel(hours) {
 }
 
 function dishModifiersFor(item) {
+  if (item?.source === 'ury') return []
   if (item?.veg) {
     return [
       { id: 'extra-bread', name: 'Extra naan', price: 90 },
@@ -381,7 +386,35 @@ function GuestSite() {
     return `Welcome to ${restaurantName}.`
   })()
   const reviews = site?.reviews || []
+  const ury = site?.ury || null
+  // QR table sessions keep the existing local menu and order flow.
+  const uryMenuActive = Boolean(ury?.menu) && !tableSession
+  const uryCurrency = uryMenuActive ? ury.menu.currency || null : null
+  const uryOrdering = uryMenuActive && Boolean(ury?.guestOrdering?.enabled)
+  const money = (n) => (uryMenuActive ? formatPosPrice(n, uryCurrency) : formatPrice(n))
+  const uryHoursExceptions = ury?.hours?.status === 'ok' ? (ury.hours.exceptions || []).slice(0, 5) : []
+  const uryNotices = [ury?.hours, ury?.contact]
+    .filter((s) => s && (s.status !== 'ok' || s.message))
+    .map((s) => s.message || 'Live information from the restaurant’s POS is unavailable.')
   const menuGroups = useMemo(() => {
+    if (uryMenuActive) {
+      return (ury.menu.categories || []).map((c) => ({
+        category: c.name,
+        categoryImage: '',
+        items: (c.items || []).map((item) => ({
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          price: item.price,
+          desc: '',
+          veg: false,
+          tag: item.special ? 'Special' : '',
+          imageDataUrl: '',
+          stockStatus: item.available ? 'in_stock' : 'out',
+          source: 'ury',
+        })),
+      }))
+    }
     if (site?.menu?.length) {
       return site.menu.map((c) => ({
         category: c.name,
@@ -393,7 +426,11 @@ function GuestSite() {
       }))
     }
     return []
-  }, [site])
+  }, [site, uryMenuActive, ury])
+
+  useEffect(() => {
+    if (tableSession) setCart((prev) => prev.filter((line) => line.source !== 'ury'))
+  }, [tableSession])
 
   const liveKeys = useMemo(() => {
     const fromApi = site?.oneLink?.destinations
@@ -599,6 +636,11 @@ function GuestSite() {
   }
 
   const addToCart = (item, qty = 1, extras = []) => {
+    if (item.stockStatus === 'out') return
+    if (item.source === 'ury' && !uryOrdering) {
+      toast.info('Online ordering is not available yet. Please order at the restaurant.')
+      return
+    }
     const extraTotal = extras.reduce((sum, m) => sum + Number(m.price || 0), 0)
     const extraNames = extras.map((m) => m.name).filter(Boolean)
     const lineName = extraNames.length ? `${item.name} · ${extraNames.join(', ')}` : item.name
@@ -811,7 +853,7 @@ function GuestSite() {
                           alt={item.name}
                           placeholderLabel={item.name}
                         />
-                        {item.tag || index === 0 ? (
+                        {item.tag || (index === 0 && item.source !== 'ury') ? (
                           <span className="gs-badge">{item.tag || 'Must try'}</span>
                         ) : null}
                       </Link>
@@ -820,11 +862,11 @@ function GuestSite() {
                           <Link to={guestDishPath(slug, item.id || item.name)}>
                             <strong>{item.name}</strong>
                           </Link>
-                          <p>{item.desc || 'A guest favourite from our kitchen.'}</p>
+                          {item.source === 'ury' ? null : <p>{item.desc || 'A guest favourite from our kitchen.'}</p>}
                         </div>
                         <div className="gs-popular-foot">
-                          <b>{formatPrice(item.price)}</b>
-                          {liveKeys.has('order') ? (
+                          <b>{money(item.price)}</b>
+                          {(item.source === 'ury' ? uryOrdering && item.stockStatus !== 'out' : liveKeys.has('order')) ? (
                             <button
                               type="button"
                               className="gs-add"
@@ -942,9 +984,24 @@ function GuestSite() {
                     <div>
                       <strong>Hours</strong>
                       <p>{hoursSummary}</p>
+                      {uryHoursExceptions.map((ex) => (
+                        <p key={ex.date} className="gs-muted">
+                          {formatPosDate(ex.date)}: {ex.closed ? 'Closed' : `${ex.open} – ${ex.close}`}
+                          {ex.reason ? ` · ${ex.reason}` : ''}
+                        </p>
+                      ))}
                     </div>
                   </li>
                 ) : null}
+                {uryNotices.map((note) => (
+                  <li key={note}>
+                    <span className="gs-ico clock" aria-hidden="true" />
+                    <div>
+                      <strong>Heads up</strong>
+                      <p className="gs-pos-note is-warning">{note}</p>
+                    </div>
+                  </li>
+                ))}
                 {brand.email ? (
                   <li>
                     <span className="gs-ico mail" aria-hidden="true" />
@@ -1059,7 +1116,7 @@ function GuestSite() {
                     </button>
                   ))}
                 </div>
-                <div className="gs-pill-row" role="tablist" aria-label="Dietary filters">
+                <div className="gs-pill-row" role="tablist" aria-label="Dietary filters" hidden={uryMenuActive}>
                   {[
                     { id: 'all', label: 'All' },
                     { id: 'veg', label: 'Vegetarian' },
@@ -1080,6 +1137,18 @@ function GuestSite() {
               </div>
             ) : null}
 
+            {uryMenuActive ? (
+              <p className={`gs-pos-note${ury.menu.status === 'ok' ? '' : ' is-warning'}`} role="status">
+                {ury.menu.status === 'ok'
+                  ? `Live menu and prices from the restaurant’s POS${uryCurrency ? ` (${uryCurrency})` : ''}. ${
+                      uryOrdering
+                        ? 'Order online for pickup — the POS confirms the final price.'
+                        : 'Online ordering is not available yet.'
+                    }`
+                  : ury.menu.message || 'The live menu is unavailable right now.'}
+                {ury.menu.status === 'ok' && ury.menu.message ? ` ${ury.menu.message}` : ''}
+              </p>
+            ) : null}
             {menuGroups.length === 0 ? <p className="gs-muted">Menu coming soon.</p> : null}
             {menuGroups.length > 0 && filteredMenuItems.length === 0 ? (
               <p className="gs-muted">No dishes match these filters.</p>
@@ -1106,18 +1175,31 @@ function GuestSite() {
                     </Link>
                     <div className="gs-dish-body">
                       <Link className="gs-dish-title" to={dishTo}>
-                        <span
-                          className={`gs-diet ${item.veg ? 'veg' : 'nonveg'}`}
-                          title={item.veg ? 'Vegetarian' : 'Non-veg'}
-                          aria-label={item.veg ? 'Vegetarian' : 'Non-veg'}
-                        />
+                        {item.source === 'ury' ? null : (
+                          <span
+                            className={`gs-diet ${item.veg ? 'veg' : 'nonveg'}`}
+                            title={item.veg ? 'Vegetarian' : 'Non-veg'}
+                            aria-label={item.veg ? 'Vegetarian' : 'Non-veg'}
+                          />
+                        )}
                         <strong>{item.name}</strong>
-                        <b>{formatPrice(item.price)}</b>
+                        <b>{money(item.price)}</b>
                       </Link>
-                      <p>{item.desc || 'Prepared fresh to order.'}</p>
+                      {item.source === 'ury' ? null : <p>{item.desc || 'Prepared fresh to order.'}</p>}
                       <div className="gs-dish-foot">
-                        <span>~ {item.prepMinutes || 15} min</span>
-                        {liveKeys.has('order') ? (
+                        {item.source === 'ury' ? <span /> : <span>~ {item.prepMinutes || 15} min</span>}
+                        {item.source === 'ury' ? (
+                          uryOrdering ? (
+                            <button
+                              type="button"
+                              className="gs-dish-add"
+                              disabled={soldOut}
+                              onClick={() => addToCart(item)}
+                            >
+                              <em>+</em> Add
+                            </button>
+                          ) : null
+                        ) : liveKeys.has('order') ? (
                           <button
                             type="button"
                             className="gs-dish-add"
@@ -1157,7 +1239,9 @@ function GuestSite() {
                 </div>
                 <div className="gs-dish-detail-copy">
                   <div className="gs-dish-status-row">
-                    <span className={`gs-diet ${selectedDish.veg ? 'veg' : 'nonveg'}`} />
+                    {selectedDish.source === 'ury' ? null : (
+                      <span className={`gs-diet ${selectedDish.veg ? 'veg' : 'nonveg'}`} />
+                    )}
                     {dishBadge(selectedDish) ? (
                       <span className="gs-soft-pill">{dishBadge(selectedDish).label}</span>
                     ) : (
@@ -1172,18 +1256,24 @@ function GuestSite() {
                   </div>
 
                   <h1>{selectedDish.name}</h1>
-                  <p className="gs-dish-desc">
-                    {selectedDish.desc || 'Prepared fresh to order with seasonal ingredients.'}
-                  </p>
+                  {selectedDish.source === 'ury' ? (
+                    <p className="gs-dish-desc">{money(selectedDish.price)} · price from the restaurant’s POS</p>
+                  ) : (
+                    <>
+                      <p className="gs-dish-desc">
+                        {selectedDish.desc || 'Prepared fresh to order with seasonal ingredients.'}
+                      </p>
 
-                  <div className="gs-attr-row">
-                    <span className="gs-attr">Wood-fired</span>
-                    <span className="gs-attr">Locally sourced</span>
-                    <span className="gs-attr">~{selectedDish.prepMinutes || 15} min prep</span>
-                    <span className="gs-attr">Serves 1–2</span>
-                  </div>
+                      <div className="gs-attr-row">
+                        <span className="gs-attr">Wood-fired</span>
+                        <span className="gs-attr">Locally sourced</span>
+                        <span className="gs-attr">~{selectedDish.prepMinutes || 15} min prep</span>
+                        <span className="gs-attr">Serves 1–2</span>
+                      </div>
+                    </>
+                  )}
 
-                  <div className="gs-mods">
+                  <div className="gs-mods" hidden={dishAddOns.length === 0}>
                     <h2>Make it yours</h2>
                     <ul>
                       {dishAddOns.map((mod) => {
@@ -1197,7 +1287,7 @@ function GuestSite() {
                                 onChange={() => toggleDishMod(mod.id)}
                               />
                               <span>{mod.name}</span>
-                              <b>{mod.price ? `+${formatPrice(mod.price)}` : 'Free'}</b>
+                              <b>{mod.price ? `+${money(mod.price)}` : 'Free'}</b>
                             </label>
                           </li>
                         )
@@ -1240,18 +1330,18 @@ function GuestSite() {
                     >
                       <span className="gs-wish-ico" aria-hidden="true" />
                     </button>
-                    {liveKeys.has('order') ? (
+                    {(selectedDish.source === 'ury' ? uryOrdering : liveKeys.has('order')) ? (
                       <button
                         type="button"
                         className="gs-btn primary gs-add-cart"
                         disabled={selectedDish.stockStatus === 'out'}
                         onClick={addDishToCart}
                       >
-                        Add to cart · {formatPrice(dishLineTotal)}
+                        Add to cart · {money(dishLineTotal)}
                       </button>
                     ) : (
                       <Link className="gs-btn primary gs-add-cart" to={guestSitePath(slug, 'menu')}>
-                        Back to menu · {formatPrice(dishLineTotal)}
+                        Back to menu · {money(dishLineTotal)}
                       </Link>
                     )}
                   </div>
@@ -1261,7 +1351,11 @@ function GuestSite() {
           </section>
         ) : null}
 
-        {activePage === 'order' ? (
+        {(activePage === 'order' || activePage === 'checkout') && uryMenuActive && uryOrdering ? (
+          <UryCheckout slug={slug} cart={cart} setCart={setCart} money={money} restaurantName={restaurantName} />
+        ) : null}
+
+        {activePage === 'order' && !(uryMenuActive && uryOrdering) ? (
           <GuestCartPage
             slug={slug}
             cart={cart}
@@ -1277,7 +1371,7 @@ function GuestSite() {
           />
         ) : null}
 
-        {activePage === 'checkout' ? (
+        {activePage === 'checkout' && !(uryMenuActive && uryOrdering) ? (
           <GuestCheckoutPage
             slug={slug}
             cart={cart}
@@ -1453,13 +1547,34 @@ function GuestSite() {
                 {operatingHours.map((row) => (
                   <li key={row.day || row.open}>
                     <span>{row.day}</span>
-                    <span>{row.closed ? 'Closed' : `${row.open} – ${row.close}`}</span>
+                    <span>
+                      {row.closed
+                        ? 'Closed'
+                        : Array.isArray(row.windows) && row.windows.length > 1
+                          ? row.windows.map((w) => `${w.open} – ${w.close}`).join(', ')
+                          : `${row.open} – ${row.close}`}
+                    </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="gs-footer-muted">{hoursSummary || 'Hours coming soon'}</p>
+              <p className="gs-footer-muted">
+                {ury?.hours && ury.hours.status !== 'ok'
+                  ? ury.hours.message || 'Opening hours are unavailable right now.'
+                  : hoursSummary || 'Hours coming soon'}
+              </p>
             )}
+            {uryHoursExceptions.length > 0 ? (
+              <ul className="gs-footer-hours">
+                {uryHoursExceptions.map((ex) => (
+                  <li key={ex.date}>
+                    <span>{formatPosDate(ex.date)}</span>
+                    <span>{ex.closed ? 'Closed' : `${ex.open} – ${ex.close}`}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {ury?.hours?.stale ? <p className="gs-footer-muted">Hours may be out of date.</p> : null}
           </div>
         </div>
 

@@ -39,6 +39,18 @@ import {
   parseRestaurantSettings,
   syncPendingOnboardingPayment,
 } from '../../services/onboardingPayment.js'
+import { UryError } from '../../integrations/ury/uryClient.js'
+import { IntegrationError, invalidateUryTenant, resolveUryTenant } from '../../integrations/ury/uryTenant.js'
+import { listUryTables } from '../../integrations/ury/uryTables.js'
+import { getUryMenu } from '../../integrations/ury/uryMenu.js'
+import { listUryCustomers, listUryOrders } from '../../integrations/ury/uryOrders.js'
+import { listUryStaff } from '../../integrations/ury/uryStaff.js'
+import {
+  OrderingError,
+  findOrCreateUryCustomer,
+  getUryOrderMenu,
+  placeUryOrder,
+} from '../../integrations/ury/uryOrdering.js'
 
 const router = Router()
 
@@ -810,6 +822,181 @@ router.get('/tables', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
   res.json({ tables: listDiningTables(restaurant.id) })
+})
+
+function getPosRestaurant(req, res) {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) {
+    res.status(404).json({ success: false, error: 'No restaurant found.' })
+    return null
+  }
+  if (restaurant.status === 'deleted') {
+    res.status(403).json({ success: false, error: 'This account has been closed.' })
+    return null
+  }
+  if (!assertNotAwaitingAccountApproval(restaurant, res)) return null
+  return restaurant
+}
+
+function sendPosError(res, err, { label, restaurantId, unavailableMessage }) {
+  if (err instanceof OrderingError) {
+    console.warn(`[${label}] restaurant=${restaurantId} ordering=${err.code}`)
+    return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+  }
+  if (err instanceof IntegrationError) {
+    if (err.code === 'mapping_invalid') {
+      invalidateUryTenant(restaurantId)
+      console.warn(`[${label}] restaurant=${restaurantId} mapping_invalid reason=${err.reason || 'unknown'}`)
+      return res.status(409).json({
+        success: false,
+        code: 'pos_mapping_invalid',
+        error: 'Your POS connection needs to be checked. Please contact IROAS support.',
+      })
+    }
+    return res.status(409).json({
+      success: false,
+      code: 'pos_not_connected',
+      error: 'Your POS is not connected yet.',
+    })
+  }
+  if (err instanceof UryError) {
+    if (err.code === 'auth_failed' || err.code === 'forbidden') invalidateUryTenant(restaurantId)
+    console.warn(`[${label}] restaurant=${restaurantId} ury_error=${err.code}`)
+    return res.status(502).json({ success: false, code: 'pos_unavailable', error: unavailableMessage })
+  }
+  console.error(`[${label}]`, err)
+  return res.status(500).json({ success: false, error: unavailableMessage })
+}
+
+router.get('/pos-tables', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const tables = await listUryTables(tenant)
+    res.json({ success: true, data: { tables } })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-tables',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Table service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.get('/pos-menu', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await getUryMenu(tenant)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-menu',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Menu service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.get('/pos-orders', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const orders = await listUryOrders(tenant)
+    res.json({ success: true, data: { orders, fetchedAt: new Date().toISOString() } })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-orders',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Order service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.get('/pos-order-menu', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await getUryOrderMenu(tenant, req.query.table)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-order-menu',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Menu service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-orders', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const { table, customer, items, pax, comments } = req.body || {}
+    const data = await placeUryOrder(tenant, { table, customer, items, pax, comments })
+    console.info(`[pos-orders] restaurant=${restaurant.id} placed invoice=${data.invoice || '?'} table=${data.table}`)
+    res.status(201).json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-orders:create',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not reach the POS. The order was not sent. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-customers', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const { name, phone } = req.body || {}
+    const data = await findOrCreateUryCustomer(tenant, { name, phone })
+    res.status(data.created ? 201 : 200).json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-customers:upsert',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Customer service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.get('/pos-customers', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const customers = await listUryCustomers(tenant)
+    res.json({ success: true, data: { customers } })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-customers',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Customer service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.get('/pos-staff', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await listUryStaff(tenant)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-staff',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Staff service is temporarily unavailable. Please try again.',
+    })
+  }
 })
 
 router.post('/tables', (req, res) => {

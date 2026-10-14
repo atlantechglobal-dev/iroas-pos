@@ -6,6 +6,8 @@ import { useRestaurant } from '@/shared/hooks/useRestaurant'
 import { api } from '@/shared/lib/api'
 import { prepareImageDataUrl } from '@/shared/utils/imageFile'
 import { guestSiteUrl, restaurantPublicSlug } from '@/shared/utils/guestLinks'
+import PosMenuView from '@/features/dashboard/Menu/PosMenuView'
+import { usePosMenu } from '@/features/dashboard/Menu/usePosMenu'
 import '@/features/dashboard/Menu/Menu.css'
 
 const FILTERS = ['All', 'Veg', 'Non-veg', "Chef's special", 'Best seller', 'Live', 'Draft', 'Archived']
@@ -74,6 +76,13 @@ function Menu() {
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(emptyItemForm())
   const [saving, setSaving] = useState(false)
+
+  const posMenu = usePosMenu()
+  const [sourceChoice, setSourceChoice] = useState(null)
+  const source =
+    sourceChoice ??
+    (posMenu.status === 'loading' ? 'pending' : posMenu.status === 'not_connected' ? 'local' : 'pos')
+  const showSourceSwitch = posMenu.status !== 'not_connected' && source !== 'pending'
 
   const [menuSlug, setMenuSlug] = useState(() =>
     restaurantPublicSlug(restaurantName || user?.name, 'your-restaurant'),
@@ -443,8 +452,9 @@ function Menu() {
           <p className="eyebrow">Menu management</p>
           <h1>Menu</h1>
           <p className="page-desc">
-            Organize categories, items and photos for {displayRestaurant}. Live items publish to your
-            guest menu website instantly.
+            {source === 'pos'
+              ? `Live menu from your POS for ${displayRestaurant}. Items and prices are managed in your POS.`
+              : `Organize categories, items and photos for ${displayRestaurant}. Live items publish to your guest menu website instantly.`}
           </p>
         </div>
         <div className="head-actions">
@@ -455,12 +465,42 @@ function Menu() {
           >
             👁 Preview
           </button>
-          <button className="btn btn-primary" type="button" onClick={openNewItem}>
-            + New item
-          </button>
+          {source === 'local' ? (
+            <button className="btn btn-primary" type="button" onClick={openNewItem}>
+              + New item
+            </button>
+          ) : null}
         </div>
       </div>
 
+      {showSourceSwitch ? (
+        <div className="menu-source-switch" role="tablist" aria-label="Menu source">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={source === 'pos'}
+            className={`chip ${source === 'pos' ? 'active' : ''}`}
+            onClick={() => setSourceChoice('pos')}
+          >
+            POS menu · Live
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={source === 'local'}
+            className={`chip ${source === 'local' ? 'active' : ''}`}
+            onClick={() => setSourceChoice('local')}
+          >
+            Website menu
+          </button>
+        </div>
+      ) : null}
+
+      {source === 'pending' ? <p className="empty-note">Loading menu…</p> : null}
+      {source === 'pos' ? <PosMenuView posMenu={posMenu} /> : null}
+
+      {source === 'local' ? (
+      <>
       <div className="toolbar card">
         <div className="search-bar toolbar-search">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -994,6 +1034,8 @@ function Menu() {
             </div>
           </form>
         </div>
+      ) : null}
+      </>
       ) : null}
     </DashboardLayout>
   )

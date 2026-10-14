@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
+import { usePosResource } from '@/shared/hooks/usePosResource'
+import { api } from '@/shared/lib/api'
+import PosCustomersView from '@/features/dashboard/Customers/PosCustomersView'
 import '@/features/dashboard/Customers/Customers.css'
 
 const CUSTOMERS = [
@@ -22,6 +25,23 @@ function Customers() {
   const preview = (label) => {
     setNote(`${label} — demo preview with sample customer data.`)
     setTimeout(() => setNote(''), 2500)
+  }
+
+  const posCustomers = usePosResource(api.getPosCustomers)
+
+  if (posCustomers.status !== 'not_connected') {
+    return (
+      <DashboardLayout pageClassName="customers-page" activeNav="customers">
+        <div className="page-head">
+          <div>
+            <p className="eyebrow">People</p>
+            <h1>Customers</h1>
+            <p className="page-desc">Guests who have ordered at your restaurant, live from your POS bills.</p>
+          </div>
+        </div>
+        <PosCustomersView posCustomers={posCustomers} />
+      </DashboardLayout>
+    )
   }
 
   return (

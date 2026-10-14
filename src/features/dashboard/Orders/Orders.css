@@ -99,6 +99,15 @@
   .advance-btn.secondary:hover { background: #fff7ed; }
   .empty-col { text-align: center; color: var(--muted-2); font-size: 12.5px; padding: 20px 0; }
 
+  .orders-source-switch { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .source-chip { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .source-chip.active { background: var(--green-soft); border-color: #d3e8ac; color: var(--green-text); }
+  .pos-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
+  .pos-orders-note { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; }
+  .pos-orders-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; flex-wrap: wrap; }
+  .pos-orders-error p { margin: 0; color: var(--muted); font-size: 14px; }
+  .pos-order-waiter { margin: 8px 0 0; }
+
   @media (max-width: 900px) {
     .topbar, .content { padding-left: 16px; padding-right: 16px; }
   }

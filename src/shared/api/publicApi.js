@@ -36,6 +36,17 @@ export const publicApi = {
       `/public/${encodeURIComponent(slug)}/order-history?phone=${encodeURIComponent(phone)}`,
       { auth: false },
     ),
+  createUryOrder: (slug, payload) =>
+    apiRequest(`/public/${encodeURIComponent(slug)}/ury-orders`, {
+      method: 'POST',
+      body: payload,
+      auth: false,
+    }),
+  getUryOrder: (slug, submissionId) =>
+    apiRequest(
+      `/public/${encodeURIComponent(slug)}/ury-orders/${encodeURIComponent(submissionId)}`,
+      { auth: false },
+    ),
   listTables: (slug) =>
     apiRequest(`/public/${encodeURIComponent(slug)}/tables`, { auth: false }),
   getPlatformCard: (slug) =>

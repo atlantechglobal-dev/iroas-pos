@@ -143,18 +143,6 @@ export const ADMIN_NAV_GROUPS = [
         icon: '/images/payments.svg',
         route: ROUTES.PLATFORM_PLANS,
       },
-      {
-        key: 'platform-identities',
-        label: 'Identity review',
-        icon: '/images/digicard.svg',
-        route: ROUTES.PLATFORM_IDENTITIES,
-      },
-      {
-        key: 'platform-products',
-        label: 'Products',
-        icon: '/images/pos.svg',
-        route: ROUTES.PLATFORM_PRODUCTS,
-      },
     ],
   },
   {
@@ -236,8 +224,6 @@ const ADMIN_PATH_KEYS = [
   [ROUTES.PLATFORM_ACCOUNT_APPROVE, 'platform-account-approve'],
   [ROUTES.PLATFORM_APPROVE, 'platform-account-approve'],
   [ROUTES.PLATFORM_CUSTOMER_ONBOARDING, 'platform-customer-onboarding'],
-  [ROUTES.PLATFORM_IDENTITIES, 'platform-identities'],
-  [ROUTES.PLATFORM_PRODUCTS, 'platform-products'],
   [ROUTES.PLATFORM_NOTIFICATIONS, 'platform-notifications'],
   [ROUTES.PLATFORM_AUDIT, 'platform-audit'],
   [ROUTES.PLATFORM_STAFF, 'platform-staff'],

@@ -1,0 +1,215 @@
+.pos-order-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  color: #17171a;
+}
+
+.pos-order-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(23, 23, 26, 0.45);
+}
+
+.pos-order-card {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 20px;
+  padding: 22px 24px;
+  box-shadow: 0 24px 60px rgba(30, 25, 15, 0.25);
+}
+
+.pos-order-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pos-order-head h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.pos-order-x {
+  border: none;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #8b8b8f;
+}
+
+.pos-order-sub,
+.pos-order-note {
+  margin: 4px 0 14px;
+  color: #8b8b8f;
+  font-size: 13px;
+}
+
+.pos-order-error {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fbe4e2;
+  color: #b3261e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pos-order-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pos-order-grid label,
+.pos-order-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #43434a;
+}
+
+.pos-order-grid input,
+.pos-order-grid select,
+.pos-order-notes input {
+  height: 40px;
+  border: 1px solid #ece8df;
+  border-radius: 10px;
+  padding: 0 12px;
+  font: inherit;
+  font-weight: 500;
+  font-size: 13.5px;
+}
+
+.pos-order-menu {
+  border: 1px solid #ece8df;
+  border-radius: 14px;
+  padding: 4px 14px;
+  margin-bottom: 14px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.pos-order-course h4 {
+  margin: 12px 0 4px;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6fa62a;
+}
+
+.pos-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1efe9;
+}
+
+.pos-order-item:last-child {
+  border-bottom: none;
+}
+
+.pos-order-item div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pos-order-item strong {
+  font-size: 14px;
+}
+
+.pos-order-item small {
+  color: #8b8b8f;
+  font-size: 12.5px;
+}
+
+.pos-order-item.is-off strong {
+  color: #b3b1a8;
+}
+
+.pos-order-qty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pos-order-qty button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid #ece8df;
+  background: #fff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.pos-order-qty button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pos-order-qty span {
+  min-width: 18px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.pos-order-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+}
+
+.pos-order-foot > div {
+  display: flex;
+  gap: 8px;
+}
+
+.pos-order-btn {
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: #8bc53f;
+  color: #16210a;
+  font: inherit;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.pos-order-btn.ghost {
+  background: #fff;
+  border-color: #ece8df;
+}
+
+.pos-order-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .pos-order-grid {
+    grid-template-columns: 1fr;
+  }
+}

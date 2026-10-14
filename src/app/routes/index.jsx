@@ -45,8 +45,6 @@ function RedirectLegacyApproveProfile() {
   const { tenantId } = useParams()
   return <Navigate to={platformAccountApproveProfilePath(tenantId)} replace />
 }
-const PlatformIdentityReview = lazy(() => import('@/features/platform-admin/PlatformAdmin/IdentityReview'))
-const PlatformProducts = lazy(() => import('@/features/platform-admin/PlatformAdmin/ProductsAdmin'))
 const PlatformNotifications = lazy(
   () => import('@/features/platform-admin/PlatformAdmin/PlatformNotifications'),
 )
@@ -251,11 +249,11 @@ export function AppRoutes() {
         />
         <Route
           path={ROUTES.PLATFORM_IDENTITIES}
-          element={withProtection(PlatformIdentityReview, { adminOnly: true })}
+          element={<Navigate to={ROUTES.PLATFORM_ADMIN} replace />}
         />
         <Route
           path={ROUTES.PLATFORM_PRODUCTS}
-          element={withProtection(PlatformProducts, { adminOnly: true })}
+          element={<Navigate to={ROUTES.PLATFORM_ADMIN} replace />}
         />
         <Route
           path={ROUTES.PLATFORM_NOTIFICATIONS}

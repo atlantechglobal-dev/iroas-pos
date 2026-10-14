@@ -132,15 +132,6 @@ function PlatformAdmin() {
         to: ROUTES.PLATFORM_ACCOUNT_APPROVE,
       })
     }
-    if ((displayStats.identityPending || 0) > 0) {
-      items.push({
-        name: 'Identity review',
-        meta: `${displayStats.identityPending} Digital IDs need moderation`,
-        level: 'Low',
-        levelClass: 'level-low',
-        to: ROUTES.PLATFORM_IDENTITIES,
-      })
-    }
     const pay = (health?.checks || []).find((c) => c.key === 'payment')
     if (pay && !pay.ok) {
       items.push({
@@ -268,21 +259,6 @@ function PlatformAdmin() {
           </div>
           <p className="stat-sub">Account approve</p>
           <p className="stat-foot">New Create Account requests</p>
-        </button>
-
-        <button
-          type="button"
-          className="stat-card"
-          style={{ cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
-          onClick={() => navigate(ROUTES.PLATFORM_IDENTITIES)}
-        >
-          <div className="stat-top">
-            <span className="stat-ico">✦</span>
-            <span className="trend up">IDs</span>
-          </div>
-          <div className="stat-number">{loading ? '—' : displayStats.identityPending ?? 0}</div>
-          <p className="stat-sub">Identity queue</p>
-          <p className="stat-foot">Digital IDs to moderate</p>
         </button>
 
         <div className="stat-card">

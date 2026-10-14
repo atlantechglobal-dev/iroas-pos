@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { useRestaurant } from '@/shared/hooks/useRestaurant'
+import { usePosResource } from '@/shared/hooks/usePosResource'
+import { api } from '@/shared/lib/api'
+import PosStaffView from '@/features/dashboard/Staff/PosStaffView'
 import '@/features/dashboard/Staff/Staff.css'
 
 const ROLES = ['Owner', 'Manager', 'Chef', 'Cashier', 'Waiter', 'Kitchen Staff']
@@ -24,8 +27,23 @@ function Staff() {
   const [query, setQuery] = useState('')
 
   const filtered = DIRECTORY.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
+  const posStaff = usePosResource(api.getPosStaff)
 
-  
+  if (posStaff.status !== 'not_connected') {
+    return (
+      <DashboardLayout pageClassName="staff-page" activeNav="staff">
+        <div className="page-head">
+          <div>
+            <p className="eyebrow">People</p>
+            <h1>Staff</h1>
+            <p className="page-desc">Your team at {displayRestaurant}, live from your POS. Add or edit staff in the POS.</p>
+          </div>
+        </div>
+        <PosStaffView posStaff={posStaff} />
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout pageClassName="staff-page" activeNav="staff">
 <div className="page-head">

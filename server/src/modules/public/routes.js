@@ -20,6 +20,12 @@ import { verifyNotifySignature } from '../../services/addpayClient.js'
 import { getPaymentSettings } from '../../services/paymentSettings.js'
 import { finalizeOnboardingPayment, parseRestaurantSettings } from '../../services/onboardingPayment.js'
 import { getPublishedAdminCardBySlug } from '../../services/platformAdminService.js'
+import { rateLimit } from '../../middleware/rateLimit.js'
+import { UryError } from '../../integrations/ury/uryClient.js'
+import { IntegrationError, resolveUryTenant } from '../../integrations/ury/uryTenant.js'
+import { getUryFeatures, getUryPublicSite } from '../../integrations/ury/uryPublic.js'
+import { toSiteHours } from '../../integrations/ury/uryHours.js'
+import { GuestOrderError, getGuestOrder, submitGuestOrder } from '../../integrations/ury/urySelfOrdering.js'
 
 const router = Router()
 
@@ -231,10 +237,33 @@ router.get('/platform-card/:slug', (req, res) => {
   })
 })
 
+/** Hours/contact fields of the site payload when URY owns them (no local fallback). */
+function applyUrySiteFields(fields, ury) {
+  if (!ury) return fields
+  const next = { ...fields }
+  if (ury.features.hours) {
+    next.hours = ury.hours?.status === 'ok' ? toSiteHours(ury.hours.weekly) : []
+  }
+  if (ury.features.contact) {
+    const ok = ury.contact?.status === 'ok'
+    for (const key of ['phone', 'email', 'address', 'city', 'country']) next[key] = ok ? ury.contact[key] || '' : ''
+  }
+  return next
+}
+
 /** Public restaurant site payload (images as URLs, not base64) */
-router.get('/:slug', (req, res) => {
+router.get('/:slug', async (req, res, next) => {
+  try {
+    await sendPublicSite(req, res)
+  } catch (err) {
+    next(err)
+  }
+})
+
+async function sendPublicSite(req, res) {
   const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
   if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+  const ury = await getUryPublicSite(restaurant.id)
 
   const settings = parseSettings(restaurant)
   seedReviewsIfEmpty(restaurant.id, restaurant.name)
@@ -264,6 +293,18 @@ router.get('/:slug', (req, res) => {
 
   const menu = mapPublicMenu(restaurant, slug)
 
+  const contactFields = applyUrySiteFields(
+    {
+      phone: restaurant.phone || '',
+      email: restaurant.email || '',
+      address: restaurant.address || '',
+      city: restaurant.city || '',
+      country: restaurant.country || '',
+      hours: parseHours(restaurant),
+    },
+    ury,
+  )
+
   res.json({
     restaurant: {
       name: restaurant.name,
@@ -271,13 +312,8 @@ router.get('/:slug', (req, res) => {
       cuisine: restaurant.cuisine || '',
       description: restaurant.description || '',
       tagline: settings.tagline || '',
-      phone: restaurant.phone || '',
-      email: restaurant.email || '',
       website: restaurant.website || '',
-      address: restaurant.address || '',
-      city: restaurant.city || '',
-      country: restaurant.country || '',
-      hours: parseHours(restaurant),
+      ...contactFields,
       socials: {
         instagram: settings.instagram || settings.socialInstagram || '',
         facebook: settings.facebook || '',
@@ -318,7 +354,81 @@ router.get('/:slug', (req, res) => {
         ? settings.oneLinkDestinations
         : null,
     },
+    ...(ury ? { ury } : {}),
   })
+}
+
+const uryOrderLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: 'Too many order attempts. Please wait a moment and try again.',
+})
+
+function sendGuestOrderError(res, err, restaurantId) {
+  if (err instanceof GuestOrderError) {
+    return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+  }
+  if (err instanceof IntegrationError) {
+    console.warn(`[public-ury-orders] restaurant=${restaurantId} ${err.code}${err.reason ? ` reason=${err.reason}` : ''}`)
+    return res.status(503).json({ success: false, code: 'ordering_unavailable', error: 'Online ordering is currently unavailable.' })
+  }
+  if (err instanceof UryError) {
+    console.warn(`[public-ury-orders] restaurant=${restaurantId} ury_error=${err.code}`)
+    return res.status(502).json({
+      success: false,
+      code: 'pos_unavailable',
+      error: 'We could not reach the restaurant’s POS. Please try again.',
+    })
+  }
+  console.error('[public-ury-orders]', err)
+  return res.status(500).json({ success: false, error: 'Something went wrong. Please try again.' })
+}
+
+/** Resolves the live restaurant and its verified URY tenant when guest ordering is switched on. */
+async function guestOrderingTenant(req, res) {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) {
+    res.status(404).json({ success: false, error: 'Restaurant not found.' })
+    return null
+  }
+  if (!getUryFeatures(restaurant.id)?.guestOrdering) {
+    res.status(404).json({ success: false, code: 'ordering_unavailable', error: 'Online ordering is not available.' })
+    return null
+  }
+  return { restaurant, tenant: await resolveUryTenant(restaurant.id) }
+}
+
+/** Guest pickup order placed in URY (self-ordering). Retries reuse submissionId. */
+router.post('/:slug/ury-orders', uryOrderLimiter, async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const { submissionId, items, guestName, guestPhone } = req.body || {}
+    const result = await submitGuestOrder(ctx.tenant, { submissionId, items, guestName, guestPhone })
+    const data = result.body.data
+    console.info(
+      `[public-ury-orders] restaurant=${restaurantId} submission=${data?.submissionId || '?'} status=${data?.status || result.body.code}` +
+        `${data?.invoice ? ` invoice=${data.invoice}` : ''}`,
+    )
+    res.status(result.httpStatus).json(result.body)
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
+})
+
+router.get('/:slug/ury-orders/:submissionId', async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const result = await getGuestOrder(ctx.tenant, req.params.submissionId)
+    res.status(result.httpStatus === 201 ? 200 : result.httpStatus).json(result.body)
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
 })
 
 /** Availability slots for a date + party size (live restaurants only). */

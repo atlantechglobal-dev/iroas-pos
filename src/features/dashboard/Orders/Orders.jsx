@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
+import { usePosResource } from '@/shared/hooks/usePosResource'
+import PosOrdersBoard from '@/features/dashboard/Orders/PosOrdersBoard'
+import PosOrderModal from '@/features/dashboard/Orders/PosOrderModal'
 import '@/features/dashboard/Orders/Orders.css'
 
 const COLUMNS = [
@@ -46,6 +49,11 @@ function Orders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [filterMode, setFilterMode] = useState('all')
+  const [source, setSource] = useState('website')
+  const posOrders = usePosResource(api.getPosOrders, { refreshMs: source === 'pos' ? 20000 : 0 })
+  const posLinked = posOrders.status !== 'not_connected' && posOrders.status !== 'loading'
+  const showPos = posLinked && source === 'pos'
+  const [posModalOpen, setPosModalOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -107,8 +115,9 @@ function Orders() {
           <p className="eyebrow">Live kitchen</p>
           <h1>Orders</h1>
           <p className="page-desc">
-            Guest website orders (dine-in, takeaway, delivery). Advance kitchen status and confirm
-            Cash / UPI payments manually.
+            {showPos
+              ? 'Live orders from your POS, refreshed every 20 seconds. Manage them in your POS.'
+              : 'Guest website orders (dine-in, takeaway, delivery). Advance kitchen status and confirm Cash / UPI payments manually.'}
           </p>
         </div>
         <div className="head-actions">
@@ -123,14 +132,45 @@ function Orders() {
             <option value="pickup">Takeaway</option>
             <option value="delivery">Delivery</option>
           </select>
-          <button className="btn btn-primary" type="button" onClick={load}>
+          {showPos ? (
+            <button className="btn btn-outline" type="button" onClick={() => setPosModalOpen(true)}>
+              + New POS order
+            </button>
+          ) : null}
+          <button className="btn btn-primary" type="button" onClick={showPos ? posOrders.reload : load}>
             Refresh
           </button>
         </div>
       </div>
 
-      {loading ? <p className="empty-col">Loading orders…</p> : null}
+      {posLinked ? (
+        <div className="orders-source-switch" role="tablist" aria-label="Order source">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={source === 'website'}
+            className={`source-chip ${source === 'website' ? 'active' : ''}`}
+            onClick={() => setSource('website')}
+          >
+            Website orders
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={source === 'pos'}
+            className={`source-chip ${source === 'pos' ? 'active' : ''}`}
+            onClick={() => setSource('pos')}
+          >
+            <span className="pos-live-dot" /> POS orders · Live
+          </button>
+        </div>
+      ) : null}
 
+      {showPos ? <PosOrdersBoard posOrders={posOrders} filterMode={filterMode} /> : null}
+
+      {!showPos && loading ? <p className="empty-col">Loading orders…</p> : null}
+
+      {!showPos ? (
       <div className="board">
         {columns.map((col) => (
           <div className="board-col" key={col.key}>
@@ -187,6 +227,18 @@ function Orders() {
           </div>
         ))}
       </div>
+      ) : null}
+
+      {posModalOpen ? (
+        <PosOrderModal
+          onClose={() => setPosModalOpen(false)}
+          onPlaced={(result) => {
+            setPosModalOpen(false)
+            toast.success(`Order sent to the kitchen · ${result.table}${result.invoice ? ` · ${result.invoice}` : ''}`)
+            posOrders.reload()
+          }}
+        />
+      ) : null}
     </DashboardLayout>
   )
 }

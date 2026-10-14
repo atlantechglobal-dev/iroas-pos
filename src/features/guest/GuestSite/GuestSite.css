@@ -3584,3 +3584,43 @@
     min-height: 44px;
   }
 }
+
+.gs-pos-note {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--gs-soft);
+  color: var(--gs-text);
+  font-size: 0.9rem;
+}
+
+.gs-pos-note.is-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.gs-ury-lines {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.gs-ury-lines li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gs-line);
+}
+
+.gs-ury-lines li > span:first-child {
+  flex: 1;
+}
+
+.gs-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}

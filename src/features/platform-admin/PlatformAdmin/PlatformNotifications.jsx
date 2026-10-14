@@ -113,10 +113,6 @@ function PlatformNotifications() {
       navigate(`${ROUTES.PLATFORM_ACCOUNT_APPROVE}/${item.meta.tenantId}`)
       return
     }
-    if (item.type === 'identity') {
-      navigate(ROUTES.PLATFORM_IDENTITIES)
-      return
-    }
     if (item.type === 'audit') {
       navigate(ROUTES.PLATFORM_AUDIT)
     }

@@ -5,6 +5,9 @@ import { api } from '@/shared/lib/api'
 import { downloadQrPng } from '@/shared/ui/QrCodePreview'
 import { guestTableUrl, restaurantPublicSlug } from '@/shared/utils/guestLinks'
 import { todayIso } from '@/shared/utils/localDate'
+import PosTablesPanel from '@/features/dashboard/Tables/PosTablesPanel'
+import PosOrderModal from '@/features/dashboard/Orders/PosOrderModal'
+import { usePosResource } from '@/shared/hooks/usePosResource'
 import '@/features/dashboard/Reservations/Reservations.css'
 
 function formatTimeLabel(time) {
@@ -55,6 +58,9 @@ function Reservations() {
   })
   const [siteSlug, setSiteSlug] = useState('')
   const [modalError, setModalError] = useState('')
+  const posTables = usePosResource(api.getPosTables)
+  const posLinked = posTables.status === 'ready'
+  const [seatingRes, setSeatingRes] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -589,6 +595,11 @@ function Reservations() {
                 </span>
 
                 <div className="res-actions">
+                  {posLinked && res.status !== 'cancelled' ? (
+                    <button type="button" className="btn-manage-res" onClick={() => setSeatingRes(res)}>
+                      Seat in POS
+                    </button>
+                  ) : null}
                   <button type="button" className="btn-manage-res" onClick={() => openEditBooking(res)}>
                     Edit
                   </button>
@@ -625,6 +636,8 @@ function Reservations() {
           </div>
         </div>
       ) : null}
+
+      {activeView === 'Tables' ? <PosTablesPanel hideWhenNotConnected /> : null}
 
       {activeView === 'Tables' ? (
         <div className="upcoming-card">
@@ -839,6 +852,25 @@ function Reservations() {
             </div>
           </form>
         </div>
+      ) : null}
+
+      {seatingRes ? (
+        <PosOrderModal
+          initial={{
+            guestName: seatingRes.guestName,
+            phone: seatingRes.phone,
+            pax: seatingRes.guests,
+            notes: seatingRes.notes,
+          }}
+          onClose={() => setSeatingRes(null)}
+          onPlaced={(result) => {
+            const res = seatingRes
+            setSeatingRes(null)
+            toast.success(`${res.guestName} seated at ${result.table} · order sent to the kitchen`)
+            posTables.reload()
+            if (res.status === 'pending') setStatus(res.id, 'confirmed')
+          }}
+        />
       ) : null}
     </DashboardLayout>
   )

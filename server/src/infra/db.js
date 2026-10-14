@@ -515,6 +515,82 @@ db.exec(`
   }
 }
 
+// External POS mapping: one row per (restaurant, provider). The external
+// restaurant is set server-side only and is the tenant boundary for all
+// POS reads — never taken from the browser.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS restaurant_integrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL CHECK (provider IN ('ury')),
+    external_restaurant TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (restaurant_id, provider)
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_external
+    ON restaurant_integrations(provider, external_restaurant);
+`)
+
+// Migration: per-tenant URY identity. credential_ref names server-side env
+// vars (URY_CRED_<ref>_*); secrets are never stored here. verified_user is the
+// URY user last verified for the mapping (non-secret, for audit/uniqueness).
+{
+  const cols = db.prepare('PRAGMA table_info(restaurant_integrations)').all()
+  for (const name of [
+    'ury_branch',
+    'ury_pos_profile',
+    'ury_self_ordering_profile',
+    'credential_ref',
+    'verified_user',
+    'verified_at',
+  ]) {
+    if (!cols.some((c) => c.name === name)) {
+      db.exec(`ALTER TABLE restaurant_integrations ADD COLUMN ${name} TEXT`)
+    }
+  }
+  // Demo switches: which public features read from URY instead of local records.
+  for (const name of ['feature_hours', 'feature_contact', 'feature_menu', 'feature_guest_ordering']) {
+    if (!cols.some((c) => c.name === name)) {
+      db.exec(`ALTER TABLE restaurant_integrations ADD COLUMN ${name} INTEGER NOT NULL DEFAULT 0`)
+    }
+  }
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_credential
+      ON restaurant_integrations(provider, credential_ref) WHERE credential_ref IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_verified_user
+      ON restaurant_integrations(provider, verified_user) WHERE verified_user IS NOT NULL;
+  `)
+}
+
+// Guest orders submitted to URY self-ordering. The order itself lives in URY
+// (POS Invoice); this row only tracks the IROAS submission id for safe retries,
+// the server-side URY ordering session, and guest contact that URY's
+// self-ordering API cannot store yet. ury_session is never sent to the browser.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ury_guest_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    submission_id TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('submitting', 'placed', 'rejected', 'unknown', 'failed')),
+    ury_session TEXT,
+    invoice TEXT,
+    response_json TEXT,
+    error_code TEXT,
+    error_message TEXT,
+    guest_name TEXT,
+    guest_phone TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_attempt_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (restaurant_id, submission_id)
+  );
+`)
+
 // Migration: orders.payment_timing (bill_now | pay_later)
 {
   const cols = db.prepare('PRAGMA table_info(orders)').all()
