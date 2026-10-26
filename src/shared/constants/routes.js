@@ -27,6 +27,7 @@ export const ROUTES = {
   ONE_LINK: '/one-link',
   MENU: '/menu',
   ORDERS: '/orders',
+  POS_SHIFT: '/pos-shift',
   RESERVATIONS: '/reservations',
   TABLES: '/tables',
   STAFF: '/staff',

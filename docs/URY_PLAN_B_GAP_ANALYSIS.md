@@ -284,3 +284,44 @@ IROAS side built and tested against a fake URY. **Not yet live end to end**, bec
 2. `node scripts/ury-link-restaurant.js link 3 --restaurant "Demo Restaurant" --branch "Demo Branch" --pos-profile "Demo Profile" --self-ordering-profile "Demo Restaurant Website" --credential-ref TENANT_3 --move-from 62`
 3. `node scripts/ury-link-restaurant.js features 3 --hours on --contact on --menu on --guest-ordering on`
 4. Start the server and the web app, then open `/s/saffron-fig`.
+
+## 11. Images, menu edits and URY table QR ordering (2026-10-15, restaurant #62 `enwe-wn-kitchen`)
+
+**Menu images and availability.** `uryMenu.js` adds one `get_list Item` (`name in <menu codes>`, fields `image, disabled`). Items carry `image` (absolute URL; `/files/...` paths are prefixed with `URY_BASE_URL`), and an item is unavailable if either the URY Menu Item row or the Item is disabled. When the URY menu is active, the website uses no stock photos (hero, gallery, category tiles, dish cards).
+
+**Menu edits from the dashboard.** `PATCH /api/restaurant/pos-menu/items/:id` `{ available?: boolean, price?: number > 0 }` → `POST frappe.client.set_value { doctype: "URY Menu Item", name: <row>, fieldname: { disabled?, rate? } }`. The row must be in the mapped restaurant's active menu (re-read from URY before writing). Adding/removing items stays in URY desk (not authorized).
+
+**URY table QR.** `GET /api/restaurant/pos-tables/qr` returns the restaurant's non-take-away URY tables with a code `u.<base64url table>.<HMAC>` signed with `URY_TABLE_QR_SECRET` (fallback `JWT_SECRET`) and the restaurant id. Guests open `/s/<slug>/t/<code>`; `GET /api/public/:slug/ury-table/:code` verifies the signature and re-reads the table from URY (must belong to the mapped restaurant). `POST /api/public/:slug/ury-orders` accepts `tableCode`; the server asks URY for that table's token (`generate_qr_token(profile, table)`) and places the order through the same self-ordering path (one session per submission, reconcile before resend). The URY token never reaches the browser. URY Self Ordering Profile `Demo Restaurant Website` now has `enable_qr_table_ordering = 1` (authorized).
+
+**Live verification (2026-10-15):** public menu shows all 7 URY images; a forged code returns 404; a no-op menu write (Momo price 40 → 40) succeeded; the authorized test order 1 × Chicken Gravy on T12 created POS Invoice `UDT-SA-00004` (Draft, Dine In, R120), KOT `KOT-UD-00004` (Demo Kitchen) and set T12 occupied; resubmitting the same submission id returned the same invoice (`replay: true`). Cancel `UDT-SA-00004` in URY POS to free T12.
+
+**Not changed:** table reservations stay in IROAS (URY still has no `ury.ury.api.table_reservation` module, re-checked 2026-10-15). A table with an open order cannot take a second QR order (`allow_add_to_running_table = 0`); staff add items from URY POS.
+
+## 12. Take Away / Dine In + payment status tracking (2026-10-17)
+
+**URY Orders tabs (live):** `getPosInvoice(status=Draft|Unbilled|Paid)` returns the same buckets as the URY POS Orders screen. On Demo Restaurant (2026-10-17): Draft → `UDT-SA-00001` Take Away; Unbilled → `UDT-SA-00002` Dine In Draft on T10; Paid → paid invoices. `POS Invoice.status` stays `Draft` for both Draft and Unbilled — the split is by channel (takeaway/counter vs open dine-in).
+
+**IROAS mapping** (`mapInvoiceState` in `uryOrders.js`): Take Away / Delivery / Phone In / Aggregators (or no table) + Draft → `draft`; Dine In + Draft (or submitted unpaid) → `unbilled`; Paid/Submitted/Consolidated → `paid`. Staff **POS orders** board columns are now Draft · Unbilled · Paid · Cancelled, with a Take Away / Dine In channel pill. Guest checkout shows channel + payment status and can call `POST …/ury-orders/:id/request-bill` → `ury.ury.api.self_ordering.request_bill` (session from the stored submission).
+
+**Flows:** Guest website without a table QR = Take Away (pickup self-ordering → Draft in URY). Scanned URY table QR = Dine In → Unbilled. Staff “New POS order” labels each free table as Dine In or Take Away from `URY Table.is_take_away` (Demo Restaurant currently has **no** takeaway table — staff takeaway still needs one in URY desk, or guests use the website pickup path). Payment remains in URY POS (Payment button); IROAS tracks status only.
+
+## 14. Dual-lane status architecture (kitchen + payment)
+
+Two independent lanes so guests see a step strip while payment stays truthful to URY:
+
+| Lane | Owner | Steps | Who changes it |
+|------|--------|--------|----------------|
+| **Payment** | URY `POS Invoice` | Draft → Unbilled → Paid (Cancelled) | Cashier in URY POS; guest may `request_bill` |
+| **Kitchen** | IROAS `ury_order_kitchen` | Received → Accepted → Preparing → Ready → Completed | Staff **Move to … →** on POS orders board |
+
+- Staff board: toggle **By kitchen steps** / **By payment (URY)**; each card shows both labels.
+- Guest Track / Account: kitchen drives the Received→Completed strip; payment shows as Draft/Unbilled/Paid.
+- API: `PATCH /api/restaurant/pos-orders/:invoiceId/kitchen` `{ advance: true }` or `{ step }`; public `ury-track` and `ury-account` attach `kitchenStep`.
+
+## 13. Guest ↔ URY Customer account (2026-10-21)
+
+Self-ordering still creates the invoice under profile `default_customer` (`IROAS Website Guest`). Immediately after place (while Draft), IROAS calls `ury.ury_pos.api.create_customer` / find-by-mobile, then `frappe.client.set_value` on the POS Invoice `{ customer, mobile_number }` (verified live on Draft invoices). Paid invoices cannot be rewritten; the guest link is still stored in `ury_guest_orders.ury_customer` for Account.
+
+**Account page:** `GET /api/public/:slug/ury-account?phone=` lists that restaurant’s POS invoices for the phone (Take Away / Dine In / Draft·Unbilled·Paid). Enter the checkout phone on Account → History to see them. New website orders show “Customer in POS: &lt;name&gt;” on the confirmation screen.
+
+**Security:** Never paste URY Administrator `sid` / CSRF tokens into chat; rotate that desk session if it was shared. IROAS uses only the dedicated `TENANT_62` integration credential from `server/.env`.

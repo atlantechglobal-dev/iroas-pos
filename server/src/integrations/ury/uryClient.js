@@ -100,7 +100,7 @@ async function toUryWriteError(res) {
   const plain = message.replace(/<[^>]*>/g, '').trim().slice(0, 300)
   if (res.status === 401) return new UryError('auth_failed', 'URY authentication failed.', { status: 401 })
   if (res.status === 403) return new UryError('forbidden', plain || 'URY user lacks permission.', { status: 403 })
-  if (res.status === 417 || excType === 'ValidationError') {
+  if (res.status === 417 || res.status === 409 || excType === 'ValidationError' || excType === 'DuplicateEntryError') {
     return new UryError('validation', plain || 'URY rejected the request.', { status: res.status })
   }
   return new UryError('upstream_error', `URY request failed (${res.status}${excType ? ` ${excType}` : ''}).`, {
@@ -160,9 +160,36 @@ export function createUryClient(rawCfg) {
   }
 
   /**
-   * POST a whitelisted Frappe method with a JSON body (as the URY POS frontend does).
-   * Not retried after a successful send, so a write is never applied twice.
+   * POST /api/method/upload_file as multipart, the same call the URY menu screen uses.
+   * Returns the public file URL.
    */
+  async function uploadFile(filename, bytes, mime) {
+    assertConfigured()
+    const form = new FormData()
+    form.append('file', new Blob([bytes], { type: mime || 'application/octet-stream' }), filename)
+    form.append('is_private', '0')
+    form.append('folder', 'Home')
+    const url = `${cfg.baseUrl}/api/method/upload_file`
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const res = await rawFetch(url, {
+        method: 'POST',
+        headers: { Accept: 'application/json', ...(await authHeaders()) },
+        body: form,
+      })
+      if (res.ok) {
+        const body = await res.json()
+        const fileUrl = body?.message?.file_url
+        if (!fileUrl) throw new UryError('upstream_error', 'URY did not return a file URL.')
+        return fileUrl
+      }
+      if (cfg.authMode === 'session' && attempt === 0 && res.status === 401) {
+        sessionCookie = null
+        continue
+      }
+      throw await toUryWriteError(res)
+    }
+    throw new UryError('auth_failed', 'URY authentication failed.')
+  }
   async function post(methodPath, body = {}) {
     assertConfigured()
     const url = `${cfg.baseUrl}/api/method/${methodPath}`
@@ -220,7 +247,27 @@ export function createUryClient(rawCfg) {
     return Array.isArray(body?.message) ? body.message : []
   }
 
-  return { get, post, getLoggedUser, getDocType, getDoc, getList }
+  /** REST /api/resource write, matching the URY POS settings screen. */
+  async function writeResource(method, resourcePath, body) {
+    assertConfigured()
+    const url = `${cfg.baseUrl}/api/resource/${resourcePath}`
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const res = await rawFetch(url, {
+        method,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: body == null ? undefined : JSON.stringify(body),
+      })
+      if (res.ok) return res.json()
+      if (cfg.authMode === 'session' && attempt === 0 && res.status === 401) {
+        sessionCookie = null
+        continue
+      }
+      throw await toUryWriteError(res)
+    }
+    throw new UryError('auth_failed', 'URY authentication failed.')
+  }
+
+  return { get, post, getLoggedUser, getDocType, getDoc, getList, writeResource, uploadFile }
 }
 
 let operatorClient = null

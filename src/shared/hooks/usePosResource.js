@@ -32,5 +32,12 @@ export function usePosResource(fetcher, { refreshMs = 0 } = {}) {
   }, [load, refreshMs])
 
   const reload = useCallback(() => load(), [load])
-  return { ...state, reload }
+  const replaceData = useCallback((updater) => {
+    setState((prev) => {
+      if (prev.status !== 'ready' || !prev.data) return prev
+      const nextData = typeof updater === 'function' ? updater(prev.data) : updater
+      return { ...prev, data: nextData }
+    })
+  }, [])
+  return { ...state, reload, replaceData }
 }

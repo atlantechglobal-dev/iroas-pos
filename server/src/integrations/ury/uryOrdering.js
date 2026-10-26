@@ -11,6 +11,7 @@
 
 import { UryError } from './uryClient.js'
 import { IntegrationError } from './uryTenant.js'
+import { sellableByCode } from './uryMenu.js'
 
 export class OrderingError extends Error {
   constructor(code, message, { status = 400 } = {}) {
@@ -46,9 +47,21 @@ async function getOrderingContext(tenant) {
   }
 
   const opening = await client.get('erpnext.selling.page.point_of_sale.point_of_sale.check_opening_entry', { user: waiter })
-  const open = (Array.isArray(opening?.message) ? opening.message : []).some((e) => e.pos_profile === profileName)
-  if (!open) {
-    throw new OrderingError('pos_closed', 'The POS shift is not open. Open the POS in URY first.', { status: 409 })
+  const ownOpen = (Array.isArray(opening?.message) ? opening.message : []).some((e) => e.pos_profile === profileName)
+  const profileOpen = ownOpen
+    ? true
+    : (
+        await client.getList('POS Opening Entry', {
+          fields: ['name', 'pos_profile', 'status'],
+          filters: [
+            ['pos_profile', '=', profileName],
+            ['status', '=', 'Open'],
+          ],
+          limit: 5,
+        })
+      ).some((row) => row.pos_profile === profileName && row.status === 'Open')
+  if (!profileOpen) {
+    throw new OrderingError('pos_closed', 'The POS shift is not open. Open the shift in IROAS or URY POS first.', { status: 409 })
   }
 
   const modeOfPayment = modes[0]?.mode_of_payment
@@ -86,15 +99,25 @@ async function getMenuItems(client, profileName, table) {
 export async function getUryOrderMenu(tenant, tableName) {
   const ctx = await getOrderingContext(tenant)
   const table = await getTableForRestaurant(tenant, clean(tableName, 140))
-  const items = (await getMenuItems(tenant.client, ctx.profileName, table)).map((it) => ({
-    code: it.item,
-    name: it.item_name || it.item,
-    rate: typeof it.rate === 'number' ? it.rate : null,
-    course: it.course_label || it.course || '',
-    available: it.disabled !== 1,
-    special: it.special_dish === 1,
-    image: it.item_image || null,
-  }))
+  const raw = await getMenuItems(tenant.client, ctx.profileName, table)
+  const availability = await sellableByCode(tenant.client, {
+    posProfile: ctx.profileName,
+    branch: tenant.branch,
+    codes: raw.map((it) => it.item),
+  })
+  const items = raw.map((it) => {
+    const avail = availability?.get(it.item)
+    return {
+      code: it.item,
+      name: it.item_name || it.item,
+      rate: typeof it.rate === 'number' ? it.rate : null,
+      course: it.course_label || it.course || '',
+      available: it.disabled !== 1 && (avail ? avail.sellable : true),
+      stockQty: avail ? avail.availableQty : null,
+      special: it.special_dish === 1,
+      image: it.item_image || null,
+    }
+  })
   return {
     table: { name: table.name, room: table.restaurant_room || '', seats: table.no_of_seats || null, occupied: table.occupied === 1 },
     orderType: orderTypeFor(table),
@@ -102,27 +125,110 @@ export async function getUryOrderMenu(tenant, tableName) {
   }
 }
 
-/** Finds a URY customer by exact mobile number, or creates one. Customers are global in URY. */
-export async function findOrCreateUryCustomer({ client }, { name, phone }) {
-  const { getList } = client
+/** Phone forms URY may already store (desk uses local digits; create_customer often keeps +). */
+export function phoneLookupVariants(phone) {
+  const mobile = normalizePhone(phone)
+  const digits = mobile.replace(/\D/g, '')
+  const variants = [mobile, digits]
+  if (!digits) return []
+
+  // South Africa: 27… ↔ 0… (local mobiles are 10 digits including leading 0)
+  if (digits.startsWith('27') && digits.length >= 11) {
+    variants.push(`0${digits.slice(2)}`, `+${digits}`, digits.slice(2))
+  }
+  if (digits.startsWith('0') && digits.length === 10) {
+    variants.push(`+27${digits.slice(1)}`, `27${digits.slice(1)}`)
+  }
+  // India: 91… ↔ 10-digit mobile (common on this demo)
+  if (digits.startsWith('91') && digits.length >= 12) {
+    variants.push(digits.slice(2), `+${digits}`)
+  }
+  if (digits.length === 10 && /^[6-9]/.test(digits)) {
+    variants.push(`+91${digits}`, `91${digits}`)
+  }
+  // Desk often stores the national number without country code
+  if (digits.length > 10) variants.push(digits.slice(-10))
+  if (digits.length > 9) variants.push(digits.slice(-9))
+
+  return [...new Set(variants.filter((v) => String(v || '').replace(/\D/g, '').length >= 7))]
+}
+
+function phoneDigits(value) {
+  return String(value || '').replace(/\D/g, '')
+}
+
+/** True when two phone strings refer to the same national number (ignores + / country prefix). */
+export function phonesMatch(a, b) {
+  const da = phoneDigits(a)
+  const db = phoneDigits(b)
+  if (!da || !db || da.length < 7 || db.length < 7) return false
+  if (da === db) return true
+  const variantsA = new Set(phoneLookupVariants(a).map(phoneDigits))
+  const variantsB = new Set(phoneLookupVariants(b).map(phoneDigits))
+  for (const v of variantsA) {
+    if (variantsB.has(v)) return true
+  }
+  const tail = (d) => (d.length > 9 ? d.slice(-9) : d)
+  return tail(da) === tail(db)
+}
+
+/** Looks up a URY Customer by phone (exact variants, then trailing-digit match). */
+export async function findUryCustomerByPhone({ client }, phone) {
+  const mobile = normalizePhone(phone)
+  const digits = phoneDigits(mobile)
+  if (digits.length < 7) return null
+
+  const variants = phoneLookupVariants(mobile)
+  try {
+    const existing = await client.getList('Customer', {
+      fields: ['name', 'customer_name', 'mobile_number', 'disabled'],
+      filters: [['mobile_number', 'in', variants]],
+      limit: 20,
+    })
+    const hit = existing.find((c) => c.disabled !== 1)
+    if (hit) {
+      return { id: hit.name, name: hit.customer_name || hit.name, phone: hit.mobile_number || mobile, created: false }
+    }
+  } catch (err) {
+    if (!(err instanceof UryError && err.code === 'forbidden')) throw err
+  }
+
+  // Desk values with spaces / odd formatting: match on national tail
+  const tail = digits.length >= 10 ? digits.slice(-10) : digits
+  try {
+    const liked = await client.getList('Customer', {
+      fields: ['name', 'customer_name', 'mobile_number', 'disabled'],
+      filters: [['mobile_number', 'like', `%${tail}%`]],
+      limit: 20,
+    })
+    const match = liked.find((c) => c.disabled !== 1 && phonesMatch(c.mobile_number, mobile))
+    if (match) {
+      return {
+        id: match.name,
+        name: match.customer_name || match.name,
+        phone: match.mobile_number || mobile,
+        created: false,
+      }
+    }
+  } catch (err) {
+    if (!(err instanceof UryError && err.code === 'forbidden')) throw err
+  }
+  return null
+}
+
+/** Finds a URY customer by mobile number (common formats), or creates one. Customers are global in URY. */
+export async function findOrCreateUryCustomer(tenant, { name, phone }) {
   const mobile = normalizePhone(phone)
   const customerName = clean(name, 140)
   if (mobile.replace(/\D/g, '').length < 7) throw new OrderingError('invalid_phone', 'Enter a valid phone number.')
 
-  const existing = await getList('Customer', {
-    fields: ['name', 'customer_name', 'mobile_number', 'disabled'],
-    filters: { mobile_number: mobile },
-    limit: 1,
-  })
-  if (existing[0] && existing[0].disabled !== 1) {
-    const c = existing[0]
-    return { id: c.name, name: c.customer_name || c.name, phone: c.mobile_number || mobile, created: false }
-  }
+  const existing = await findUryCustomerByPhone(tenant, mobile)
+  if (existing) return existing
 
   if (!customerName) throw new OrderingError('invalid_name', 'Enter the guest’s name.')
   let body
   try {
-    body = await client.post('ury.ury_pos.api.create_customer', { customer_name: customerName, mobile_number: mobile })
+    body = await tenant.client.post('ury.ury_pos.api.create_customer', { customer_name: customerName, mobile_number: mobile })
   } catch (err) {
     if (err instanceof UryError && err.code === 'validation') throw new OrderingError('customer_failed', err.message, { status: 422 })
     throw err
@@ -160,13 +266,22 @@ export async function placeUryOrder(tenant, input = {}) {
     throw err
   }
 
-  const menu = new Map((await getMenuItems(client, ctx.profileName, table)).map((it) => [it.item, it]))
+  const menuRows = await getMenuItems(client, ctx.profileName, table)
+  const menu = new Map(menuRows.map((it) => [it.item, it]))
+  const availability = await sellableByCode(client, {
+    posProfile: ctx.profileName,
+    branch: tenant.branch,
+    codes: lines.map((line) => line?.item ?? line?.code),
+  })
   const items = []
   for (const line of lines) {
     const code = clean(line?.item ?? line?.code, 140)
     const qty = Math.trunc(Number(line?.qty))
     const menuItem = menu.get(code)
-    if (!menuItem || menuItem.disabled === 1) throw new OrderingError('item_unavailable', `Item unavailable: ${code || 'unknown'}.`)
+    const avail = availability?.get(code)
+    if (!menuItem || menuItem.disabled === 1 || (avail && (!avail.sellable || avail.availableQty < qty))) {
+      throw new OrderingError('item_unavailable', `${menuItem?.item_name || code || 'This item'} is not available today.`)
+    }
     if (!(qty >= 1 && qty <= MAX_QTY)) throw new OrderingError('invalid_qty', `Quantity must be 1–${MAX_QTY}.`)
     const comment = clean(line?.comment, 140)
     items.push({ item: menuItem.item, item_name: menuItem.item_name, rate: menuItem.rate, qty, ...(comment ? { comment } : {}) })

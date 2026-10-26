@@ -62,16 +62,27 @@ function Reservations() {
   const posLinked = posTables.status === 'ready'
   const [seatingRes, setSeatingRes] = useState(null)
 
-  const load = async () => {
+  const load = async ({ syncPos = false } = {}) => {
     setLoading(true)
     try {
+      if (syncPos || posLinked) {
+        try {
+          await api.syncDiningTablesFromPos()
+        } catch {
+          /* POS not linked or sync unavailable — keep local tables */
+        }
+      }
       const [{ reservations: rows }, tablesRes, restRes] = await Promise.all([
         api.getReservations(),
         api.getDiningTables().catch(() => ({ tables: [] })),
         api.getRestaurant().catch(() => null),
       ])
       setReservations(rows || [])
-      setTables((tablesRes?.tables || []).filter((t) => t.active !== 0 && t.active !== false))
+      const active = (tablesRes?.tables || [])
+        .filter((t) => t.active !== 0 && t.active !== false)
+        .slice()
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true }))
+      setTables(active)
       if (restRes?.restaurant) {
         setSiteSlug(restaurantPublicSlug(restRes.restaurant, 'your-restaurant'))
       }
@@ -83,8 +94,13 @@ function Reservations() {
   }
 
   useEffect(() => {
-    load()
+    load({ syncPos: true })
   }, [])
+
+  useEffect(() => {
+    if (posLinked) load({ syncPos: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh tables when POS becomes ready
+  }, [posLinked])
 
   useEffect(() => {
     if (!modalOpen || !form.date) {
@@ -643,8 +659,20 @@ function Reservations() {
         <div className="upcoming-card">
           <div className="card-title-head">
             <h2>Dining tables</h2>
-            <span>Print QR codes for dine-in ordering · also used for reservation seating</span>
+            <span>
+              {posLinked
+                ? 'Synced from your POS for reservations · QR codes for dine-in ordering'
+                : 'Print QR codes for dine-in ordering · also used for reservation seating'}
+            </span>
           </div>
+
+          {posLinked ? (
+            <div className="head-actions" style={{ marginBottom: 12 }}>
+              <button type="button" className="btn btn-outline" onClick={() => load({ syncPos: true })}>
+                Sync tables from POS
+              </button>
+            </div>
+          ) : null}
 
           <form className="table-add-form" onSubmit={addTable}>
             <input
@@ -780,7 +808,7 @@ function Reservations() {
             ) : null}
             {tables.length > 0 ? (
               <label>
-                Table (optional)
+                Table {posLinked ? '(POS)' : '(optional)'}
                 <select
                   value={form.tableId}
                   onChange={(e) => setForm((f) => ({ ...f, tableId: e.target.value }))}
@@ -788,12 +816,20 @@ function Reservations() {
                   <option value="">Auto-assign / none</option>
                   {tables.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name} ({t.seats})
+                      {t.name}
+                      {t.seats != null ? ` · ${t.seats} seats` : ''}
+                      {t.zone ? ` · ${t.zone}` : ''}
                     </option>
                   ))}
                 </select>
               </label>
-            ) : null}
+            ) : (
+              <p className="empty-res">
+                {posLinked
+                  ? 'No dine-in POS tables yet. Add tables in URY, then refresh.'
+                  : 'No tables yet — bookings use covers only, or add tables under Tables view.'}
+              </p>
+            )}
             <div className="res-slot-field">
               <span className="res-slot-label">Available times</span>
               {!form.date ? (
@@ -861,12 +897,14 @@ function Reservations() {
             phone: seatingRes.phone,
             pax: seatingRes.guests,
             notes: seatingRes.notes,
+            orderMode: 'dinein',
+            table: seatingRes.tableId ? tableName(seatingRes.tableId) || '' : '',
           }}
           onClose={() => setSeatingRes(null)}
           onPlaced={(result) => {
             const res = seatingRes
             setSeatingRes(null)
-            toast.success(`${res.guestName} seated at ${result.table} · order sent to the kitchen`)
+            toast.success(`${res.guestName} seated at ${result.table} · table booked in POS`)
             posTables.reload()
             if (res.status === 'pending') setStatus(res.id, 'confirmed')
           }}

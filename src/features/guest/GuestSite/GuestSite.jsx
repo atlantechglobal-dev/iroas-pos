@@ -140,22 +140,33 @@ function FooterSocialLink({ href, label, children }) {
   )
 }
 
+function isOpenDay(row) {
+  return Boolean(row && !row.closed && row.open && row.close)
+}
+
 function formatHoursSummary(hours) {
   if (!Array.isArray(hours) || !hours.length) return ''
-  const openDays = hours.filter((h) => !h.closed && h.open && h.close)
+  const openDays = hours.filter(isOpenDay)
   if (!openDays.length) return 'Hours coming soon'
   const first = openDays[0]
   const same = openDays.every((h) => h.open === first.open && h.close === first.close)
   const closed = hours.filter((h) => h.closed).map((h) => h.day)
   if (same) {
-    const openLabels = openDays.map((h) => h.day)
-    const openRange =
-      openLabels.length > 1 ? `${openLabels[0]} – ${openLabels[openLabels.length - 1]}` : openLabels[0]
-    const openPart = `${openRange}: ${first.open} – ${first.close}`
-    if (closed.length) return `${openPart} · ${closed.join(', ')}: Closed`
-    return openPart
+    const start = hours.findIndex((h) => h.day === openDays[0].day)
+    const end = hours.findIndex((h) => h.day === openDays[openDays.length - 1].day)
+    const span = hours.slice(start, end + 1)
+    const contiguous = span.length === openDays.length && span.every(isOpenDay)
+    if (contiguous) {
+      const openLabels = openDays.map((h) => h.day)
+      const openRange =
+        openLabels.length > 1 ? `${openLabels[0]} – ${openLabels[openLabels.length - 1]}` : openLabels[0]
+      const openPart = `${openRange}: ${first.open} – ${first.close}`
+      if (closed.length) return `${openPart} · ${closed.join(', ')}: Closed`
+      return openPart
+    }
   }
   return hours
+    .filter((h) => h.closed || isOpenDay(h))
     .map((h) => (h.closed ? `${h.day}: Closed` : `${h.day}: ${h.open} – ${h.close}`))
     .join(' · ')
 }
@@ -250,32 +261,62 @@ function GuestSite() {
 
   useEffect(() => {
     let cancelled = false
-    setLoadError(false)
-    api
-      .getPublicSite(slug)
-      .then((data) => {
-        if (cancelled) return
-        setSite(data)
-        const rest = data?.restaurant || {}
-        // Soft-prefill delivery city only; phone/email stay as placeholders for the guest.
-        setCheckout((prev) => ({
-          ...prev,
-          city: prev.city || rest.city || '',
-        }))
-      })
-      .catch(() => {
-        if (cancelled) return
-        setSite(null)
-        setLoadError(true)
-      })
+    const apply = (data, initial) => {
+      if (cancelled || !data) return
+      setSite(data)
+      if (!initial) return
+      const rest = data?.restaurant || {}
+      setCheckout((prev) => ({
+        ...prev,
+        city: prev.city || rest.city || '',
+      }))
+    }
+    const load = (initial) => {
+      if (initial) setLoadError(false)
+      return api
+        .getPublicSite(slug)
+        .then((data) => apply(data, initial))
+        .catch(() => {
+          if (cancelled || !initial) return
+          setSite(null)
+          setLoadError(true)
+        })
+    }
+    load(true)
+    const timer = setInterval(() => load(false), 60_000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load(false)
+    }
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [slug])
 
   useEffect(() => {
     if (!tableCode) return undefined
     let cancelled = false
+    if (tableCode.startsWith('u.')) {
+      api
+        .getPublicUryTable(slug, tableCode)
+        .then((res) => {
+          const table = res?.data?.table
+          if (cancelled || !table) return
+          setTableSession({ ...table, ury: true, fromQr: true })
+          setServiceMode('dinein')
+          navigate(guestSitePath(slug, 'menu'), { replace: true })
+        })
+        .catch((err) => {
+          if (cancelled) return
+          setTableSession(null)
+          toast.error(err?.message || 'This table QR code could not be opened. Please ask the staff.')
+        })
+      return () => {
+        cancelled = true
+      }
+    }
     api
       .getPublicTable(slug, tableCode)
       .then(({ table }) => {
@@ -387,13 +428,17 @@ function GuestSite() {
   })()
   const reviews = site?.reviews || []
   const ury = site?.ury || null
-  // QR table sessions keep the existing local menu and order flow.
-  const uryMenuActive = Boolean(ury?.menu) && !tableSession
+  // Local-table QR sessions keep the existing local menu and order flow; URY-table QR sessions use URY.
+  const uryTable = tableSession?.ury ? tableSession : null
+  const uryMenuActive = Boolean(ury?.menu) && (!tableSession || Boolean(uryTable))
   const uryCurrency = uryMenuActive ? ury.menu.currency || null : null
   const uryOrdering = uryMenuActive && Boolean(ury?.guestOrdering?.enabled)
   const money = (n) => (uryMenuActive ? formatPosPrice(n, uryCurrency) : formatPrice(n))
   const uryHoursExceptions = ury?.hours?.status === 'ok' ? (ury.hours.exceptions || []).slice(0, 5) : []
-  const uryNotices = [ury?.hours, ury?.contact]
+  const uryNotices = [
+    operatingHours.some(isOpenDay) ? null : ury?.hours,
+    brand.phone || brand.email || brand.address ? null : ury?.contact,
+  ]
     .filter((s) => s && (s.status !== 'ok' || s.message))
     .map((s) => s.message || 'Live information from the restaurant’s POS is unavailable.')
   const menuGroups = useMemo(() => {
@@ -409,8 +454,9 @@ function GuestSite() {
           desc: '',
           veg: false,
           tag: item.special ? 'Special' : '',
-          imageDataUrl: '',
-          stockStatus: item.available ? 'in_stock' : 'out',
+          imageDataUrl: item.image || '',
+          stockStatus: item.available ? (item.stockQty != null && item.stockQty <= 10 ? 'low' : 'in_stock') : 'out',
+          stockQty: item.stockQty ?? null,
           source: 'ury',
         })),
       }))
@@ -429,7 +475,7 @@ function GuestSite() {
   }, [site, uryMenuActive, ury])
 
   useEffect(() => {
-    if (tableSession) setCart((prev) => prev.filter((line) => line.source !== 'ury'))
+    if (tableSession && !tableSession.ury) setCart((prev) => prev.filter((line) => line.source !== 'ury'))
   }, [tableSession])
 
   const liveKeys = useMemo(() => {
@@ -562,9 +608,9 @@ function GuestSite() {
     push(brand.coverDataUrl)
     flatMenuItems.forEach((i) => push(i.imageDataUrl))
     menuGroups.forEach((g) => push(g.categoryImage))
-    FALLBACK_PHOTOS.forEach((src) => push(src))
+    if (!uryMenuActive) FALLBACK_PHOTOS.forEach((src) => push(src))
     return pool
-  }, [site?.gallery, brand.coverDataUrl, flatMenuItems, menuGroups])
+  }, [site?.gallery, brand.coverDataUrl, flatMenuItems, menuGroups, uryMenuActive])
 
   const heroTiles = photoPool.slice(0, 4)
   const bentoTiles = photoPool.slice(0, 5)
@@ -619,7 +665,6 @@ function GuestSite() {
     { to: guestSitePath(slug, 'website'), label: 'Home', end: true },
     liveKeys.has('menu') && { to: guestSitePath(slug, 'menu'), label: 'Menu' },
     liveKeys.has('book') && { to: guestSitePath(slug, 'book'), label: 'Book a table' },
-    { to: guestSitePath(slug, 'order'), label: 'Order' },
     { to: guestSitePath(slug, 'tracking'), label: 'Track' },
     { to: guestSitePath(slug, 'account'), label: 'Account' },
   ].filter(Boolean)
@@ -752,8 +797,8 @@ function GuestSite() {
             </Link>
           ) : null}
           {liveKeys.has('order') ? (
-            <Link className="gs-btn dark" to={guestSitePath(slug, 'order')}>
-              Order now
+            <Link className="gs-btn dark" to={guestSitePath(slug, 'menu')}>
+              View menu
             </Link>
           ) : liveKeys.has('book') ? (
             <Link className="gs-btn dark" to={guestSitePath(slug, 'book')}>
@@ -817,13 +862,13 @@ function GuestSite() {
                       resolveMediaUrl(group.categoryImage) ||
                       resolveMediaUrl(group.items.find((i) => i.imageDataUrl)?.imageDataUrl) ||
                       dishPhotoSrc(group.items[0], index) ||
-                      photoPool[index % photoPool.length]
+                      (photoPool.length ? photoPool[index % photoPool.length] : '')
                     return (
                       <Link
                         key={group.category}
                         className="gs-cat-card"
                         to={guestSitePath(slug, 'menu')}
-                        style={{ backgroundImage: `url(${img})` }}
+                        style={img ? { backgroundImage: `url(${img})` } : undefined}
                       >
                         <span>
                           <strong>{group.category}</strong>
@@ -853,7 +898,9 @@ function GuestSite() {
                           alt={item.name}
                           placeholderLabel={item.name}
                         />
-                        {item.tag || (index === 0 && item.source !== 'ury') ? (
+                        {item.stockStatus === 'out' ? (
+                          <span className="gs-soldout-badge">Sold out today</span>
+                        ) : item.tag || (index === 0 && item.source !== 'ury') ? (
                           <span className="gs-badge">{item.tag || 'Must try'}</span>
                         ) : null}
                       </Link>
@@ -865,7 +912,17 @@ function GuestSite() {
                           {item.source === 'ury' ? null : <p>{item.desc || 'A guest favourite from our kitchen.'}</p>}
                         </div>
                         <div className="gs-popular-foot">
-                          <b>{money(item.price)}</b>
+                          <span>
+                            <b>{money(item.price)}</b>
+                            {item.source === 'ury' ? (
+                              <>
+                                {' · '}
+                                <span className={`gs-avail${item.stockStatus === 'out' ? ' is-out' : ' is-in'}`}>
+                                  {item.stockStatus === 'out' ? 'Unavailable' : 'Available'}
+                                </span>
+                              </>
+                            ) : null}
+                          </span>
                           {(item.source === 'ury' ? uryOrdering && item.stockStatus !== 'out' : liveKeys.has('order')) ? (
                             <button
                               type="button"
@@ -1061,17 +1118,30 @@ function GuestSite() {
             <div className="gs-menu-hero">
               <p className="gs-kicker">The menu</p>
               <h1>Choose your evening.</h1>
-              <p>
-                From quiet small plates to wood-fired favourites — every dish is hand-portioned,
-                freshly prepared, and priced honestly.
-              </p>
+              {uryMenuActive ? null : (
+                <p>
+                  From quiet small plates to wood-fired favourites — every dish is hand-portioned,
+                  freshly prepared, and priced honestly.
+                </p>
+              )}
             </div>
 
             {tableSession?.name ? (
               <p className="gs-table-banner">
-                {tableSession.fromQr ? 'Scanned · ' : ''}
-                Ordering for <strong>{tableSession.name}</strong> · dine-in — add dishes, then open cart
+                <span>
+                  {tableSession.fromQr ? 'Scanned · ' : 'Dine in · '}
+                  Ordering for <strong>{tableSession.name}</strong>
+                  {tableSession.room ? ` · ${tableSession.room}` : ''} — add dishes, then open cart
+                </span>
+                {tableSession.dineIn && !tableSession.fromQr ? (
+                  <button type="button" className="gs-text-cta" onClick={() => setTableSession(null)}>
+                    Change table
+                  </button>
+                ) : null}
               </p>
+            ) : null}
+            {uryTable && !uryOrdering ? (
+              <p className="gs-pos-note is-warning">Ordering from the table is not available right now. Please ask the staff.</p>
             ) : null}
 
             <div className="gs-menu-toolbar">
@@ -1142,7 +1212,9 @@ function GuestSite() {
                 {ury.menu.status === 'ok'
                   ? `Live menu and prices from the restaurant’s POS${uryCurrency ? ` (${uryCurrency})` : ''}. ${
                       uryOrdering
-                        ? 'Order online for pickup — the POS confirms the final price.'
+                        ? uryTable
+                          ? `Dine-in for table ${uryTable.name} — order goes to the POS kitchen.`
+                          : 'Take Away (pickup) — order goes to the POS as Draft until paid.'
                         : 'Online ordering is not available yet.'
                     }`
                   : ury.menu.message || 'The live menu is unavailable right now.'}
@@ -1168,13 +1240,18 @@ function GuestSite() {
                     <Link className="gs-dish-media" to={dishTo}>
                       <DishPhoto src={photo} alt={item.name} placeholderLabel={item.name} />
                       {badge ? <span className={`gs-dish-badge ${badge.kind}`}>{badge.label}</span> : null}
-                      {soldOut ? <span className="gs-soldout-badge">Sold out today</span> : null}
-                      {!soldOut && item.stockStatus === 'low' ? (
+                      {soldOut ? <span className="gs-soldout-badge">Not available today</span> : null}
+                      {!soldOut && item.stockQty != null ? (
+                        <span className="gs-lowstock-badge">{Math.max(0, Math.floor(item.stockQty))} left</span>
+                      ) : !soldOut && item.stockStatus === 'low' ? (
                         <span className="gs-lowstock-badge">Low stock</span>
                       ) : null}
                     </Link>
                     <div className="gs-dish-body">
-                      <Link className="gs-dish-title" to={dishTo}>
+                      <Link
+                        className={`gs-dish-title${item.source === 'ury' ? ' is-pos' : ''}`}
+                        to={dishTo}
+                      >
                         {item.source === 'ury' ? null : (
                           <span
                             className={`gs-diet ${item.veg ? 'veg' : 'nonveg'}`}
@@ -1182,12 +1259,22 @@ function GuestSite() {
                             aria-label={item.veg ? 'Vegetarian' : 'Non-veg'}
                           />
                         )}
-                        <strong>{item.name}</strong>
+                        <strong title={item.name}>{item.name}</strong>
                         <b>{money(item.price)}</b>
                       </Link>
                       {item.source === 'ury' ? null : <p>{item.desc || 'Prepared fresh to order.'}</p>}
                       <div className="gs-dish-foot">
-                        {item.source === 'ury' ? <span /> : <span>~ {item.prepMinutes || 15} min</span>}
+                        {item.source === 'ury' ? (
+                          <span className={`gs-avail${soldOut ? ' is-out' : ' is-in'}`}>
+                            {soldOut
+                              ? 'Not available today'
+                              : item.stockQty != null
+                                ? `${Math.max(0, Math.floor(item.stockQty))} left`
+                                : 'Available'}
+                          </span>
+                        ) : (
+                          <span>~ {item.prepMinutes || 15} min</span>
+                        )}
                         {item.source === 'ury' ? (
                           uryOrdering ? (
                             <button
@@ -1195,8 +1282,9 @@ function GuestSite() {
                               className="gs-dish-add"
                               disabled={soldOut}
                               onClick={() => addToCart(item)}
+                              aria-label={soldOut ? `${item.name} unavailable` : `Add ${item.name}`}
                             >
-                              <em>+</em> Add
+                              {soldOut ? 'Sold out' : <><em>+</em> Add</>}
                             </button>
                           ) : null
                         ) : liveKeys.has('order') ? (
@@ -1248,7 +1336,9 @@ function GuestSite() {
                       <span className="gs-soft-pill">{selectedDish.category || 'Menu'}</span>
                     )}
                     {selectedDish.stockStatus === 'out' ? (
-                      <span className="gs-soft-pill warn">Sold out today</span>
+                      <span className="gs-soft-pill warn">Unavailable</span>
+                    ) : selectedDish.source === 'ury' ? (
+                      <span className="gs-soft-pill">Available</span>
                     ) : null}
                     {selectedDish.stockStatus === 'low' ? (
                       <span className="gs-soft-pill warn">Low stock</span>
@@ -1257,7 +1347,10 @@ function GuestSite() {
 
                   <h1>{selectedDish.name}</h1>
                   {selectedDish.source === 'ury' ? (
-                    <p className="gs-dish-desc">{money(selectedDish.price)} · price from the restaurant’s POS</p>
+                    <p className="gs-dish-desc">
+                      {money(selectedDish.price)} ·{' '}
+                      {selectedDish.stockStatus === 'out' ? 'unavailable in the POS' : 'available · price from the restaurant’s POS'}
+                    </p>
                   ) : (
                     <>
                       <p className="gs-dish-desc">
@@ -1352,7 +1445,22 @@ function GuestSite() {
         ) : null}
 
         {(activePage === 'order' || activePage === 'checkout') && uryMenuActive && uryOrdering ? (
-          <UryCheckout slug={slug} cart={cart} setCart={setCart} money={money} restaurantName={restaurantName} />
+          <UryCheckout
+            slug={slug}
+            cart={cart}
+            setCart={setCart}
+            money={money}
+            restaurantName={restaurantName}
+            table={uryTable}
+            onSelectTable={(picked) => {
+              setTableSession({ ...picked, id: picked.name, ury: true, dineIn: true, fromQr: false })
+              setServiceMode('dinein')
+            }}
+            onClearTable={() => {
+              setTableSession((prev) => (prev?.fromQr ? prev : null))
+              setServiceMode('takeaway')
+            }}
+          />
         ) : null}
 
         {activePage === 'order' && !(uryMenuActive && uryOrdering) ? (
@@ -1398,6 +1506,7 @@ function GuestSite() {
             slug={slug}
             lastOrder={lastOrder}
             restaurantAddress={fullAddress}
+            uryOrdering={uryOrdering}
           />
         ) : null}
 
@@ -1424,6 +1533,7 @@ function GuestSite() {
             restaurantName={restaurantName}
             checkout={checkout}
             lastOrder={lastOrder}
+            uryOrdering={uryOrdering}
             restaurantContact={{
               phone: brand.phone,
               email: brand.email,
@@ -1542,9 +1652,11 @@ function GuestSite() {
 
           <div className="gs-footer-col">
             <h4>Hours</h4>
-            {operatingHours.length > 0 ? (
+            {operatingHours.some((row) => row.closed || isOpenDay(row)) ? (
               <ul className="gs-footer-hours">
-                {operatingHours.map((row) => (
+                {operatingHours
+                  .filter((row) => row.closed || isOpenDay(row))
+                  .map((row) => (
                   <li key={row.day || row.open}>
                     <span>{row.day}</span>
                     <span>

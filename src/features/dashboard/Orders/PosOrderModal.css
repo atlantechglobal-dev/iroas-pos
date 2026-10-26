@@ -55,6 +55,39 @@
   font-size: 13px;
 }
 
+.pos-order-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  margin: 0 0 14px;
+  border-radius: 999px;
+  background: #f3f4f6;
+}
+
+.pos-order-mode-btn {
+  height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.pos-order-mode-btn.is-active {
+  background: #fff;
+  color: #16210a;
+  box-shadow: 0 1px 3px rgba(23, 23, 26, 0.12);
+}
+
+.pos-order-mode-btn:disabled:not(.is-active) {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .pos-order-error {
   margin: 0 0 14px;
   padding: 10px 12px;

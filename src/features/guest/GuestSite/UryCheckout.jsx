@@ -2,8 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '@/shared/api'
 import { guestSitePath } from '@/shared/utils/guestLinks'
+import { loadGuestAccount, saveGuestAccount } from '@/shared/utils/guestAccount'
+import UryTablePicker from './UryTablePicker.jsx'
 
 const LIVE_LABELS = {
+  draft: 'Draft in POS — with the kitchen (Take Away)',
+  unbilled: 'Unbilled in POS — ready for payment',
   open: 'Received by the restaurant — being prepared',
   unpaid: 'Ready for payment at the counter',
   paid: 'Paid',
@@ -43,6 +47,14 @@ function itemsKey(items) {
   return items.map((i) => `${i.code}x${i.qty}`).join(',')
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 /** Converts an API response or ApiError into `{ status, data, code, message }`. */
 function readResult(result) {
   if (result instanceof Error) {
@@ -63,15 +75,32 @@ function readResult(result) {
   return { status: data.status || 'verifying', data, code: data.code || '', message: data.message || '' }
 }
 
-export default function UryCheckout({ slug, cart, setCart, money, restaurantName }) {
+export default function UryCheckout({
+  slug,
+  cart,
+  setCart,
+  money,
+  restaurantName,
+  table = null,
+  onSelectTable,
+  onClearTable,
+}) {
   const uryCart = useMemo(() => cart.filter((line) => line.source === 'ury' && line.code), [cart])
   const otherLines = cart.length - uryCart.length
-  const [guestName, setGuestName] = useState('')
-  const [guestPhone, setGuestPhone] = useState('')
+  const savedAccount = loadGuestAccount(slug)
+  const [guestName, setGuestName] = useState(() => savedAccount?.name || '')
+  const [guestPhone, setGuestPhone] = useState(() => savedAccount?.phone || '')
   const [saved, setSaved] = useState(() => loadSaved(slug))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [billPanel, setBillPanel] = useState(null) // null | 'actions' | 'pay'
+  const tableLocked = Boolean(table?.fromQr)
+  const [service, setService] = useState(table?.fromQr || table?.dineIn ? 'dinein' : 'takeaway')
   const pollRef = useRef(null)
+
+  useEffect(() => {
+    if (table?.fromQr || table?.dineIn) setService('dinein')
+  }, [table?.fromQr, table?.dineIn, table?.name])
 
   const persist = useCallback(
     (next) => {
@@ -88,6 +117,13 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
         persist({ ...base, status: 'placed', order: r.data })
         setCart((prev) => prev.filter((line) => line.source !== 'ury'))
         setError('')
+        if (base.guestName && base.guestPhone) {
+          saveGuestAccount(slug, {
+            name: r.data?.customerName || base.guestName,
+            phone: base.guestPhone,
+            customerId: r.data?.customer || '',
+          })
+        }
         return
       }
       if (r.status === 'missing') {
@@ -121,7 +157,7 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
         setError(r.message || 'The restaurant could not accept this order. It was not placed.')
       }
     },
-    [persist, setCart],
+    [persist, setCart, slug],
   )
 
   const refresh = useCallback(async () => {
@@ -134,10 +170,12 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
     }
   }, [applyResult, slug])
 
-  const pending = Boolean(saved && PENDING.has(saved.status))
+  const pending = Boolean(saved && saved.channel !== 'dine' && PENDING.has(saved.status))
   const placed = saved?.status === 'placed'
+  const dineInOrder = service === 'dinein' && Boolean(table?.dineIn && table?.name && !table?.code)
 
   useEffect(() => {
+    if (saved?.channel === 'dine') return undefined
     if (!pending && !placed) return undefined
     const delay = pending ? Math.min(Math.max(saved.retryAfterSeconds || 5, 3), 15) * 1000 : 20000
     pollRef.current = setTimeout(refresh, delay)
@@ -153,14 +191,73 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
       setError('Please enter your name and a phone number so the restaurant can reach you.')
       return
     }
-    const key = itemsKey(items)
-    const reuse = saved && saved.itemsKey === key && saved.status !== 'placed'
+    if (service === 'dinein' && !table?.name) {
+      setError('Choose a free table for dine-in.')
+      return
+    }
+    if (dineInOrder) {
+      const base = {
+        channel: 'dine',
+        items,
+        guestName: guestName.trim(),
+        guestPhone: guestPhone.trim(),
+        tableName: table.name,
+      }
+      persist({ ...base, status: 'sending' })
+      setBusy(true)
+      try {
+        const result = await api.createPublicUryDineOrder(slug, {
+          table: table.name,
+          guestName: base.guestName,
+          guestPhone: base.guestPhone,
+          items,
+          pax: 1,
+        })
+        const data = result?.data || {}
+        persist({
+          ...base,
+          status: 'placed',
+          order: {
+            status: 'placed',
+            invoice: data.invoice,
+            table: data.table || table.name,
+            customer: data.customer,
+            customerName: data.customerName || base.guestName,
+            orderType: 'Dine In',
+            items: uryCart.map((line) => ({
+              code: line.code,
+              name: line.name,
+              qty: line.qty,
+              amount: line.price * line.qty,
+            })),
+            total: uryCart.reduce((sum, line) => sum + line.price * line.qty, 0),
+            live: { orderType: 'Dine In', table: data.table || table.name, state: 'unbilled' },
+          },
+        })
+        setCart((prev) => prev.filter((line) => line.source !== 'ury'))
+        saveGuestAccount(slug, {
+          name: data.customerName || base.guestName,
+          phone: base.guestPhone,
+          customerId: data.customer || '',
+        })
+        setError('')
+      } catch (err) {
+        persist(null)
+        setError(err?.message || 'The restaurant could not accept this dine-in order. It was not placed.')
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+    const key = `${table?.code || 'pickup'}|${itemsKey(items)}`
+    const reuse = saved && saved.channel !== 'dine' && saved.itemsKey === key && saved.status !== 'placed'
     const base = {
       submissionId: reuse ? saved.submissionId : newSubmissionId(),
       itemsKey: key,
       items,
       guestName: guestName.trim(),
       guestPhone: guestPhone.trim(),
+      ...(table?.code ? { tableCode: table.code } : {}),
     }
     persist({ ...base, status: 'sending' })
     setBusy(true)
@@ -177,9 +274,18 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
     if (!saved?.submissionId) return
     setBusy(true)
     setError('')
-    const { submissionId, items, guestName: name, guestPhone: phone } = saved
+    const { submissionId, items, guestName: name, guestPhone: phone, tableCode } = saved
     try {
-      applyResult(saved, await api.createPublicUryOrder(slug, { submissionId, items, guestName: name, guestPhone: phone }))
+      applyResult(
+        saved,
+        await api.createPublicUryOrder(slug, {
+          submissionId,
+          items,
+          guestName: name,
+          guestPhone: phone,
+          ...(tableCode ? { tableCode } : {}),
+        }),
+      )
     } catch (err) {
       applyResult(saved, err)
     } finally {
@@ -195,9 +301,112 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
     )
   }
 
+  const openBillPanel = () => {
+    setError('')
+    setBillPanel('actions')
+  }
+
+  const requestBill = async () => {
+    if (!saved?.submissionId) return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await api.requestPublicUryBill(slug, saved.submissionId)
+      const data = result?.data
+      if (data?.status === 'placed') {
+        persist({ ...saved, status: 'placed', order: data })
+        setError('')
+        setBillPanel('actions')
+      } else if (/not enabled/i.test(result?.error || '')) {
+        openBillPanel()
+      } else {
+        setError(result?.error || 'The restaurant could not prepare the bill.')
+      }
+    } catch (err) {
+      if (/not enabled/i.test(err?.message || '') || err?.code === 'bill_not_enabled') {
+        openBillPanel()
+      } else {
+        setError(err?.message || 'The restaurant could not prepare the bill. Please ask the staff.')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const printBill = () => {
+    setError('')
+    const order = saved?.order || {}
+    const live = order.live
+    const channel =
+      live?.orderType || (order.table || live?.table ? 'Dine In' : 'Take Away')
+    const ref = order.pickupCode || order.invoice || saved?.submissionId || ''
+    const total = live?.total ?? order.total
+    const lines = (order.items || [])
+      .map(
+        (it) =>
+          `<tr><td>${Number(it.qty) || 0}× ${escapeHtml(it.name || it.code || '')}</td><td style="text-align:right">${escapeHtml(money(it.amount))}</td></tr>`,
+      )
+      .join('')
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Bill ${escapeHtml(ref)}</title>
+<style>
+  body{font-family:Georgia,serif;padding:24px;color:#17171a;max-width:420px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px} .muted{color:#666;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:16px 0} td{padding:6px 0;border-bottom:1px solid #eee;font-size:14px}
+  .total{font-size:18px;font-weight:700;margin-top:12px}
+</style></head><body>
+  <h1>${escapeHtml(restaurantName || 'Bill')}</h1>
+  <p class="muted">${escapeHtml(channel)}${order.table || live?.table ? ` · Table ${escapeHtml(order.table || live?.table)}` : ''} · ${escapeHtml(ref)}</p>
+  ${order.customerName ? `<p class="muted">Customer: ${escapeHtml(order.customerName)}</p>` : ''}
+  <table>${lines}</table>
+  <p class="total">Total ${escapeHtml(money(total))}</p>
+  <p class="muted">Payment: ${escapeHtml(live?.state === 'paid' ? 'Paid' : 'Pay at the counter')}</p>
+</body></html>`
+    // Hidden iframe — no pop-up blocker
+    let iframe = document.getElementById('gs-bill-print-frame')
+    if (!iframe) {
+      iframe = document.createElement('iframe')
+      iframe.id = 'gs-bill-print-frame'
+      iframe.title = 'Print bill'
+      iframe.setAttribute('aria-hidden', 'true')
+      iframe.style.cssText =
+        'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none'
+      document.body.appendChild(iframe)
+    }
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    const win = iframe.contentWindow
+    if (!doc || !win) {
+      setError('Could not open the print dialog. Try again.')
+      return
+    }
+    doc.open()
+    doc.write(html)
+    doc.close()
+    const trigger = () => {
+      try {
+        win.focus()
+        win.print()
+      } catch {
+        setError('Could not open the print dialog. Try again.')
+      }
+    }
+    if (doc.readyState === 'complete') setTimeout(trigger, 50)
+    else iframe.onload = () => setTimeout(trigger, 50)
+  }
+
   if (placed) {
     const order = saved.order || {}
     const live = order.live
+    const channel =
+      live?.orderType ||
+      (order.table || live?.table ? 'Dine In' : 'Take Away')
+    const statusText = live
+      ? LIVE_LABELS[live.state] || live.posStatus || 'Received'
+      : 'Received'
+    const showBillActions =
+      billPanel === 'actions' || billPanel === 'pay' || live?.billed || live?.billReady
+    const showPayOptions = billPanel === 'pay'
+    const dineIn = channel === 'Dine In' || Boolean(order.table || live?.table)
+    const payAtCounter = live?.canPayAtCounter !== false
     return (
       <section className="gs-checkout-page" aria-live="polite">
         <h1>Order placed</h1>
@@ -205,9 +414,24 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
           <p>
             <strong>{restaurantName}</strong> received your order in its POS.
           </p>
+          {order.customerName || order.guestDetailsStoredInPos ? (
+            <p>
+              Customer in POS:{' '}
+              <strong>{order.customerName || 'Saved'}</strong>
+              {order.guestDetailsStoredInPos ? ' · linked to your phone' : ''}
+            </p>
+          ) : null}
           <p>
-            Pickup code: <strong>{order.pickupCode || order.invoice}</strong>
-            {order.invoice && order.pickupCode && order.pickupCode !== order.invoice ? ` · Ref ${order.invoice}` : ''}
+            {dineIn ? (
+              <>
+                Dine In · Table <strong>{order.table || live?.table}</strong>
+              </>
+            ) : (
+              <>
+                Take Away · Pickup code <strong>{order.pickupCode || order.invoice}</strong>
+              </>
+            )}
+            {order.invoice ? ` · Ref ${order.invoice}` : ''}
           </p>
           <ul className="gs-ury-lines">
             {(order.items || []).map((it) => (
@@ -219,19 +443,85 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
               </li>
             ))}
           </ul>
-          {order.total != null ? (
+          {(live?.total ?? order.total) != null ? (
             <p>
-              Total charged by the POS: <strong>{money(order.total)}</strong> · pay at the counter
+              Total charged by the POS: <strong>{money(live?.total ?? order.total)}</strong> ·{' '}
+              {dineIn ? 'pay when staff bring the bill' : 'pay at the counter'}
             </p>
           ) : null}
           <p className="gs-muted">
-            Status: {live ? LIVE_LABELS[live.state] || live.posStatus || 'Received' : 'Received'}
+            Payment status: <strong>{statusText}</strong>
+            {live?.billed ? ' · Bill requested' : ''}
+            {live?.posStatus ? ` · POS: ${live.posStatus}` : ''}
           </p>
+
+          {showBillActions ? (
+            <div className="gs-bill-actions" role="region" aria-label="Bill options">
+              <p className="gs-bill-actions-title">Print &amp; payment</p>
+              <p className="gs-muted">
+                {payAtCounter
+                  ? 'This restaurant uses pay at the counter. Print your bill, then staff take Cash / Card in the POS (same as the Payment screen).'
+                  : 'Print a copy for yourself, then pay at the restaurant POS.'}
+              </p>
+              <div className="gs-form-actions">
+                <button type="button" className="gs-btn primary" onClick={printBill}>
+                  Print bill
+                </button>
+                <button
+                  type="button"
+                  className="gs-btn primary"
+                  onClick={() => setBillPanel(showPayOptions ? 'actions' : 'pay')}
+                >
+                  {showPayOptions ? 'Hide payment' : 'Payment options'}
+                </button>
+              </div>
+              {showPayOptions ? (
+                <ul className="gs-pay-options">
+                  <li>
+                    <strong>{dineIn ? 'Pay at your table' : 'Pay at the counter'}</strong>
+                    <span className="gs-muted">
+                      {' '}
+                      — show code <strong>{order.pickupCode || order.invoice}</strong> and pay{' '}
+                      <strong>{money(live?.total ?? order.total)}</strong> (cash or card).
+                    </span>
+                  </li>
+                  <li>
+                    <strong>After you pay</strong>
+                    <span className="gs-muted"> — tap Refresh status, or </span>
+                    <Link
+                      className="gs-text-cta"
+                      to={`${guestSitePath(slug, 'tracking')}?code=${encodeURIComponent(order.invoice || '')}&phone=${encodeURIComponent(guestPhone || saved?.guestPhone || '')}`}
+                    >
+                      track payment
+                    </Link>
+                    <span className="gs-muted"> until it shows Paid.</span>
+                  </li>
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          {error ? (
+            <p className="gs-form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+
           <div className="gs-form-actions">
-            <button type="button" className="gs-btn" onClick={refresh}>
+            <button type="button" className="gs-btn" onClick={refresh} disabled={busy}>
               Refresh status
             </button>
-            <button type="button" className="gs-btn primary" onClick={() => persist(null)}>
+            {live?.canRequestBill ? (
+              <button type="button" className="gs-btn primary" onClick={requestBill} disabled={busy}>
+                {busy ? 'Requesting…' : 'Request bill'}
+              </button>
+            ) : null}
+            {!live?.canRequestBill && !showBillActions && live?.state !== 'paid' ? (
+              <button type="button" className="gs-btn primary" onClick={openBillPanel}>
+                Print &amp; payment
+              </button>
+            ) : null}
+            <button type="button" className="gs-btn" onClick={() => persist(null)}>
               Start a new order
             </button>
           </div>
@@ -268,17 +558,86 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
     )
   }
 
+  const estimate = uryCart.reduce((sum, line) => sum + line.price * line.qty, 0)
+  const accountLinked = Boolean(savedAccount?.customerId && savedAccount?.phone)
+
   return (
     <section className="gs-checkout-page">
-      <h1>Order for pickup</h1>
+      <div className="gs-checkout-hero">
+        <p className="gs-kicker">{service === 'dinein' ? 'Dine in' : 'Take away'} checkout</p>
+        <h1>{service === 'dinein' && table?.name ? `Checkout · Table ${table.name}` : 'Checkout'}</h1>
+        <p className="gs-muted">
+          {dineInOrder
+            ? `Your name and phone are saved as the customer on ${table.name}. The order is sent to the POS and the table shows as occupied.`
+            : 'Confirm your items and details. The order goes to the restaurant POS; you pay at the counter.'}
+        </p>
+        <ol className="gs-checkout-steps" aria-label="Checkout steps">
+          <li className="is-done">
+            <span className="gs-step-dot" aria-hidden="true">
+              1
+            </span>
+            Menu
+          </li>
+          <li className="is-active">
+            <span className="gs-step-dot" aria-hidden="true">
+              2
+            </span>
+            Checkout
+          </li>
+          <li>
+            <span className="gs-step-dot" aria-hidden="true">
+              3
+            </span>
+            In the kitchen
+          </li>
+        </ol>
+      </div>
+
+      {tableLocked ? null : (
+        <div className="gs-checkout-card">
+          <div className="gs-checkout-card-head">
+            <h2>Order type</h2>
+          </div>
+          <div className="gs-order-mode-cards is-two" role="radiogroup" aria-label="Dine in or take away">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={service === 'dinein'}
+              className={`gs-order-mode-card${service === 'dinein' ? ' is-active' : ''}`}
+              onClick={() => setService('dinein')}
+            >
+              <strong>Dine in</strong>
+              <span>Choose a table. The order occupies that table in the POS.</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={service === 'takeaway'}
+              className={`gs-order-mode-card${service === 'takeaway' ? ' is-active' : ''}`}
+              onClick={() => {
+                setService('takeaway')
+                onClearTable?.()
+              }}
+            >
+              <strong>Take away</strong>
+              <span>Pickup at the counter. No table is assigned.</span>
+            </button>
+          </div>
+          {service === 'dinein' ? (
+            <UryTablePicker slug={slug} selectedName={table?.name || ''} onSelect={(picked) => onSelectTable?.(picked)} />
+          ) : null}
+        </div>
+      )}
+
       {otherLines > 0 ? (
         <p className="gs-pos-note is-warning">
           {otherLines} item(s) in your cart are not on the live menu and will not be sent.
         </p>
       ) : null}
+
       {!uryCart.length ? (
-        <div className="gs-checkout-card">
-          <p className="gs-muted">Your cart is empty.</p>
+        <div className="gs-checkout-card gs-checkout-empty">
+          <p className="gs-muted">Your cart is empty. Add dishes from the menu, then come back to check out.</p>
           <Link className="gs-btn primary" to={guestSitePath(slug, 'menu')}>
             Browse menu
           </Link>
@@ -289,9 +648,63 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
           ) : null}
         </div>
       ) : (
-        <form className="gs-checkout-layout" onSubmit={submit}>
-          <div className="gs-checkout-card">
-            <h2>Your order</h2>
+        <form className="gs-checkout-layout is-checkout" onSubmit={submit}>
+          <div className="gs-checkout-main">
+            <div className="gs-checkout-card">
+              <div className="gs-checkout-card-head">
+                <h2>Contact</h2>
+                {accountLinked ? (
+                  <span className="gs-soft-pill">POS account</span>
+                ) : (
+                  <Link className="gs-text-cta" to={guestSitePath(slug, 'account')}>
+                    Open account
+                  </Link>
+                )}
+              </div>
+              <div className="gs-form-grid two">
+                <label>
+                  Full name
+                  <input
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    autoComplete="name"
+                    required
+                  />
+                </label>
+                <label>
+                  Phone
+                  <input
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    autoComplete="tel"
+                    inputMode="tel"
+                    placeholder="+91…"
+                    required
+                  />
+                </label>
+              </div>
+              <p className="gs-muted gs-checkout-hint">
+                Saved as the customer on your POS order so the kitchen and counter can find you. Use the same phone on
+                Account to track orders.
+              </p>
+            </div>
+
+            <div className="gs-checkout-card">
+              <div className="gs-checkout-card-head">
+                <h2>Payment</h2>
+              </div>
+              <p className="gs-pay-method">
+                <strong>{service === 'dinein' ? 'Pay at the table' : 'Pay at the counter'}</strong>
+                <span className="gs-muted">
+                  {' '}
+                  — cash or card in the restaurant POS after you place the order. No online card charge on this site.
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <aside className="gs-checkout-card gs-checkout-summary">
+            <h2>Order summary</h2>
             <ul className="gs-ury-lines">
               {uryCart.map((line) => (
                 <li key={line.lineKey}>
@@ -309,42 +722,31 @@ export default function UryCheckout({ slug, cart, setCart, money, restaurantName
                 </li>
               ))}
             </ul>
-            <p className="gs-muted">
-              Menu estimate: {money(uryCart.reduce((sum, line) => sum + line.price * line.qty, 0))}. The restaurant’s
-              POS sets the final price when it accepts the order. Payment is at the counter.
-            </p>
-          </div>
-          <div className="gs-checkout-card">
-            <h2>Your details</h2>
-            <div className="gs-form-grid two">
-              <label>
-                Full name
-                <input value={guestName} onChange={(e) => setGuestName(e.target.value)} autoComplete="name" required />
-              </label>
-              <label>
-                Phone
-                <input
-                  value={guestPhone}
-                  onChange={(e) => setGuestPhone(e.target.value)}
-                  autoComplete="tel"
-                  inputMode="tel"
-                  required
-                />
-              </label>
+            <div className="gs-checkout-total">
+              <span>Estimated total</span>
+              <strong>{money(estimate)}</strong>
             </div>
-            <p className="gs-muted">
-              Your name and phone are kept by IROAS so the restaurant can contact you; they are not yet stored in the
-              restaurant’s POS.
+            <p className="gs-muted gs-checkout-hint">
+              Final total is set by the POS when the kitchen accepts the order.
             </p>
             {error ? (
               <p className="gs-form-error" role="alert">
                 {error}
               </p>
             ) : null}
-            <button type="submit" className="gs-btn primary" disabled={busy}>
-              {busy ? 'Sending to the restaurant…' : 'Place pickup order'}
+            <button type="submit" className="gs-btn primary gs-wide" disabled={busy || (service === 'dinein' && !table?.name)}>
+              {busy
+                ? 'Sending to the restaurant…'
+                : service === 'dinein'
+                  ? table?.name
+                    ? `Send to kitchen · ${table.name}`
+                    : 'Choose a table'
+                  : 'Place takeaway order'}
             </button>
-          </div>
+            <Link className="gs-btn ghost gs-wide" to={guestSitePath(slug, 'menu')}>
+              Add more from menu
+            </Link>
+          </aside>
         </form>
       )}
     </section>

@@ -8,6 +8,7 @@ import {
   loadGuestOrderHistory,
   rememberGuestOrder,
 } from '@/shared/utils/guestOrderHistory'
+import { clearGuestAccount, loadGuestAccount, saveGuestAccount } from '@/shared/utils/guestAccount'
 
 function formatPrice(n) {
   return `₹${Math.round(Number(n) || 0)}`
@@ -80,6 +81,53 @@ function trackStepsForStatus(status) {
     label,
     state: i < idx ? 'done' : i === idx ? 'active' : 'pending',
   }))
+}
+
+/** Kitchen lane step → guest track strip status. */
+function statusFromKitchenStep(step) {
+  if (step === 'received') return 'new'
+  if (step === 'accepted') return 'accepted'
+  if (step === 'preparing') return 'preparing'
+  if (step === 'ready') return 'ready'
+  if (step === 'completed') return 'completed'
+  return 'new'
+}
+
+function mapUryTrackToGuestOrder(data) {
+  if (!data?.id) return null
+  const state = data.state || ''
+  const paid = state === 'paid'
+  const kitchenStep = data.kitchenStep || (paid ? 'completed' : 'received')
+  return {
+    publicCode: data.id,
+    id: data.id,
+    status: statusFromKitchenStep(kitchenStep),
+    kitchenStep,
+    kitchenLabel: data.kitchenLabel || '',
+    items: (data.items || []).map((it) => ({
+      id: it.id,
+      name: it.name,
+      qty: it.qty,
+      price: it.rate,
+      unitPrice: it.rate,
+      amount: it.amount,
+    })),
+    total: data.total,
+    subtotal: data.total,
+    paymentStatus: paid ? 'paid' : 'payment_pending',
+    paymentTiming: paid ? 'paid' : 'pay_later',
+    paymentMethod: paid ? 'pos' : 'pay_at_counter',
+    serviceMode: String(data.orderType || '').toLowerCase().includes('dine') ? 'dinein' : 'takeaway',
+    tableName: data.table || '',
+    phone: data.phone || '',
+    customer: data.customer || '',
+    posState: state,
+    posStatus: data.posStatus || '',
+    paymentLabel: data.paymentLabel || '',
+    currency: data.currency || null,
+    orderType: data.orderType || '',
+    fromPos: true,
+  }
 }
 
 function OrderSummaryCard({ cart, subtotal, deliveryFee, gst, total, serviceMode }) {
@@ -868,9 +916,10 @@ export function GuestPlacedPage({ slug, lastOrder }) {
   )
 }
 
-export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
+export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '', uryOrdering = false }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const hintPhone = guestPhoneHint(slug) || lastOrder?.phone || lastOrder?.checkout?.phone || ''
+  const hintPhone =
+    loadGuestAccount(slug)?.phone || guestPhoneHint(slug) || lastOrder?.phone || lastOrder?.checkout?.phone || ''
   const [lookupCode, setLookupCode] = useState(
     () => searchParams.get('code') || lastOrder?.publicCode || lastOrder?.id || '',
   )
@@ -881,24 +930,45 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [history, setHistory] = useState(() => loadGuestOrderHistory(slug))
+  const [posList, setPosList] = useState([])
 
   const activeCode = live?.publicCode || searchParams.get('code') || lastOrder?.publicCode || lastOrder?.id
-  const activePhone = lookupPhone || live?.phone || lastOrder?.phone || lastOrder?.checkout?.phone
+
+  const money = (n, currency) =>
+    currency ? `${currency} ${Number(n || 0).toFixed(2)}` : formatPrice(n)
+
+  const fetchLiveOrder = async (code, phone) => {
+    const cleanCode = String(code || '').trim()
+    const cleanPhone = String(phone || '').trim()
+    if (uryOrdering) {
+      const res = await api.trackPublicUryOrder(slug, { invoice: cleanCode, phone: cleanPhone })
+      const mapped = mapUryTrackToGuestOrder(res?.data)
+      if (!mapped) throw new Error('Order not found.')
+      return mapped
+    }
+    const { order } = await api.getPublicOrder(slug, cleanCode, { phone: cleanPhone || undefined })
+    return order
+  }
 
   const runLookup = async (code = lookupCode, phone = lookupPhone) => {
     const cleanCode = String(code || '').trim()
+    const cleanPhone = String(phone || '').trim()
     if (!cleanCode) {
-      setError('Enter your order number.')
+      setError(uryOrdering ? 'Enter your POS order number (e.g. UDT-SA-00005).' : 'Enter your order number.')
+      return
+    }
+    if (uryOrdering && cleanPhone.replace(/\D/g, '').length < 7) {
+      setError('Enter the phone number used at checkout.')
       return
     }
     setLoading(true)
     setError('')
     try {
-      const { order } = await api.getPublicOrder(slug, cleanCode, { phone: phone || undefined })
+      const order = await fetchLiveOrder(cleanCode, cleanPhone)
       setLive(order)
       rememberGuestOrder(slug, order)
       setHistory(loadGuestOrderHistory(slug))
-      setSearchParams({ code: order.publicCode, ...(phone ? { phone } : {}) })
+      setSearchParams({ code: order.publicCode, ...(cleanPhone ? { phone: cleanPhone } : {}) })
     } catch (err) {
       setLive(null)
       setError(err.message || 'Order not found.')
@@ -912,30 +982,50 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
     if (!code) return undefined
     let cancelled = false
     const phone = searchParams.get('phone') || hintPhone || lastOrder?.phone || lastOrder?.checkout?.phone
-    api
-      .getPublicOrder(slug, code, { phone: phone || undefined })
-      .then(({ order }) => {
-        if (cancelled) return
-        setLive(order)
-        rememberGuestOrder(slug, order)
-        setHistory(loadGuestOrderHistory(slug))
-      })
-      .catch(() => {})
-    const timer = setInterval(() => {
-      api
-        .getPublicOrder(slug, code, { phone: phone || undefined })
-        .then(({ order }) => {
-          if (!cancelled) setLive(order)
+    const refresh = () =>
+      fetchLiveOrder(code, phone)
+        .then((order) => {
+          if (cancelled) return
+          setLive(order)
+          rememberGuestOrder(slug, order)
+          setHistory(loadGuestOrderHistory(slug))
         })
         .catch(() => {})
-    }, 12000)
+    refresh()
+    const timer = setInterval(refresh, 12000)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [slug, searchParams, lastOrder, hintPhone])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchLiveOrder closes over uryOrdering/slug
+  }, [slug, searchParams, lastOrder, hintPhone, uryOrdering])
 
-  const order = live || (lastOrder?.publicCode || lastOrder?.id ? lastOrder : null)
+  useEffect(() => {
+    if (!uryOrdering) {
+      setPosList([])
+      return undefined
+    }
+    const phone = String(lookupPhone || hintPhone || '').trim()
+    if (phone.replace(/\D/g, '').length < 7) {
+      setPosList([])
+      return undefined
+    }
+    let cancelled = false
+    const customerId = loadGuestAccount(slug)?.customerId || ''
+    api
+      .getPublicUryAccount(slug, phone, { customerId })
+      .then((res) => {
+        if (!cancelled) setPosList(res?.data?.orders || [])
+      })
+      .catch(() => {
+        if (!cancelled) setPosList([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug, uryOrdering, lookupPhone, hintPhone])
+
+  const order = live || (lastOrder?.fromPos || lastOrder?.publicCode || lastOrder?.id ? lastOrder : null)
   const items = order?.items || []
   const total =
     order?.total ??
@@ -948,13 +1038,18 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
   const steps = trackStepsForStatus(order?.status || 'new')
   const payLater = order?.paymentTiming === 'pay_later'
   const unpaid = order?.paymentStatus === 'payment_pending'
+  const fromPos = Boolean(order?.fromPos || uryOrdering)
 
   return (
     <section className="gs-tracking-page">
       <div className="gs-tracking-hero">
         <p className="gs-kicker">Order tracking</p>
         <h1>Follow your order</h1>
-        <p className="gs-muted">Enter your order number and phone to see live kitchen status and your bill.</p>
+        <p className="gs-muted">
+          {uryOrdering
+            ? 'Enter the POS order number from your confirmation (e.g. UDT-SA-00005) and the phone used at checkout.'
+            : 'Enter your order number and phone to see live kitchen status and your bill.'}
+        </p>
       </div>
 
       <form
@@ -969,8 +1064,10 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
           <input
             value={lookupCode}
             onChange={(e) => setLookupCode(e.target.value)}
-            placeholder="e.g. 10428"
-            inputMode="numeric"
+            placeholder={uryOrdering ? 'e.g. UDT-SA-00005' : 'e.g. 10428'}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
           />
         </label>
         <label>
@@ -979,6 +1076,8 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
             value={lookupPhone}
             onChange={(e) => setLookupPhone(e.target.value)}
             placeholder="Phone used at checkout"
+            inputMode="tel"
+            autoComplete="tel"
           />
         </label>
         <button type="submit" className="gs-btn primary" disabled={loading}>
@@ -990,14 +1089,20 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
       {order ? (
         <div className="gs-tracking-layout">
           <div>
-            <h2>Order #{order.publicCode || activeCode}</h2>
+            <h2>{fromPos ? order.publicCode || activeCode : `Order #${order.publicCode || activeCode}`}</h2>
             <p className="gs-muted">
-              {payLater && unpaid
-                ? 'Pay later · bill open'
-                : unpaid
-                  ? 'Payment pending staff confirmation'
-                  : 'Payment confirmed'}{' '}
-              · ETA ~{order.etaMinutes || 25} min
+              {fromPos
+                ? `Kitchen: ${order.kitchenLabel || 'Received'} · Payment: ${
+                    order.paymentLabel || (unpaid ? 'Unpaid' : 'Paid')
+                  }${order.orderType || order.serviceMode ? ` · ${order.orderType || order.serviceMode}` : ''}${
+                    order.tableName ? ` · ${order.tableName}` : ''
+                  }`
+                : payLater && unpaid
+                  ? 'Pay later · bill open'
+                  : unpaid
+                    ? 'Payment pending staff confirmation'
+                    : 'Payment confirmed'}
+              {!fromPos ? ` · ETA ~${order.etaMinutes || 25} min` : ''}
             </p>
 
             <TrackStrip steps={steps} />
@@ -1011,12 +1116,17 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
                       <span>
                         {item.qty}× {item.name}
                       </span>
-                      <b>{formatPrice((item.price || item.unitPrice || 0) * item.qty)}</b>
+                      <b>
+                        {money(
+                          item.amount ?? (item.price || item.unitPrice || 0) * item.qty,
+                          order.currency,
+                        )}
+                      </b>
                     </li>
                   ))
                 ) : (
                   <li>
-                    <span>No line items</span>
+                    <span>{fromPos ? 'Open in POS — line items load when tracked' : 'No line items'}</span>
                     <b>—</b>
                   </li>
                 )}
@@ -1024,27 +1134,31 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
               <div className="gs-summary-break">
                 <div>
                   <span>Subtotal</span>
-                  <b>{formatPrice(order.subtotal ?? total)}</b>
+                  <b>{money(order.subtotal ?? total, order.currency)}</b>
                 </div>
                 {order.tax ? (
                   <div>
                     <span>Tax</span>
-                    <b>{formatPrice(order.tax)}</b>
+                    <b>{money(order.tax, order.currency)}</b>
                   </div>
                 ) : null}
                 {order.fees ? (
                   <div>
                     <span>Fees</span>
-                    <b>{formatPrice(order.fees)}</b>
+                    <b>{money(order.fees, order.currency)}</b>
                   </div>
                 ) : null}
               </div>
               <div className="gs-summary-total">
                 <span>Total</span>
-                <strong>{formatPrice(total)}</strong>
+                <strong>{money(total, order.currency)}</strong>
               </div>
               {payLater && unpaid ? (
-                <p className="gs-bill-note">Ask staff for the bill when you are ready to pay.</p>
+                <p className="gs-bill-note">
+                  {fromPos
+                    ? 'Pay at the counter, or ask staff to settle this bill in the POS.'
+                    : 'Ask staff for the bill when you are ready to pay.'}
+                </p>
               ) : null}
             </div>
           </div>
@@ -1055,17 +1169,27 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
               <strong>Service</strong>
               <br />
               {order.serviceMode === 'dinein'
-                ? `Table${order.tableName ? ` · ${order.tableName}` : ''}`
+                ? `Dine In${order.tableName ? ` · ${order.tableName}` : ''}`
                 : order.serviceMode === 'delivery'
                   ? 'Delivery'
-                  : 'Takeaway'}
+                  : order.orderType || 'Takeaway'}
             </p>
             <p>
               <strong>Payment</strong>
               <br />
-              {payLater ? 'Pay later' : (order.paymentMethod || 'cash').toUpperCase()}
-              {unpaid ? ' · unpaid' : ' · paid'}
+              {fromPos
+                ? `${order.paymentLabel || (unpaid ? 'Unpaid' : 'Paid')} · POS ${order.posStatus || order.posState || ''}`
+                : `${payLater ? 'Pay later' : (order.paymentMethod || 'cash').toUpperCase()}${
+                    unpaid ? ' · unpaid' : ' · paid'
+                  }`}
             </p>
+            {order.customer ? (
+              <p>
+                <strong>Customer in POS</strong>
+                <br />
+                {order.customer}
+              </p>
+            ) : null}
             <p>
               <strong>Address</strong>
               <br />
@@ -1075,13 +1199,17 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
               Back to menu
             </Link>
             <Link className="gs-btn primary" to={guestSitePath(slug, 'account')}>
-              Order history
+              All orders
             </Link>
           </aside>
         </div>
       ) : (
         <div className="gs-track-empty">
-          <p className="gs-muted">No live order yet. Place an order or look one up above.</p>
+          <p className="gs-muted">
+            {uryOrdering
+              ? 'No live order yet. Use the pickup code from “Order placed”, or open All orders on Account.'
+              : 'No live order yet. Place an order or look one up above.'}
+          </p>
           <div className="gs-placed-actions">
             <Link className="gs-btn primary" to={guestSitePath(slug, 'order')}>
               Start ordering
@@ -1090,7 +1218,34 @@ export function GuestTrackingPage({ slug, lastOrder, restaurantAddress = '' }) {
         </div>
       )}
 
-      {history.length ? (
+      {uryOrdering && posList.length ? (
+        <div className="gs-recent-orders">
+          <h3>Your website orders</h3>
+          <ul>
+            {posList.slice(0, 12).map((h) => (
+              <li key={h.id}>
+                <button
+                  type="button"
+                  className="gs-history-row"
+                  onClick={() => {
+                    setLookupCode(h.id)
+                    runLookup(h.id, lookupPhone || hintPhone)
+                  }}
+                >
+                  <strong>{h.id}</strong>
+                  <span>
+                    {h.orderType || 'order'}
+                    {h.table ? ` · ${h.table}` : ''} · {h.paymentLabel || h.posStatus}
+                    {h.total != null ? ` · ${money(h.total, h.currency)}` : ''}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {!uryOrdering && history.length ? (
         <div className="gs-recent-orders">
           <h3>Recent on this device</h3>
           <ul>
@@ -1128,14 +1283,34 @@ export function GuestAccountPage({
   favorites = [],
   photoFor,
   restaurantContact = {},
+  uryOrdering = false,
 }) {
   const [tab, setTab] = useState('orders')
+  const [account, setAccount] = useState(() => loadGuestAccount(slug))
+  const [formName, setFormName] = useState(() => loadGuestAccount(slug)?.name || checkout?.name || '')
+  const [formPhone, setFormPhone] = useState(
+    () => loadGuestAccount(slug)?.phone || checkout?.phone || guestPhoneHint(slug) || '',
+  )
+  const [accountBusy, setAccountBusy] = useState(false)
   const [historyPhone, setHistoryPhone] = useState(
-    () => checkout?.phone || guestPhoneHint(slug) || '',
+    () => loadGuestAccount(slug)?.phone || checkout?.phone || guestPhoneHint(slug) || '',
   )
   const [remoteOrders, setRemoteOrders] = useState([])
+  const [uryOrders, setUryOrders] = useState([])
   const [localHistory, setLocalHistory] = useState(() => loadGuestOrderHistory(slug))
   const [historyError, setHistoryError] = useState('')
+  const [uryCustomerName, setUryCustomerName] = useState(() => loadGuestAccount(slug)?.name || '')
+
+  useEffect(() => {
+    const saved = loadGuestAccount(slug)
+    setAccount(saved)
+    if (saved?.phone) {
+      setHistoryPhone(saved.phone)
+      setFormPhone(saved.phone)
+      setFormName(saved.name || '')
+      setUryCustomerName(saved.name || '')
+    }
+  }, [slug])
 
   useEffect(() => {
     setLocalHistory(loadGuestOrderHistory(slug))
@@ -1143,35 +1318,126 @@ export function GuestAccountPage({
 
   useEffect(() => {
     const phone = String(historyPhone || '').trim()
-    if (phone.replace(/\D/g, '').length < 8) {
+    if (phone.replace(/\D/g, '').length < 7) {
       setRemoteOrders([])
+      setUryOrders([])
       return undefined
     }
     let cancelled = false
+    if (uryOrdering) {
+      const customerId = account?.customerId || loadGuestAccount(slug)?.customerId || ''
+      api
+        .getPublicUryAccount(slug, phone, { customerId })
+        .then((res) => {
+          if (cancelled) return
+          const rows = res?.data?.orders || []
+          const cust = res?.data?.customer
+          const savedId = account?.customerId || loadGuestAccount(slug)?.customerId || ''
+          if (savedId && cust?.id && cust.id !== savedId) {
+            setUryOrders([])
+            setHistoryError('')
+            return
+          }
+          setUryOrders(rows)
+          if (cust?.name && (!savedId || cust.id === savedId)) {
+            setUryCustomerName(cust.name)
+            if (account?.phone === phone || !account) {
+              const next = saveGuestAccount(slug, {
+                name: cust.name,
+                phone: cust.phone || phone,
+                customerId: cust.id,
+              })
+              setAccount(next)
+            }
+          }
+          setHistoryError('')
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setUryOrders([])
+            setHistoryError(err.message || 'Unable to load POS orders.')
+          }
+        })
+    } else {
+      setUryOrders([])
+    }
     api
       .getPublicOrderHistory(slug, phone)
       .then(({ orders }) => {
         if (!cancelled) {
           setRemoteOrders(orders || [])
-          setHistoryError('')
+          if (!uryOrdering) setHistoryError('')
         }
       })
       .catch((err) => {
-        if (!cancelled) setHistoryError(err.message || 'Unable to load history.')
+        if (!cancelled && !uryOrdering) setHistoryError(err.message || 'Unable to load history.')
       })
     return () => {
       cancelled = true
     }
-  }, [slug, historyPhone])
+  }, [slug, historyPhone, uryOrdering, account?.phone])
+
+  const openAccount = async (event) => {
+    event?.preventDefault?.()
+    if (!uryOrdering) return
+    setAccountBusy(true)
+    setHistoryError('')
+    try {
+      const phone = formPhone.trim()
+      const name = formName.trim()
+      if (!name) {
+        setHistoryError('Enter your name (same as the Customer name in the POS is fine).')
+        return
+      }
+      if (phone.replace(/\D/g, '').length < 7) {
+        setHistoryError('Enter the Mobile Number saved on your POS customer (e.g. +918317274115).')
+        return
+      }
+      // findOrCreate: opens an existing URY Customer when the phone matches, otherwise creates one
+      const res = await api.createPublicUryAccount(slug, { name, phone })
+      const customer = res?.data?.customer
+      const orders = res?.data?.orders || []
+      if (!customer?.id) {
+        setHistoryError('Could not open your POS account. Please try again.')
+        return
+      }
+      const next = saveGuestAccount(slug, {
+        name: customer.name || name,
+        phone: customer.phone || phone,
+        customerId: customer.id,
+      })
+      setAccount(next)
+      setUryCustomerName(next.name)
+      setHistoryPhone(next.phone)
+      setFormPhone(next.phone)
+      setUryOrders(orders)
+      setTab('orders')
+    } catch (err) {
+      setHistoryError(err?.message || 'Could not open your POS account.')
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
+  const signOutAccount = () => {
+    clearGuestAccount(slug)
+    setAccount(null)
+    setUryCustomerName('')
+    setUryOrders([])
+    setHistoryPhone('')
+    setFormName('')
+    setFormPhone('')
+  }
 
   const profile = {
-    name: checkout?.name || 'Guest',
+    name: account?.name || checkout?.name || uryCustomerName || 'Guest',
     email: checkout?.email || restaurantContact.email || '',
-    phone: checkout?.phone || historyPhone || restaurantContact.phone || '',
+    phone: account?.phone || checkout?.phone || historyPhone || '',
     address:
       [checkout?.street, checkout?.city, checkout?.pincode].filter(Boolean).join(', ') ||
       restaurantContact.address ||
       '',
+    customerId: account?.customerId || '',
   }
   const initials = profile.name
     .split(/\s+/)
@@ -1179,8 +1445,34 @@ export function GuestAccountPage({
     .join('')
     .slice(0, 2)
     .toUpperCase()
+  const signedIn = Boolean(uryOrdering && account?.phone && account?.customerId)
 
   const orders = useMemo(() => {
+    if (uryOrdering) {
+      const wantId = String(account?.customerId || '').trim()
+      const wantName = String(uryCustomerName || account?.name || '').trim().toLowerCase()
+      return uryOrders
+        .filter((o) => {
+          const gotId = String(o.customerId || '').trim()
+          const gotName = String(o.customer || '').trim().toLowerCase()
+          if (wantId && gotId) return gotId === wantId
+          if (wantName && gotName) return gotName === wantName
+          return false
+        })
+        .map((o) => ({
+          id: o.id,
+          when: o.postedAt ? String(o.postedAt).slice(0, 16) : '',
+          status: o.paymentLabel || o.posStatus || o.state,
+          total: o.total,
+          live: o.state === 'draft' || o.state === 'unbilled',
+          serviceMode: o.orderType || '',
+          tableName: o.table || '',
+          paymentTiming: o.state === 'paid' ? 'paid' : 'pay_later',
+          paymentStatus: o.state === 'paid' ? 'paid' : 'payment_pending',
+          currency: o.currency,
+          fromPos: true,
+        }))
+    }
     if (remoteOrders.length) {
       return remoteOrders.map((o) => ({
         id: o.publicCode,
@@ -1205,7 +1497,7 @@ export function GuestAccountPage({
       paymentTiming: o.paymentTiming,
       paymentStatus: o.paymentStatus,
     }))
-  }, [remoteOrders, localHistory])
+  }, [uryOrdering, uryOrders, remoteOrders, localHistory, account?.customerId, account?.name, uryCustomerName])
 
   const notifications = useMemo(() => {
     const notes = []
@@ -1231,23 +1523,74 @@ export function GuestAccountPage({
     <section className="gs-account-page">
       <div className="gs-account-hero">
         <span className="gs-account-av" aria-hidden="true">
-          {initials || 'AR'}
+          {initials || 'G'}
         </span>
         <div>
-          <h1>{profile.name}</h1>
+          <h1>{signedIn ? profile.name : 'Your account'}</h1>
           <p className="gs-muted">
-            {orders.length} order{orders.length === 1 ? '' : 's'} on file
+            {signedIn
+              ? `${orders.length} order${orders.length === 1 ? '' : 's'} · linked to ${restaurantName} POS`
+              : uryOrdering
+                ? 'Create a customer account to order takeaway or dine-in and track Paid / Unpaid in the POS.'
+                : `${orders.length} order${orders.length === 1 ? '' : 's'} on file`}
           </p>
         </div>
       </div>
 
+      {uryOrdering && !signedIn ? (
+        <form className="gs-account-card gs-account-signin" onSubmit={openAccount}>
+          <p className="gs-muted">
+            Enter your name and the <strong>Mobile Number</strong> on your URY Customer. If that
+            phone already exists we open it; otherwise we create a new POS customer.
+          </p>
+          <div className="gs-form-grid two">
+            <label>
+              Full name
+              <input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                autoComplete="name"
+                required
+              />
+            </label>
+            <label>
+              Phone
+              <input
+                value={formPhone}
+                onChange={(e) => setFormPhone(e.target.value)}
+                autoComplete="tel"
+                inputMode="tel"
+                placeholder="+918317274115"
+                required
+              />
+            </label>
+          </div>
+          {historyError ? (
+            <p className="gs-form-error" role="alert">
+              {historyError}
+            </p>
+          ) : null}
+          <button type="submit" className="gs-btn primary" disabled={accountBusy}>
+            {accountBusy ? 'Opening…' : 'Open POS account'}
+          </button>
+        </form>
+      ) : null}
+
       <div className="gs-account-order-actions">
-        <Link className="gs-btn primary" to={guestSitePath(slug, 'order')}>
-          Order at table / takeaway
+        <Link className="gs-btn primary" to={guestSitePath(slug, 'menu')}>
+          Order takeaway
+        </Link>
+        <Link className="gs-btn ghost" to={guestSitePath(slug, 'order')}>
+          {uryOrdering ? 'View cart / checkout' : 'Order at table / takeaway'}
         </Link>
         <Link className="gs-btn ghost" to={guestSitePath(slug, 'tracking')}>
           Track an order
         </Link>
+        {signedIn ? (
+          <button type="button" className="gs-btn ghost" onClick={signOutAccount}>
+            Sign out
+          </button>
+        ) : null}
       </div>
 
       <div className="gs-account-tabs" role="tablist" aria-label="Account sections">
@@ -1268,64 +1611,99 @@ export function GuestAccountPage({
 
       {tab === 'profile' ? (
         <div className="gs-account-card gs-profile-grid">
-          <div>
-            <span className="gs-side-label">Name</span>
-            <strong>{profile.name}</strong>
-            <span className="gs-side-label">Email</span>
-            <strong>{profile.email || '—'}</strong>
-          </div>
-          <div>
-            <span className="gs-side-label">Phone</span>
-            <strong>{profile.phone || '—'}</strong>
-            <span className="gs-side-label">Default address</span>
-            <strong>{profile.address || 'Add an address at checkout.'}</strong>
-          </div>
-          <p className="gs-fine gs-profile-hint">
-            Guest details come from your latest checkout
-            {restaurantContact.phone || restaurantContact.email || restaurantContact.address
-              ? '; restaurant contact is shown until then.'
-              : '.'}
-          </p>
+          {uryOrdering && !signedIn ? (
+            <p className="gs-muted">Open your POS account above to see your profile here.</p>
+          ) : (
+            <>
+              <div>
+                <span className="gs-side-label">Name</span>
+                <strong>{profile.name}</strong>
+                <span className="gs-side-label">Email</span>
+                <strong>{profile.email || '—'}</strong>
+              </div>
+              <div>
+                <span className="gs-side-label">Phone</span>
+                <strong>{profile.phone || '—'}</strong>
+                <span className="gs-side-label">{uryOrdering ? 'POS customer' : 'Default address'}</span>
+                <strong>
+                  {uryOrdering
+                    ? profile.customerId || profile.name
+                    : profile.address || 'Add an address at checkout.'}
+                </strong>
+              </div>
+              <p className="gs-fine gs-profile-hint">
+                {uryOrdering
+                  ? 'This account is the customer record in the restaurant POS. Orders you place with this phone attach to it.'
+                  : 'Guest details come from your latest checkout.'}
+              </p>
+            </>
+          )}
         </div>
       ) : null}
 
       {tab === 'orders' ? (
         <div className="gs-order-history">
-          <label className="gs-history-phone">
-            Lookup by phone
-            <input
-              value={historyPhone}
-              onChange={(e) => setHistoryPhone(e.target.value)}
-              placeholder="Phone used on orders"
-            />
-          </label>
-          {historyError ? <p className="gs-form-error">{historyError}</p> : null}
+          {uryOrdering && (signedIn || historyPhone) ? (
+            <p className="gs-muted">
+              {signedIn
+                ? <>Orders placed from this website account for <strong>{profile.name || profile.phone}</strong> (Draft / Unbilled / Paid).</>
+                : 'Open your POS account to see only orders placed from this website.'}
+            </p>
+          ) : null}
+          {uryOrdering && !signedIn ? (
+            <p className="gs-muted">Or create an account above so orders stay linked to your POS customer.</p>
+          ) : null}
+          {!signedIn ? (
+            <label className="gs-history-phone">
+              Lookup by phone
+              <input
+                value={historyPhone}
+                onChange={(e) => setHistoryPhone(e.target.value)}
+                placeholder="Phone used on orders"
+                inputMode="tel"
+                autoComplete="tel"
+              />
+            </label>
+          ) : null}
+          {historyError && signedIn ? (
+            <p className="gs-form-error" role="alert">
+              {historyError}
+            </p>
+          ) : null}
           <div className="gs-order-list">
             {orders.length === 0 ? (
-              <p className="gs-muted">No orders yet. Start a table or takeaway order.</p>
+              <p className="gs-muted">
+                {uryOrdering
+                  ? signedIn
+                    ? 'No website orders for this account yet. Place a takeaway or scan a table QR.'
+                    : 'Open your POS account above to load your orders.'
+                  : 'No orders yet. Start a table or takeaway order.'}
+              </p>
             ) : null}
             {orders.map((o) => (
               <article key={o.id} className="gs-order-row">
                 <div>
-                  <strong>Order #{o.id}</strong>
+                  <strong>{o.fromPos ? o.id : `Order #${o.id}`}</strong>
                   <p>
                     {o.when}
                     {o.serviceMode ? ` · ${o.serviceMode}` : ''}
                     {o.tableName ? ` · ${o.tableName}` : ''} · {o.status}
                     {o.paymentTiming === 'pay_later' && o.paymentStatus === 'payment_pending'
-                      ? ' · pay later'
+                      ? ' · unpaid'
                       : ''}
                   </p>
                 </div>
                 <div className="gs-order-row-side">
-                  <b>{formatPrice(o.total)}</b>
+                  <b>{o.currency ? `${o.currency} ${Number(o.total || 0).toFixed(2)}` : formatPrice(o.total)}</b>
                   <Link
                     className="gs-text-cta"
                     to={`${guestSitePath(slug, 'tracking')}?code=${encodeURIComponent(o.id)}${
-                      historyPhone ? `&phone=${encodeURIComponent(historyPhone)}` : ''
+                      (profile.phone || historyPhone)
+                        ? `&phone=${encodeURIComponent(profile.phone || historyPhone)}`
+                        : ''
                     }`}
                   >
-                    Track / bill
+                    {o.fromPos ? 'Track status' : 'Track / bill'}
                   </Link>
                 </div>
               </article>
@@ -1384,18 +1762,20 @@ export function GuestBookPage({
   submitBooking,
   restaurantPhone = '',
 }) {
+  const account = useMemo(() => loadGuestAccount(slug), [slug])
   const dateChips = useMemo(() => {
     const chips = []
     const start = new Date()
-    for (let i = 0; i < 7; i += 1) {
+    for (let i = 0; i < 10; i += 1) {
       const d = new Date(start)
       d.setDate(start.getDate() + i)
       const iso = localDateIso(d)
       chips.push({
         iso,
-        dow: d.toLocaleDateString('en-IN', { weekday: 'short' }).toUpperCase(),
+        dow: d.toLocaleDateString('en-IN', { weekday: 'short' }),
         day: d.getDate(),
         mon: d.toLocaleDateString('en-IN', { month: 'short' }),
+        today: i === 0,
       })
     }
     return chips
@@ -1406,11 +1786,48 @@ export function GuestBookPage({
     setBooking((b) => (b.date ? b : { ...b, date: dateChips[0].iso }))
   }, [booking.date, dateChips, setBooking])
 
-  const step = !booking.date
-    ? 1
-    : !booking.time
-      ? 2
-      : 3
+  useEffect(() => {
+    if (!account) return
+    setBooking((b) => {
+      const name = b.name || account.name || ''
+      const phone = b.phone || account.phone || ''
+      if (name === b.name && phone === b.phone) return b
+      return { ...b, name, phone }
+    })
+  }, [account, setBooking])
+
+  const [uiStep, setUiStep] = useState(1)
+  const selectedDateLabel = useMemo(() => {
+    if (!booking.date) return 'Choose a date'
+    try {
+      return new Date(`${booking.date}T12:00:00`).toLocaleDateString('en-IN', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      })
+    } catch {
+      return booking.date
+    }
+  }, [booking.date])
+
+  useEffect(() => {
+    if (uiStep >= 3 && !booking.time) setUiStep(2)
+    else if (uiStep >= 2 && !booking.date) setUiStep(1)
+  }, [booking.date, booking.time, uiStep])
+
+  const slotLabel = (slot) => {
+    if (slot.full) return 'Full'
+    const left = Number(slot.remainingCovers)
+    if (!Number.isFinite(left)) return 'Open'
+    if (left <= 4) return `${left} left`
+    return 'Available'
+  }
+
+  const goStep = (n) => {
+    if (n === 2 && !booking.date) return
+    if (n === 3 && (!booking.date || !booking.time)) return
+    setUiStep(n)
+  }
 
   if (booked) {
     const dateLabel = (() => {
@@ -1434,11 +1851,11 @@ export function GuestBookPage({
           <div className="gs-book-confirm-ico" aria-hidden="true">
             {pending ? '…' : '✓'}
           </div>
-          <h1>{pending ? 'Request received.' : 'Table confirmed.'}</h1>
+          <h1>{pending ? 'Request received' : 'Table confirmed'}</h1>
           <p className="gs-muted">
             {reservationId ? `Reservation #${reservationId} · ` : ''}
             {dateLabel} at {booked.time} for {booked.guests} guests
-            {pending ? ' · Pending confirmation' : ''}
+            {pending ? ' · Awaiting confirmation' : ''}
           </p>
           <div className="gs-book-confirm-card">
             <div>
@@ -1465,9 +1882,7 @@ export function GuestBookPage({
                 : booked.email
                   ? 'A confirmation is on its way to your inbox.'
                   : 'You’re all set.'}
-              {restaurantPhone
-                ? ` Questions? Call ${restaurantPhone}.`
-                : ''}
+              {restaurantPhone ? ` Questions? Call ${restaurantPhone}.` : ''}
             </p>
           </div>
           <div className="gs-placed-actions">
@@ -1491,160 +1906,272 @@ export function GuestBookPage({
   }
 
   return (
-    <section className="gs-book-page">
-      <div className="gs-book-hero">
-        <p className="gs-kicker">Reservations</p>
-        <h1>Book a table.</h1>
-        <p>Pick a date and party size (up to 12 guests), then choose an open slot.</p>
-        <ol className="gs-book-steps" aria-label="Booking steps">
-          <li className={step > 1 ? 'is-done' : step === 1 ? 'is-active' : ''}>Date &amp; party</li>
-          <li className={step > 2 ? 'is-done' : step === 2 ? 'is-active' : ''}>Time</li>
-          <li className={step >= 3 ? 'is-done' : ''}>Details</li>
-        </ol>
-      </div>
-
-      <form className="gs-book-card" onSubmit={submitBooking}>
-        {bookError ? (
-          <p className="gs-form-error">
-            {bookError}
-            {restaurantPhone ? ` Call ${restaurantPhone} if you need help.` : ''}
+    <section className="gs-book-page is-pro">
+      <div className="gs-book-shell">
+        <header className="gs-book-hero">
+          <p className="gs-kicker">Reservations</p>
+          <h1>Book a table</h1>
+          <p className="gs-muted">
+            Reserve at <strong>{restaurantName}</strong>. Pick a date, choose a time, then leave your details.
           </p>
-        ) : null}
+        </header>
 
-        <div className="gs-book-field">
-          <span className="gs-book-label">1. Date</span>
-          <div className="gs-date-chips">
-            {dateChips.map((chip) => (
-              <button
-                key={chip.iso}
-                type="button"
-                className={`gs-date-chip${booking.date === chip.iso ? ' is-selected' : ''}`}
-                onClick={() => setBooking((b) => ({ ...b, date: chip.iso, time: '' }))}
-              >
-                <em>{chip.dow}</em>
-                <strong>{chip.day}</strong>
-                <span>{chip.mon}</span>
-              </button>
-            ))}
+        <ol className="gs-book-steps" aria-label="Booking steps">
+          <li className={uiStep === 1 ? 'is-active' : uiStep > 1 ? 'is-done' : ''}>
+            <button type="button" className="gs-book-step-btn" onClick={() => goStep(1)}>
+              <span className="gs-book-step-num" aria-hidden="true">
+                1
+              </span>
+              When
+            </button>
+          </li>
+          <li className={uiStep === 2 ? 'is-active' : uiStep > 2 ? 'is-done' : ''}>
+            <button
+              type="button"
+              className="gs-book-step-btn"
+              onClick={() => goStep(2)}
+              disabled={!booking.date}
+            >
+              <span className="gs-book-step-num" aria-hidden="true">
+                2
+              </span>
+              Time
+            </button>
+          </li>
+          <li className={uiStep === 3 ? 'is-active' : ''}>
+            <button
+              type="button"
+              className="gs-book-step-btn"
+              onClick={() => goStep(3)}
+              disabled={!booking.date || !booking.time}
+            >
+              <span className="gs-book-step-num" aria-hidden="true">
+                3
+              </span>
+              Details
+            </button>
+          </li>
+        </ol>
+
+        <div className="gs-book-summary-bar" aria-label="Booking summary">
+          <div>
+            <span>Date</span>
+            <strong>{booking.date ? selectedDateLabel : '—'}</strong>
+          </div>
+          <div>
+            <span>Time</span>
+            <strong>{booking.time || '—'}</strong>
+          </div>
+          <div>
+            <span>Party</span>
+            <strong>
+              {booking.guests} guest{Number(booking.guests) === 1 ? '' : 's'}
+            </strong>
           </div>
         </div>
 
-        <div className="gs-book-field">
-          <span className="gs-book-label">2. Party size</span>
-          <div className="gs-qty book">
-            <button
-              type="button"
-              aria-label="Fewer guests"
-              onClick={() =>
-                setBooking((b) => ({
-                  ...b,
-                  guests: String(Math.max(1, Number(b.guests) - 1)),
-                  time: '',
-                }))
-              }
-            >
-              −
-            </button>
-            <strong>{booking.guests}</strong>
-            <button
-              type="button"
-              aria-label="More guests"
-              onClick={() =>
-                setBooking((b) => ({
-                  ...b,
-                  guests: String(Math.min(12, Number(b.guests) + 1)),
-                  time: '',
-                }))
-              }
-            >
-              +
-            </button>
-          </div>
-          <p className="gs-fine">Up to 12 guests online. Larger parties — call the restaurant.</p>
-        </div>
-
-        <div className="gs-book-field">
-          <span className="gs-book-label">3. Time</span>
-          {!booking.date ? (
-            <p className="gs-muted">Pick a date to see open slots.</p>
-          ) : availMeta.loading ? (
-            <p className="gs-muted">Loading availability…</p>
-          ) : availMeta.closed || availSlots.length === 0 ? (
-            <p className="gs-muted">
-              {availMeta.reason || 'No open slots for this date.'}
-              {restaurantPhone ? ` Call ${restaurantPhone} for help.` : ''}
+        <form className="gs-book-main" onSubmit={submitBooking}>
+          {bookError ? (
+            <p className="gs-form-error" role="alert">
+              {bookError}
+              {restaurantPhone ? ` Call ${restaurantPhone} if you need help.` : ''}
             </p>
-          ) : (
-            <div className="gs-time-grid">
-              {availSlots.map((slot) => (
+          ) : null}
+
+          {uiStep === 1 ? (
+            <section className="gs-book-panel">
+              <div className="gs-book-panel-head">
+                <h2>Date &amp; party</h2>
+                <p className="gs-muted">Up to 12 guests online</p>
+              </div>
+              <div className="gs-book-field">
+                <span className="gs-book-label">Date</span>
+                <div className="gs-date-chips" role="listbox" aria-label="Choose a date">
+                  {dateChips.map((chip) => (
+                    <button
+                      key={chip.iso}
+                      type="button"
+                      role="option"
+                      aria-selected={booking.date === chip.iso}
+                      className={`gs-date-chip${booking.date === chip.iso ? ' is-selected' : ''}`}
+                      onClick={() => {
+                        setBooking((b) => ({ ...b, date: chip.iso, time: '' }))
+                      }}
+                    >
+                      <em>{chip.today ? 'Today' : chip.dow}</em>
+                      <strong>{chip.day}</strong>
+                      <span>{chip.mon}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="gs-book-field gs-book-party">
+                <span className="gs-book-label">Party size</span>
+                <div className="gs-qty book">
+                  <button
+                    type="button"
+                    aria-label="Fewer guests"
+                    onClick={() =>
+                      setBooking((b) => ({
+                        ...b,
+                        guests: String(Math.max(1, Number(b.guests) - 1)),
+                        time: '',
+                      }))
+                    }
+                  >
+                    −
+                  </button>
+                  <strong>
+                    {booking.guests} <span>guests</span>
+                  </strong>
+                  <button
+                    type="button"
+                    aria-label="More guests"
+                    onClick={() =>
+                      setBooking((b) => ({
+                        ...b,
+                        guests: String(Math.min(12, Number(b.guests) + 1)),
+                        time: '',
+                      }))
+                    }
+                  >
+                    +
+                  </button>
+                </div>
+                {restaurantPhone ? (
+                  <p className="gs-fine">Larger parties — call {restaurantPhone}.</p>
+                ) : (
+                  <p className="gs-fine">Larger parties — call the restaurant.</p>
+                )}
+              </div>
+              <div className="gs-book-nav">
                 <button
-                  key={slot.time}
                   type="button"
-                  disabled={Boolean(slot.full)}
-                  className={`gs-time-chip${booking.time === slot.time ? ' is-selected' : ''}${slot.full ? ' is-full' : ''}`}
-                  onClick={() => setBooking((b) => ({ ...b, time: slot.time }))}
+                  className="gs-btn primary"
+                  disabled={!booking.date}
+                  onClick={() => goStep(2)}
                 >
-                  <strong>{slot.time}</strong>
-                  <span>{slot.full ? 'Full' : `${slot.remainingCovers ?? '—'} left`}</span>
+                  Continue to time
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            </section>
+          ) : null}
 
-        <div className="gs-book-field">
-          <span className="gs-book-label">4. Your details</span>
-        </div>
+          {uiStep === 2 ? (
+            <section className="gs-book-panel">
+              <div className="gs-book-panel-head">
+                <h2>Choose a time</h2>
+                <p className="gs-muted">{selectedDateLabel}</p>
+              </div>
+              {availMeta.loading ? (
+                <p className="gs-muted">Checking availability…</p>
+              ) : availMeta.closed || availSlots.length === 0 ? (
+                <p className="gs-muted">
+                  {availMeta.reason || 'No open slots for this date and party size.'}
+                  {restaurantPhone ? ` Call ${restaurantPhone} for help.` : ''}
+                </p>
+              ) : (
+                <div className="gs-time-grid" role="listbox" aria-label="Available times">
+                  {availSlots.map((slot) => (
+                    <button
+                      key={slot.time}
+                      type="button"
+                      role="option"
+                      aria-selected={booking.time === slot.time}
+                      disabled={Boolean(slot.full)}
+                      className={`gs-time-chip${booking.time === slot.time ? ' is-selected' : ''}${slot.full ? ' is-full' : ''}`}
+                      onClick={() => setBooking((b) => ({ ...b, time: slot.time }))}
+                    >
+                      <strong>{slot.time}</strong>
+                      <span>{slotLabel(slot)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="gs-book-nav">
+                <button type="button" className="gs-btn ghost" onClick={() => goStep(1)}>
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className="gs-btn primary"
+                  disabled={!booking.time}
+                  onClick={() => goStep(3)}
+                >
+                  Continue to details
+                </button>
+              </div>
+            </section>
+          ) : null}
 
-        <div className="gs-book-field two-col">
-          <label>
-            Name
-            <input
-              required
-              value={booking.name}
-              onChange={(e) => setBooking((b) => ({ ...b, name: e.target.value }))}
-              placeholder="Guest name"
-            />
-          </label>
-          <label>
-            Phone
-            <input
-              required
-              value={booking.phone}
-              onChange={(e) => setBooking((b) => ({ ...b, phone: e.target.value }))}
-              placeholder={restaurantPhone || '+91 …'}
-            />
-          </label>
-        </div>
-
-        <label className="gs-book-field">
-          <span className="gs-book-label">Email (for confirmation)</span>
-          <input
-            type="email"
-            value={booking.email || ''}
-            onChange={(e) => setBooking((b) => ({ ...b, email: e.target.value }))}
-            placeholder="you@email.com"
-          />
-        </label>
-
-        <label className="gs-book-field">
-          <span className="gs-book-label">Special requests</span>
-          <textarea
-            rows={3}
-            value={booking.notes}
-            onChange={(e) => setBooking((b) => ({ ...b, notes: e.target.value }))}
-            placeholder="Birthday cake at 8:30pm, window table preferred…"
-          />
-        </label>
-
-        <button
-          className="gs-btn primary gs-wide"
-          type="submit"
-          disabled={bookingBusy || !booking.date || !booking.time}
-        >
-          {bookingBusy ? 'Sending…' : 'Request booking'}
-        </button>
-      </form>
+          {uiStep === 3 ? (
+            <section className="gs-book-panel">
+              <div className="gs-book-panel-head">
+                <h2>Your details</h2>
+                <p className="gs-muted">So the restaurant can confirm your booking</p>
+              </div>
+              <div className="gs-book-field two-col">
+                <label>
+                  Full name
+                  <input
+                    required
+                    autoComplete="name"
+                    value={booking.name}
+                    onChange={(e) => setBooking((b) => ({ ...b, name: e.target.value }))}
+                    placeholder="Guest name"
+                  />
+                </label>
+                <label>
+                  Phone
+                  <input
+                    required
+                    autoComplete="tel"
+                    inputMode="tel"
+                    value={booking.phone}
+                    onChange={(e) => setBooking((b) => ({ ...b, phone: e.target.value }))}
+                    placeholder={restaurantPhone || '+91…'}
+                  />
+                </label>
+              </div>
+              <label className="gs-book-field">
+                Email <span className="gs-optional">(optional)</span>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={booking.email || ''}
+                  onChange={(e) => setBooking((b) => ({ ...b, email: e.target.value }))}
+                  placeholder="you@email.com"
+                />
+              </label>
+              <label className="gs-book-field">
+                Special requests <span className="gs-optional">(optional)</span>
+                <textarea
+                  rows={3}
+                  value={booking.notes}
+                  onChange={(e) => setBooking((b) => ({ ...b, notes: e.target.value }))}
+                  placeholder="Occasion, seating preference, allergies…"
+                />
+              </label>
+              <div className="gs-book-nav">
+                <button type="button" className="gs-btn ghost" onClick={() => goStep(2)}>
+                  Back
+                </button>
+                <button
+                  className="gs-btn primary"
+                  type="submit"
+                  disabled={bookingBusy || !booking.date || !booking.time || !booking.name || !booking.phone}
+                >
+                  {bookingBusy ? 'Sending request…' : 'Request reservation'}
+                </button>
+              </div>
+              <p className="gs-fine gs-book-submit-note">
+                You’ll get a confirmation once the restaurant accepts.
+                {restaurantPhone ? ` Questions? Call ${restaurantPhone}.` : ''}
+              </p>
+            </section>
+          ) : null}
+        </form>
+      </div>
     </section>
   )
 }

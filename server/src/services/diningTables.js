@@ -1,8 +1,8 @@
 import { db } from '../infra/db.js'
 import { DEFAULT_DWELL_MINUTES, parseTimeToMinutes } from './reservationAvailability.js'
 
-export function listDiningTables(restaurantId) {
-  return db
+export function listDiningTables(restaurantId, { activeOnly = false } = {}) {
+  const rows = db
     .prepare(
       `SELECT id, restaurant_id AS restaurantId, name, seats, zone, sort_order AS sortOrder,
               active, public_code AS publicCode, created_at AS createdAt
@@ -11,6 +11,67 @@ export function listDiningTables(restaurantId) {
        ORDER BY sort_order ASC, id ASC`,
     )
     .all(restaurantId)
+  return activeOnly ? rows.filter((t) => t.active !== 0) : rows
+}
+
+/** Normalize T8 / t08 / "T 08" → T8 for matching POS ↔ local dining tables. */
+export function fuzzyTableKey(name) {
+  const s = String(name || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '')
+  const m = s.match(/^(.*?)(\d+)$/)
+  if (!m) return s
+  return `${m[1]}${Number(m[2])}`
+}
+
+/**
+ * Upsert IROAS dining_tables from URY POS tables (dine-in only).
+ * Dedupes local aliases (t08 vs T8), keeps canonical POS names, moves reservations off duplicates.
+ */
+export function syncDiningTablesFromPos(restaurantId, posTables = []) {
+  const dineIn = (Array.isArray(posTables) ? posTables : []).filter((t) => !t.takeAway && t.name)
+  const locals = listDiningTables(restaurantId)
+  const usedLocalIds = new Set()
+
+  dineIn.forEach((pt, idx) => {
+    const key = fuzzyTableKey(pt.name)
+    const matches = locals.filter((t) => fuzzyTableKey(t.name) === key)
+    const seats = Math.max(1, Math.min(40, Number(pt.seats) || matches[0]?.seats || 2))
+    const zone = String(pt.room || matches[0]?.zone || '').trim() || null
+    const primary = matches.find((t) => String(t.name) === String(pt.name)) || matches[0]
+
+    if (primary) {
+      db.prepare(
+        `UPDATE dining_tables
+         SET name = ?, seats = ?, zone = ?, sort_order = ?, active = 1
+         WHERE id = ? AND restaurant_id = ?`,
+      ).run(pt.name, seats, zone, idx, primary.id, restaurantId)
+      usedLocalIds.add(primary.id)
+      for (const dup of matches) {
+        if (dup.id === primary.id) continue
+        db.prepare(`UPDATE reservations SET table_id = ? WHERE table_id = ?`).run(primary.id, dup.id)
+        db.prepare(`UPDATE dining_tables SET active = 0 WHERE id = ? AND restaurant_id = ?`).run(
+          dup.id,
+          restaurantId,
+        )
+      }
+    } else {
+      const info = db
+        .prepare(
+          `INSERT INTO dining_tables (restaurant_id, name, seats, zone, sort_order, active, public_code)
+           VALUES (?, ?, ?, ?, ?, 1, ?)`,
+        )
+        .run(restaurantId, pt.name, seats, zone, idx, `tmp${Date.now()}${idx}`)
+      const newId = Number(info.lastInsertRowid)
+      ensurePublicCode(newId)
+      usedLocalIds.add(newId)
+    }
+  })
+
+  return listDiningTables(restaurantId, { activeOnly: true }).filter((t) =>
+    dineIn.some((pt) => fuzzyTableKey(pt.name) === fuzzyTableKey(t.name)),
+  )
 }
 
 function ensurePublicCode(id) {

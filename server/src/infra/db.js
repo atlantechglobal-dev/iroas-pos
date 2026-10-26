@@ -591,6 +591,24 @@ db.exec(`
   );
 `)
 
+// Migration: URY table for QR dine-in submissions (NULL = pickup) + linked Customer id.
+{
+  const cols = db.prepare('PRAGMA table_info(ury_guest_orders)').all()
+  if (!cols.some((c) => c.name === 'ury_table')) db.exec('ALTER TABLE ury_guest_orders ADD COLUMN ury_table TEXT')
+  if (!cols.some((c) => c.name === 'ury_customer')) db.exec('ALTER TABLE ury_guest_orders ADD COLUMN ury_customer TEXT')
+}
+
+// Staff-advanced kitchen lane for URY invoices (payment lane stays on POS Invoice.status).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ury_order_kitchen (
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    invoice_id TEXT NOT NULL,
+    step TEXT NOT NULL CHECK (step IN ('received', 'accepted', 'preparing', 'ready', 'completed')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (restaurant_id, invoice_id)
+  );
+`)
+
 // Migration: orders.payment_timing (bill_now | pay_later)
 {
   const cols = db.prepare('PRAGMA table_info(orders)').all()

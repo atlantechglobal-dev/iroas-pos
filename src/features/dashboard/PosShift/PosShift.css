@@ -1,0 +1,188 @@
+.pos-shift-page {
+  --ink: #17171a;
+  --muted: #6f6d68;
+  --line: #ece8df;
+  --panel: #fff;
+  --green: #8bc53f;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+}
+
+.pos-shift-page .shift-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.pos-shift-page .shift-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pos-shift-page h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.pos-shift-page .shift-desc,
+.pos-shift-page .shift-balance p,
+.pos-shift-page .shift-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  max-width: 640px;
+}
+
+.pos-shift-page .shift-pill {
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #fff4e8;
+  color: #7a4b12;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pos-shift-page .shift-pill.is-open {
+  background: #eaf5db;
+  color: #3d6b16;
+}
+
+.pos-shift-page .shift-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.pos-shift-page h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.pos-shift-page .shift-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 18px;
+}
+
+.pos-shift-page label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pos-shift-page input {
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #f7f6f2;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+}
+
+.pos-shift-page .shift-balance {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 22px 0 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.pos-shift-page .shift-balance strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.pos-shift-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pos-shift-page th,
+.pos-shift-page td {
+  text-align: left;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pos-shift-page th {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pos-shift-page td input {
+  width: 140px;
+  background: #fff;
+}
+
+.pos-shift-page .shift-total {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 14px 0 0;
+  font-weight: 700;
+}
+
+.pos-shift-page .shift-note,
+.pos-shift-page .shift-error {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff4e8;
+  color: #7a4b12;
+}
+
+.pos-shift-page .shift-error {
+  background: #fdecec;
+  color: #8a2a2a;
+}
+
+.pos-shift-page .shift-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pos-shift-page .shift-btn {
+  height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--green);
+  color: #16210a;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pos-shift-page .shift-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.pos-shift-page .shift-btn-outline {
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 720px) {
+  .pos-shift-page .shift-grid,
+  .pos-shift-page .shift-balance,
+  .pos-shift-page .shift-head {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+}

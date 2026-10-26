@@ -16,6 +16,7 @@ import {
   assignTableForParty,
   assertTableAvailable,
   listDiningTables,
+  syncDiningTablesFromPos,
   upsertDiningTable,
 } from '../../services/diningTables.js'
 import {
@@ -41,9 +42,12 @@ import {
 } from '../../services/onboardingPayment.js'
 import { UryError } from '../../integrations/ury/uryClient.js'
 import { IntegrationError, invalidateUryTenant, resolveUryTenant } from '../../integrations/ury/uryTenant.js'
-import { listUryTables } from '../../integrations/ury/uryTables.js'
-import { getUryMenu } from '../../integrations/ury/uryMenu.js'
-import { listUryCustomers, listUryOrders } from '../../integrations/ury/uryOrders.js'
+import { TableEditError, createUryTable, getUryTableOptions, listUryTables } from '../../integrations/ury/uryTables.js'
+import { MenuEditError, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
+import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
+import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
+import { getUryInvoiceBill, listUryCustomers, listUryOrders, payUryInvoice, printUryInvoice } from '../../integrations/ury/uryOrders.js'
+import { attachKitchenProgress, setKitchenStep } from '../../integrations/ury/uryKitchenFlow.js'
 import { listUryStaff } from '../../integrations/ury/uryStaff.js'
 import {
   OrderingError,
@@ -51,6 +55,7 @@ import {
   getUryOrderMenu,
   placeUryOrder,
 } from '../../integrations/ury/uryOrdering.js'
+import { closeUryShift, getUryShift, openUryShift } from '../../integrations/ury/uryShift.js'
 
 const router = Router()
 
@@ -824,6 +829,25 @@ router.get('/tables', (req, res) => {
   res.json({ tables: listDiningTables(restaurant.id) })
 })
 
+/** Pull dine-in tables from URY POS into dining_tables (dedupe T8/t08, keep POS names). */
+router.post('/tables/sync-from-pos', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const posTables = await listUryTables(tenant)
+    const tables = syncDiningTablesFromPos(restaurant.id, posTables)
+    console.info(`[tables:sync-pos] restaurant=${restaurant.id} synced=${tables.length}`)
+    res.json({ success: true, tables, synced: tables.length })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'tables:sync-pos',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not sync tables from the POS. Please try again.',
+    })
+  }
+})
+
 function getPosRestaurant(req, res) {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) {
@@ -868,6 +892,40 @@ function sendPosError(res, err, { label, restaurantId, unavailableMessage }) {
   return res.status(500).json({ success: false, error: unavailableMessage })
 }
 
+router.get('/pos-tables/options', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await getUryTableOptions(tenant)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-tables:options',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Table service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-tables', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const tables = await createUryTable(tenant, req.body || {})
+    console.info(`[pos-tables:create] restaurant=${restaurant.id} table=${req.body?.name || ''}`)
+    res.status(201).json({ success: true, data: { tables } })
+  } catch (err) {
+    if (err instanceof TableEditError) return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    sendPosError(res, err, {
+      label: 'pos-tables:create',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not add the table. Please try again.',
+    })
+  }
+})
+
 router.get('/pos-tables', async (req, res) => {
   const restaurant = getPosRestaurant(req, res)
   if (!restaurant) return
@@ -900,18 +958,245 @@ router.get('/pos-menu', async (req, res) => {
   }
 })
 
+router.get('/pos-menu/options', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await getUryMenuOptions(tenant)
+    res.json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    sendPosError(res, err, {
+      label: 'pos-menu:options',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Menu service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-menu/items', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await createUryMenuItem(tenant, req.body || {})
+    console.info(`[pos-menu:create-item] restaurant=${restaurant.id} menu=${req.body?.menu || ''}`)
+    res.status(201).json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    sendPosError(res, err, {
+      label: 'pos-menu:create-item',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not add the menu item. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-menu/courses', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await createUryCourse(tenant, req.body || {})
+    res.status(201).json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    sendPosError(res, err, {
+      label: 'pos-menu:create-course',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not add the course. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-menu/menus', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await createUryMenuDoc(tenant, req.body || {})
+    res.status(201).json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    sendPosError(res, err, {
+      label: 'pos-menu:create-menu',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not add the menu. Please try again.',
+    })
+  }
+})
+
+router.patch('/pos-menu/items/:id', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const { available, price } = req.body || {}
+    const data = await updateUryMenuItem(tenant, req.params.id, { available, price })
+    console.info(`[pos-menu:update] restaurant=${restaurant.id} row=${req.params.id}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) {
+      return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    }
+    sendPosError(res, err, {
+      label: 'pos-menu:update',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not reach the POS. The menu was not changed. Please try again.',
+    })
+  }
+})
+
+router.get('/pos-tables/qr', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const tables = await listUryTableQrCodes(tenant)
+    res.json({ success: true, data: { tables, guestOrdering: Boolean(getUryFeatures(restaurant.id)?.guestOrdering) } })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-tables:qr',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Table service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.get('/pos-shift', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await getUryShift(tenant)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-shift',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not read the POS shift. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-shift/open', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await openUryShift(tenant, {
+      openingAmount: req.body?.openingAmount,
+      balanceDetails: req.body?.balanceDetails,
+    })
+    console.info(`[pos-shift] restaurant=${restaurant.id} open entry=${data.entry?.name || '?'}`)
+    res.status(data.alreadyOpen ? 200 : 201).json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-shift:open',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not open the POS shift. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-shift/close', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await closeUryShift(tenant)
+    console.info(`[pos-shift] restaurant=${restaurant.id} close entry=${data.closedEntry || 'already-closed'}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-shift:close',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not close the POS shift. Please try again.',
+    })
+  }
+})
+
 router.get('/pos-orders', async (req, res) => {
   const restaurant = getPosRestaurant(req, res)
   if (!restaurant) return
   try {
     const tenant = await resolveUryTenant(restaurant.id)
-    const orders = await listUryOrders(tenant)
+    const orders = attachKitchenProgress(restaurant.id, await listUryOrders(tenant))
     res.json({ success: true, data: { orders, fetchedAt: new Date().toISOString() } })
   } catch (err) {
     sendPosError(res, err, {
       label: 'pos-orders',
       restaurantId: restaurant.id,
       unavailableMessage: 'Order service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+/** Advance or set the IROAS kitchen lane for a URY invoice (does not change POS payment status). */
+router.patch('/pos-orders/:invoiceId/kitchen', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const advance = req.body?.advance === true || req.body?.advance === 'true'
+    const step = req.body?.step ? String(req.body.step) : undefined
+    const data = setKitchenStep(restaurant.id, req.params.invoiceId, { advance, step })
+    res.json({ success: true, data })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    sendPosError(res, err, {
+      label: 'pos-orders:kitchen',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not update kitchen status.',
+    })
+  }
+})
+
+router.get('/pos-orders/:invoiceId/bill', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await getUryInvoiceBill(tenant, req.params.invoiceId)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-orders:bill',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not open this order. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-orders/:invoiceId/pay', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await payUryInvoice(tenant, req.params.invoiceId, req.body || {})
+    console.info(`[pos-orders:pay] restaurant=${restaurant.id} invoice=${data.invoice}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-orders:pay',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not take payment. Nothing was settled.',
+    })
+  }
+})
+
+router.post('/pos-orders/:invoiceId/print', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await printUryInvoice(tenant, req.params.invoiceId)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-orders:print',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not print this bill. Please try again.',
     })
   }
 })

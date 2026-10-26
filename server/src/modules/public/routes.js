@@ -25,7 +25,12 @@ import { UryError } from '../../integrations/ury/uryClient.js'
 import { IntegrationError, resolveUryTenant } from '../../integrations/ury/uryTenant.js'
 import { getUryFeatures, getUryPublicSite } from '../../integrations/ury/uryPublic.js'
 import { toSiteHours } from '../../integrations/ury/uryHours.js'
-import { GuestOrderError, getGuestOrder, submitGuestOrder } from '../../integrations/ury/urySelfOrdering.js'
+import { GuestOrderError, getGuestOrder, requestGuestBill, submitGuestOrder } from '../../integrations/ury/urySelfOrdering.js'
+import { resolveUryTableCode } from '../../integrations/ury/uryTableQr.js'
+import { findGuestAccountCustomer, getUryOrderByInvoiceAndPhone, listUryOrdersByPhone } from '../../integrations/ury/uryOrders.js'
+import { attachKitchenProgress } from '../../integrations/ury/uryKitchenFlow.js'
+import { findOrCreateUryCustomer, OrderingError, placeUryOrder } from '../../integrations/ury/uryOrdering.js'
+import { groupDineTables, listUryTables } from '../../integrations/ury/uryTables.js'
 
 const router = Router()
 
@@ -237,16 +242,15 @@ router.get('/platform-card/:slug', (req, res) => {
   })
 })
 
-/** Hours/contact fields of the site payload when URY owns them (no local fallback). */
+/** Hours and contact on the public site. URY wins when it has them; otherwise the IROAS profile is shown. */
 function applyUrySiteFields(fields, ury) {
   if (!ury) return fields
   const next = { ...fields }
-  if (ury.features.hours) {
-    next.hours = ury.hours?.status === 'ok' ? toSiteHours(ury.hours.weekly) : []
+  if (ury.features.hours && ury.hours?.status === 'ok') {
+    next.hours = toSiteHours(ury.hours.weekly)
   }
-  if (ury.features.contact) {
-    const ok = ury.contact?.status === 'ok'
-    for (const key of ['phone', 'email', 'address', 'city', 'country']) next[key] = ok ? ury.contact[key] || '' : ''
+  if (ury.features.contact && ury.contact?.status === 'ok') {
+    for (const key of ['phone', 'email', 'address', 'city', 'country']) next[key] = ury.contact[key] || ''
   }
   return next
 }
@@ -365,7 +369,7 @@ const uryOrderLimiter = rateLimit({
 })
 
 function sendGuestOrderError(res, err, restaurantId) {
-  if (err instanceof GuestOrderError) {
+  if (err instanceof GuestOrderError || err instanceof OrderingError) {
     return res.status(err.status).json({ success: false, code: err.code, error: err.message })
   }
   if (err instanceof IntegrationError) {
@@ -398,6 +402,56 @@ async function guestOrderingTenant(req, res) {
   return { restaurant, tenant: await resolveUryTenant(restaurant.id) }
 }
 
+/** URY rooms and tables for the website dine-in picker (same list the POS Select Table dialog uses). */
+router.get('/:slug/ury-dine-tables', uryOrderLimiter, async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const rooms = groupDineTables(await listUryTables(ctx.tenant))
+    res.json({ success: true, data: { rooms } })
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
+})
+
+/** New dine-in order through URY sync_order. A free table becomes occupied; the guest is the POS customer. */
+router.post('/:slug/ury-dine-orders', uryOrderLimiter, async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const { table, guestName, guestPhone, items, pax } = req.body || {}
+    const customer = await findOrCreateUryCustomer(ctx.tenant, { name: guestName, phone: guestPhone })
+    const placed = await placeUryOrder(ctx.tenant, {
+      table,
+      customer: customer.id,
+      items,
+      pax,
+    })
+    console.info(
+      `[public-ury-dine] restaurant=${restaurantId} invoice=${placed.invoice || '?'} table=${placed.table} customer=${customer.id}`,
+    )
+    res.status(201).json({
+      success: true,
+      data: {
+        status: 'placed',
+        invoice: placed.invoice,
+        table: placed.table,
+        customer: customer.id,
+        customerName: customer.name,
+        phone: customer.phone,
+        orderType: 'Dine In',
+        occupied: true,
+      },
+    })
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
+})
+
 /** Guest pickup order placed in URY (self-ordering). Retries reuse submissionId. */
 router.post('/:slug/ury-orders', uryOrderLimiter, async (req, res) => {
   let restaurantId = null
@@ -405,14 +459,34 @@ router.post('/:slug/ury-orders', uryOrderLimiter, async (req, res) => {
     const ctx = await guestOrderingTenant(req, res)
     if (!ctx) return
     restaurantId = ctx.restaurant.id
-    const { submissionId, items, guestName, guestPhone } = req.body || {}
-    const result = await submitGuestOrder(ctx.tenant, { submissionId, items, guestName, guestPhone })
+    const { submissionId, items, guestName, guestPhone, tableCode } = req.body || {}
+    let table = null
+    if (tableCode) {
+      table = (await resolveUryTableCode(ctx.tenant, tableCode))?.name || null
+      if (!table) return res.status(404).json({ success: false, code: 'table_not_found', error: 'This table QR code is not valid. Please ask the staff.' })
+    }
+    const result = await submitGuestOrder(ctx.tenant, { submissionId, items, guestName, guestPhone, table })
     const data = result.body.data
     console.info(
       `[public-ury-orders] restaurant=${restaurantId} submission=${data?.submissionId || '?'} status=${data?.status || result.body.code}` +
-        `${data?.invoice ? ` invoice=${data.invoice}` : ''}`,
+        `${table ? ` table=${table}` : ''}${data?.invoice ? ` invoice=${data.invoice}` : ''}`,
     )
     res.status(result.httpStatus).json(result.body)
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
+})
+
+/** Resolves a scanned URY table QR code (signed by IROAS) to the table, re-checked in URY. */
+router.get('/:slug/ury-table/:code', uryOrderLimiter, async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const table = await resolveUryTableCode(ctx.tenant, req.params.code)
+    if (!table) return res.status(404).json({ success: false, code: 'table_not_found', error: 'This table QR code is not valid. Please ask the staff.' })
+    res.json({ success: true, data: { table: { ...table, code: req.params.code } } })
   } catch (err) {
     sendGuestOrderError(res, err, restaurantId)
   }
@@ -425,6 +499,161 @@ router.get('/:slug/ury-orders/:submissionId', async (req, res) => {
     if (!ctx) return
     restaurantId = ctx.restaurant.id
     const result = await getGuestOrder(ctx.tenant, req.params.submissionId)
+    res.status(result.httpStatus === 201 ? 200 : result.httpStatus).json(result.body)
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
+})
+
+function mapAccountOrders(orders) {
+  return orders.map((o) => ({
+    id: o.id,
+    state: o.state,
+    posStatus: o.posStatus,
+    orderType: o.orderType,
+    table: o.table,
+    customerId: o.customerId || '',
+    customer: o.customer,
+    total: o.total,
+    currency: o.currency,
+    postedAt: o.postedAt,
+    kitchenStep: o.kitchenStep || null,
+    kitchenLabel: o.kitchenLabel || null,
+    paymentLabel:
+      o.state === 'paid' ? 'Paid' : o.state === 'draft' ? 'Draft · unpaid' : o.state === 'unbilled' ? 'Unbilled · unpaid' : o.posStatus,
+  }))
+}
+
+/**
+ * Guest Track: POS Invoice id (e.g. UDT-SA-00005) + phone from checkout.
+ * Returns the same shape as Account order rows, plus line items.
+ */
+router.get('/:slug/ury-track', uryOrderLimiter, async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const invoice = String(req.query.invoice || req.query.code || '').trim()
+    const phone = String(req.query.phone || '').trim()
+    if (!invoice) {
+      return res.status(400).json({ success: false, code: 'invalid_invoice', error: 'Enter your order number (e.g. UDT-SA-00005).' })
+    }
+    if (phone.replace(/\D/g, '').length < 7) {
+      return res.status(400).json({ success: false, code: 'invalid_phone', error: 'Enter the phone number used at checkout.' })
+    }
+    const found = await getUryOrderByInvoiceAndPhone(ctx.tenant, invoice, phone)
+    if (!found) {
+      return res.status(404).json({
+        success: false,
+        code: 'order_not_found',
+        error: 'No POS order matches that number and phone.',
+      })
+    }
+    const [order] = attachKitchenProgress(restaurantId, [found])
+    res.json({
+      success: true,
+      data: {
+        ...order,
+        paymentLabel:
+          order.state === 'paid'
+            ? 'Paid'
+            : order.state === 'draft'
+              ? 'Draft · unpaid'
+              : order.state === 'unbilled'
+                ? 'Unbilled · unpaid'
+                : order.posStatus,
+      },
+    })
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
+})
+
+/** Guest Account: look up POS customer + invoices by phone (no create). */
+router.get('/:slug/ury-account', uryOrderLimiter, async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const phone = String(req.query.phone || '').trim()
+    const customerId = String(req.query.customerId || '').trim()
+    if (phone.replace(/\D/g, '').length < 7) {
+      return res.status(400).json({ success: false, code: 'invalid_phone', error: 'Enter the phone number used on your orders.' })
+    }
+    const customer = await findGuestAccountCustomer(ctx.tenant, phone, customerId)
+    const rawOrders = customer
+      ? await listUryOrdersByPhone(ctx.tenant, customer.phone || phone, { customerId: customer.id })
+      : []
+    const orders = attachKitchenProgress(restaurantId, rawOrders)
+    res.json({
+      success: true,
+      data: {
+        phone,
+        customer: customer
+          ? { id: customer.id, name: customer.name, phone: customer.phone, created: false }
+          : null,
+        orders: mapAccountOrders(orders),
+      },
+    })
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
+})
+
+/**
+ * Create or open a guest POS account (URY Customer) for this restaurant’s website.
+ * Same create_customer path as staff; rate-limited. Does not change IROAS login/signup.
+ */
+router.post('/:slug/ury-account', uryOrderLimiter, async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const name = String(req.body?.name || '').trim()
+    const phone = String(req.body?.phone || '').trim()
+    let customer
+    try {
+      customer = await findOrCreateUryCustomer(ctx.tenant, { name, phone })
+    } catch (err) {
+      if (err instanceof OrderingError) {
+        return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+      }
+      throw err
+    }
+    const orders = attachKitchenProgress(
+      restaurantId,
+      await listUryOrdersByPhone(ctx.tenant, customer.phone || phone, { customerId: customer.id }),
+    )
+    console.info(
+      `[public-ury-account] restaurant=${restaurantId} customer=${customer.id}${customer.created ? ' created' : ' existing'}`,
+    )
+    res.status(customer.created ? 201 : 200).json({
+      success: true,
+      data: {
+        customer: { id: customer.id, name: customer.name, phone: customer.phone, created: customer.created },
+        orders: mapAccountOrders(orders),
+      },
+    })
+  } catch (err) {
+    sendGuestOrderError(res, err, restaurantId)
+  }
+})
+
+/** Guest asks URY to prepare the bill (Draft/Unbilled → ready for Payment in POS). */
+router.post('/:slug/ury-orders/:submissionId/request-bill', uryOrderLimiter, async (req, res) => {
+  let restaurantId = null
+  try {
+    const ctx = await guestOrderingTenant(req, res)
+    if (!ctx) return
+    restaurantId = ctx.restaurant.id
+    const result = await requestGuestBill(ctx.tenant, req.params.submissionId)
+    console.info(
+      `[public-ury-orders] restaurant=${restaurantId} submission=${req.params.submissionId} action=request_bill` +
+        `${result.body?.data?.invoice ? ` invoice=${result.body.data.invoice}` : ''}`,
+    )
     res.status(result.httpStatus === 201 ? 200 : result.httpStatus).json(result.body)
   } catch (err) {
     sendGuestOrderError(res, err, restaurantId)

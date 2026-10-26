@@ -15,11 +15,11 @@ function formatInvoiceTime(value) {
   return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
 }
 
-function PosTablesPanel({ hideWhenNotConnected = false }) {
+function PosTablesPanel({ hideWhenNotConnected = false, refreshKey = 0 }) {
   const [state, setState] = useState({ status: 'loading', tables: [] })
 
   const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, status: 'loading' }))
+    setState((prev) => ({ ...prev, status: prev.status === 'ready' ? 'ready' : 'loading' }))
     try {
       const res = await api.getPosTables()
       setState({ status: 'ready', tables: res?.data?.tables || [] })
@@ -33,7 +33,7 @@ function PosTablesPanel({ hideWhenNotConnected = false }) {
 
   useEffect(() => {
     load()
-  }, [load])
+  }, [load, refreshKey])
 
   const rooms = useMemo(() => {
     const groups = new Map()

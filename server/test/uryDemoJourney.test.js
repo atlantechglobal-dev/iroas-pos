@@ -22,6 +22,18 @@ const DOCS = {
   'URY Restaurant': {
     'Demo Restaurant': { name: 'Demo Restaurant', branch: 'Demo Branch', company: 'Co', active_menu: 'Demo Menu', address: 'Demo Address' },
   },
+  'URY Self Ordering Profile': {
+    'Demo Website': {
+      name: 'Demo Website',
+      restaurant: 'Demo Restaurant',
+      branch: 'Demo Branch',
+      pos_profile: 'Demo Profile',
+      enabled: 1,
+      enable_request_bill: 1,
+      enable_pay_at_counter: 1,
+      enable_customer_payment: 0,
+    },
+  },
   Branch: { 'Demo Branch': { name: 'Demo Branch', user: [{ parent: 'Demo Branch', user: USER }] } },
   'URY Menu': {
     'Demo Menu': {
@@ -34,6 +46,7 @@ const DOCS = {
     },
   },
   'Price List': { Std: { name: 'Std', currency: 'ZAR' } },
+  Customer: {},
   Address: {
     'Demo Address': {
       name: 'Demo Address', address_line1: '1 Long St', address_line2: '', city: 'Cape Town', state: 'WC',
@@ -42,6 +55,10 @@ const DOCS = {
   },
   'URY Branch Operating Schedule': {},
   'POS Invoice': {},
+  'URY Table': {
+    T1: { name: 'T1', restaurant: 'Demo Restaurant', restaurant_room: 'Main', no_of_seats: 4, occupied: 0, is_take_away: 0 },
+    X1: { name: 'X1', restaurant: 'Other Restaurant', restaurant_room: 'Main', no_of_seats: 2, occupied: 0, is_take_away: 0 },
+  },
 }
 
 const SCHEDULE = {
@@ -58,10 +75,27 @@ const SCHEDULE = {
 const LISTS = {
   'POS Profile': [{ name: 'Demo Profile', restaurant: 'Demo Restaurant', branch: 'Demo Branch', disabled: 0 }],
   'URY Self Ordering Profile': [
-    { name: 'Demo Website', restaurant: 'Demo Restaurant', branch: 'Demo Branch', pos_profile: 'Demo Profile', enabled: 1, qr_signing_secret: 'QR-S3CRET', staff_pin: '9999' },
+    {
+      name: 'Demo Website',
+      restaurant: 'Demo Restaurant',
+      branch: 'Demo Branch',
+      pos_profile: 'Demo Profile',
+      enabled: 1,
+      enable_request_bill: 1,
+      enable_pay_at_counter: 1,
+      enable_customer_payment: 0,
+      qr_signing_secret: 'QR-S3CRET',
+      staff_pin: '9999',
+    },
   ],
   'URY Branch Operating Exception': [],
   'URY Table': [],
+  Customer: [],
+  Item: [
+    { name: 'GR', image: '/files/ghee-rice.jpg', disabled: 0 },
+    { name: 'WNG', image: 'https://img.test/wings.jpg', disabled: 0 },
+    { name: 'MOM', image: null, disabled: 0 },
+  ],
 }
 
 const fake = {
@@ -94,11 +128,14 @@ function project(row, fields) {
 }
 
 function matches(row, filters) {
-  return Object.entries(filters).every(([k, v]) => {
+  const entries = Array.isArray(filters) ? filters.map(([field, op, val]) => [field, [op, val]]) : Object.entries(filters)
+  return entries.every(([k, v]) => {
     if (Array.isArray(v)) {
       const [op, val] = v
+      if (op === '=' || op === '==') return row[k] === val
       if (op === '>=') return String(row[k]) >= String(val)
-      if (op === 'in') return val.includes(row[k])
+      if (op === 'in') return Array.isArray(val) && val.includes(row[k])
+      if (op === 'like') return String(row[k] || '').toLowerCase().includes(String(val).replace(/%/g, '').toLowerCase())
       return false
     }
     return row[k] === v
@@ -109,7 +146,7 @@ function orderOf(session) {
   const s = fake.sessions.get(session)
   const inv = DOCS['POS Invoice'][s.invoice]
   return {
-    invoice: s.invoice, table: null, order_type: 'Take Away', pickup_code: `P-${s.invoice}`,
+    invoice: s.invoice, table: s.table || null, order_type: s.table ? 'Dine In' : 'Take Away', pickup_code: `P-${s.invoice}`,
     items: inv.items, grand_total: inv.grand_total, billed: 0,
   }
 }
@@ -134,23 +171,84 @@ const fakeServer = http.createServer((req, res) => {
     if (method === 'frappe.desk.reportview.get_list') {
       const fields = JSON.parse(q('fields') || 'null')
       const filters = JSON.parse(q('filters') || '{}')
-      const rows = (LISTS[q('doctype')] || []).filter((r) => matches(r, filters))
+      const doctype = q('doctype')
+      const source = LISTS[doctype] || (DOCS[doctype] ? Object.values(DOCS[doctype]) : [])
+      const rows = source.filter((r) => matches(r, filters))
       return send(res, 200, { message: rows.map((r) => project(r, fields)) })
     }
     if (method === 'ury.ury_pos.api.getPosProfile') {
       return send(res, 200, { message: { pos_profile: 'Demo Profile', branch: 'Demo Branch', waiter: USER } })
     }
+    if (method === 'ury.ury.api.ury_availability.get_item_availability') {
+      const row = fake.availability?.[q('item_code')]
+      if (!row) return send(res, 404, { exc_type: 'DoesNotExistError' })
+      return send(res, 200, { message: row })
+    }
 
     if (method === `${SO}.generate_qr_token`) {
       if (body.profile !== 'Demo Website') return send(res, 404, { exc_type: 'DoesNotExistError' })
-      return send(res, 200, { message: `TOKEN-${body.profile}` })
+      return send(res, 200, { message: `TOKEN-${body.profile}${body.table ? `@${body.table}` : ''}` })
     }
     if (method === `${SO}.get_ordering_context`) {
       if (fake.contextMode === 'error500') return send(res, 500, { exc_type: 'InternalServerError' })
-      if (body.token !== 'TOKEN-Demo Website') return send(res, 403, { exc_type: 'PermissionError' })
+      const [base, table] = String(body.token || '').split('@')
+      if (base !== 'TOKEN-Demo Website') return send(res, 403, { exc_type: 'PermissionError' })
       const session = `SES-${(fake.sessionSeq += 1)}`
-      fake.sessions.set(session, { invoice: null })
-      return send(res, 200, { message: { session, source: 'pickup', restaurant: 'Demo Restaurant' } })
+      fake.sessions.set(session, { invoice: null, table: table || null })
+      return send(res, 200, { message: { session, source: table ? 'table' : 'pickup', restaurant: 'Demo Restaurant' } })
+    }
+    if (method === 'frappe.client.insert') {
+      const doc = body.doc || {}
+      if (doc.doctype === 'Item') {
+        DOCS.Item = DOCS.Item || {}
+        DOCS.Item[doc.item_code] = { ...doc, name: doc.item_code }
+        return send(res, 200, { message: DOCS.Item[doc.item_code] })
+      }
+      if (doc.doctype === 'URY Menu Course') {
+        DOCS['URY Menu Course'] = DOCS['URY Menu Course'] || {}
+        DOCS['URY Menu Course'][doc.course] = { name: doc.course, course: doc.course, icon: doc.icon || '', doctype: 'URY Menu Course' }
+        return send(res, 200, { message: DOCS['URY Menu Course'][doc.course] })
+      }
+      if (doc.doctype === 'URY Table') {
+        DOCS['URY Table'][doc.name] = { ...doc }
+        return send(res, 200, { message: DOCS['URY Table'][doc.name] })
+      }
+      if (doc.doctype === 'URY Menu') {
+        DOCS['URY Menu'][doc.name] = {
+          name: doc.name, branch: doc.branch, enabled: doc.enabled, price_list: doc.price_list,
+          items: doc.items || [], doctype: 'URY Menu',
+        }
+        return send(res, 200, { message: DOCS['URY Menu'][doc.name] })
+      }
+      return send(res, 404, { exc_type: 'DoesNotExistError' })
+    }
+    if (method === 'frappe.client.save' && body.doc?.doctype === 'URY Menu') {
+      DOCS['URY Menu'][body.doc.name] = body.doc
+      return send(res, 200, { message: body.doc })
+    }
+    if (method === 'frappe.client.set_value') {
+      if (body.doctype === 'URY Menu Item') {
+        const menu = DOCS['URY Menu']['Demo Menu']
+        const row = menu.items.find((r) => r.name === body.name)
+        if (!row) return send(res, 404, { exc_type: 'DoesNotExistError' })
+        Object.assign(row, body.fieldname)
+        return send(res, 200, { message: { ...menu, doctype: 'URY Menu' } })
+      }
+      if (body.doctype === 'POS Invoice') {
+        const inv = DOCS['POS Invoice'][body.name]
+        if (!inv) return send(res, 404, { exc_type: 'DoesNotExistError' })
+        Object.assign(inv, body.fieldname)
+        return send(res, 200, { message: { ...inv, doctype: 'POS Invoice' } })
+      }
+      return send(res, 404, { exc_type: 'DoesNotExistError' })
+    }
+    if (method === 'ury.ury_pos.api.create_customer') {
+      const name = body.customer_name
+      const mobile = String(body.mobile_number || '')
+      if (!name || mobile.replace(/\D/g, '').length < 7) return validation(res, 'Invalid customer')
+      DOCS.Customer[name] = { name, customer_name: name, mobile_number: mobile, disabled: 0 }
+      LISTS.Customer = Object.values(DOCS.Customer)
+      return send(res, 200, { message: { status: 'success', name, customer_name: name, mobile_number: mobile } })
     }
     if (method === `${SO}.add_customer_items`) {
       fake.addCalls.push(body)
@@ -171,7 +269,13 @@ const fakeServer = http.createServer((req, res) => {
       const invoice = `POS-INV-${String((fake.invoiceSeq += 1)).padStart(5, '0')}`
       DOCS['POS Invoice'][invoice] = {
         name: invoice, branch: 'Demo Branch', restaurant: 'Demo Restaurant', docstatus: 0, status: 'Draft',
+        order_type: s.table ? 'Dine In' : 'Take Away',
+        restaurant_table: s.table || null,
+        customer: 'IROAS Website Guest',
+        customer_name: 'IROAS Website Guest',
+        mobile_number: '',
         items, grand_total: items.reduce((n, i) => n + i.amount, 0),
+        modified: new Date().toISOString(),
       }
       s.invoice = invoice
       const reply = () => send(res, 200, { message: orderOf(body.session) })
@@ -181,12 +285,27 @@ const fakeServer = http.createServer((req, res) => {
     if (method === `${SO}.get_order_status`) {
       const s = fake.sessions.get(q('session'))
       if (!s || fake.statusForbidden) return send(res, 403, { exc_type: 'PermissionError' })
-      return send(res, 200, { message: { session_status: 'Active', invoice: s.invoice, billed: 0, submitted: Boolean(s.invoice), open_requests: [] } })
+      return send(res, 200, {
+        message: {
+          session_status: 'Active',
+          invoice: s.invoice,
+          billed: s.billed ? 1 : 0,
+          submitted: Boolean(s.invoice),
+          open_requests: [],
+        },
+      })
     }
     if (method === `${SO}.get_customer_order`) {
       const s = fake.sessions.get(q('session'))
       if (!s?.invoice) return send(res, 200, { message: null })
       return send(res, 200, { message: orderOf(q('session')) })
+    }
+    if (method === `${SO}.request_bill`) {
+      const s = fake.sessions.get(body.session)
+      if (!s?.invoice) return send(res, 403, { exc_type: 'PermissionError' })
+      s.billed = true
+      DOCS['POS Invoice'][s.invoice].status = 'Draft'
+      return send(res, 200, { message: { ok: 1, billed: 1 } })
     }
     return send(res, 404, { exc_type: 'DoesNotExistError' })
   })
@@ -205,11 +324,12 @@ const originalConsole = { warn: console.warn, info: console.info, error: console
 const SLUG = 'saffron-test'
 const LOCAL_HOURS = [{ day: 'Monday', open: '08:00', close: '09:00', closed: false }]
 
-async function call(pathname, { method = 'GET', body, ip } = {}) {
+async function call(pathname, { method = 'GET', body, ip, token } = {}) {
   const res = await fetch(`${api}${pathname}`, {
     method,
     headers: {
       'X-Forwarded-For': ip || `10.0.0.${(ipSeq += 1)}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -353,26 +473,30 @@ test('hours, contact and menu come from URY when the demo switches are on', asyn
   assert.ok(!res.text.includes('QR-S3CRET') && !res.text.includes(SECRET) && !res.text.includes('9999'))
 })
 
-test('missing schedule and address show a not-configured warning, never local or invented values', async () => {
+test('missing POS schedule and address keep the IROAS profile and still warn', async () => {
   DOCS['URY Branch Operating Schedule'] = {}
   DOCS['URY Restaurant']['Demo Restaurant'].address = null
   const res = await call(`/api/public/${SLUG}`)
   const { restaurant, ury } = res.json
   assert.equal(ury.hours.status, 'not_configured')
   assert.match(ury.hours.message, /not been set up/)
-  assert.deepEqual(restaurant.hours, [])
+  assert.deepEqual(restaurant.hours, LOCAL_HOURS)
   assert.equal(ury.contact.status, 'not_configured')
-  for (const k of ['phone', 'email', 'address', 'city', 'country']) assert.equal(restaurant[k], '', k)
+  assert.equal(restaurant.phone, '+91 local')
+  assert.equal(restaurant.email, 'local@iroas.test')
+  assert.equal(restaurant.city, 'Mumbai')
+  assert.equal(restaurant.address, '')
+  assert.equal(restaurant.country, '')
 })
 
-test('a disabled schedule is reported as disabled', async () => {
+test('a disabled schedule is reported as disabled and the site keeps IROAS hours', async () => {
   DOCS['URY Branch Operating Schedule']['Demo Branch'].enabled = 0
   const res = await call(`/api/public/${SLUG}`)
   assert.equal(res.json.ury.hours.status, 'disabled')
-  assert.deepEqual(res.json.restaurant.hours, [])
+  assert.deepEqual(res.json.restaurant.hours, LOCAL_HOURS)
 })
 
-test('URY outage: sections report unavailable and ordering is disabled (no local fallback)', async () => {
+test('URY outage: menu and ordering stop, hours and contact stay on the IROAS profile', async () => {
   process.env.URY_BASE_URL = 'http://127.0.0.1:1'
   try {
     const res = await call(`/api/public/${SLUG}`)
@@ -381,8 +505,9 @@ test('URY outage: sections report unavailable and ordering is disabled (no local
     assert.equal(ury.hours.status, 'unavailable')
     assert.equal(ury.menu.status, 'unavailable')
     assert.equal(ury.guestOrdering.enabled, false)
-    assert.deepEqual(restaurant.hours, [])
-    assert.equal(restaurant.phone, '')
+    assert.deepEqual(restaurant.hours, LOCAL_HOURS)
+    assert.equal(restaurant.phone, '+91 local')
+    assert.equal(restaurant.email, 'local@iroas.test')
   } finally {
     process.env.URY_BASE_URL = `http://127.0.0.1:${fakeServer.address().port}`
   }
@@ -414,7 +539,8 @@ test('guest order is priced by URY, placed once, and replayed on duplicate submi
   assert.match(data.invoice, /^POS-INV-/)
   assert.equal(data.pickupCode, `P-${data.invoice}`)
   assert.equal(data.total, 399, 'total from URY rates, browser price ignored')
-  assert.equal(data.guestDetailsStoredInPos, false)
+  assert.equal(data.guestDetailsStoredInPos, true)
+  assert.equal(data.customerName, 'Thandi Guest')
   assert.ok(!res.text.includes('SES-'), 'URY session never exposed')
 
   assert.equal(fake.addCalls.length, 1)
@@ -436,7 +562,8 @@ test('guest order is priced by URY, placed once, and replayed on duplicate submi
   const st = await status(id)
   assert.equal(st.status, 200)
   assert.equal(st.json.data.status, 'placed')
-  assert.equal(st.json.data.live.state, 'open')
+  assert.equal(st.json.data.live.state, 'draft')
+  assert.equal(st.json.data.live.orderType, 'Take Away')
 })
 
 test('concurrent submits with the same id create one URY order', async () => {
@@ -593,4 +720,378 @@ test('existing auth, QR table lookup and local flows still work', async () => {
   const missing = await call(`/api/public/${SLUG}/table/NOPE`)
   assert.equal(missing.status, 404)
   assert.equal(fake.addCalls.length, 0)
+})
+
+// ---------------------------------------------------------------- images, menu edits, table QR
+
+async function ownerToken() {
+  const login = await call('/api/auth/login', { method: 'POST', body: { email: 'owner@demo.test', password: 'Owner@123' } })
+  assert.equal(login.status, 200, login.text)
+  return login.json.token
+}
+
+test('menu items carry URY images and Item-level disabled makes them unavailable', async () => {
+  LISTS.Item[1].disabled = 1
+  try {
+    const res = await call(`/api/public/${SLUG}`)
+    const items = res.json.ury.menu.categories.flatMap((c) => c.items)
+    const gr = items.find((i) => i.code === 'GR')
+    assert.equal(gr.image, `${process.env.URY_BASE_URL}/files/ghee-rice.jpg`)
+    assert.equal(items.find((i) => i.code === 'WNG').image, 'https://img.test/wings.jpg')
+    assert.equal(items.find((i) => i.code === 'WNG').available, false)
+    assert.equal(items.find((i) => i.code === 'MOM').image, null)
+  } finally {
+    LISTS.Item[1].disabled = 0
+  }
+})
+
+test('owner can add a course, a menu, and an item on the active POS menu', async () => {
+  const token = await ownerToken()
+  const menu = DOCS['URY Menu']['Demo Menu']
+  const saved = menu.items.map((row) => ({ ...row }))
+  try {
+    const course = await call('/api/restaurant/pos-menu/courses', { method: 'POST', token, body: { name: 'Desserts', icon: 'Cake' } })
+    assert.equal(course.status, 201, course.text)
+    assert.equal(DOCS['URY Menu Course']['Desserts'].course, 'Desserts')
+    assert.equal(DOCS['URY Menu Course']['Desserts'].icon, 'Cake')
+
+    const createdMenu = await call('/api/restaurant/pos-menu/menus', {
+      method: 'POST',
+      token,
+      body: { name: 'Lunch Menu', items: [{ item: 'GR', rate: 90 }] },
+    })
+    assert.equal(createdMenu.status, 201, createdMenu.text)
+    assert.equal(DOCS['URY Menu']['Lunch Menu'].branch, 'Demo Branch')
+    assert.equal(DOCS['URY Menu']['Lunch Menu'].items[0].item, 'GR')
+    assert.equal(DOCS['URY Menu']['Lunch Menu'].items[0].rate, 90)
+
+    const item = await call('/api/restaurant/pos-menu/items', {
+      method: 'POST',
+      token,
+      body: { menu: 'Demo Menu', name: 'Paneer Tikka', course: 'Desserts', rate: 80 },
+    })
+    assert.equal(item.status, 201, item.text)
+    const row = DOCS['URY Menu']['Demo Menu'].items.find((entry) => entry.item_name === 'Paneer Tikka')
+    assert.ok(row)
+    assert.equal(row.rate, 80)
+    assert.equal(row.course, 'Desserts')
+    assert.equal(DOCS.Item[row.item].item_group, 'Products')
+    assert.equal((await call('/api/restaurant/pos-menu/items', { method: 'POST', token, body: { menu: 'Nope', name: 'X', rate: 10 } })).status, 404)
+  } finally {
+    DOCS['URY Menu']['Demo Menu'].items = saved
+    delete DOCS['URY Menu']['Lunch Menu']
+    delete DOCS['URY Menu Course']
+    delete DOCS.Item
+    const { clearUryMenuCache } = await import('../src/integrations/ury/uryMenu.js')
+    clearUryMenuCache()
+  }
+})
+
+test('owner can change availability and price of an active-menu row in URY; other rows and bad input are refused', async () => {
+  const token = await ownerToken()
+  const rows = DOCS['URY Menu']['Demo Menu'].items
+  const saved = rows.map((r) => ({ ...r }))
+  try {
+    const off = await call('/api/restaurant/pos-menu/items/r1', { method: 'PATCH', token, body: { available: false } })
+    assert.equal(off.status, 200, off.text)
+    assert.equal(rows[0].disabled, 1)
+    assert.equal(off.json.data.categories.flatMap((c) => c.items).find((i) => i.id === 'r1').available, false)
+
+    const price = await call('/api/restaurant/pos-menu/items/r2', { method: 'PATCH', token, body: { price: 105.5 } })
+    assert.equal(price.status, 200, price.text)
+    assert.equal(rows[1].rate, 105.5)
+    const set = fake.requests.filter((r) => r.method === 'frappe.client.set_value')
+    assert.deepEqual(set.at(-1).body, { doctype: 'URY Menu Item', name: 'r2', fieldname: { rate: 105.5 } })
+
+    const before = fake.requests.length
+    assert.equal((await call('/api/restaurant/pos-menu/items/zz', { method: 'PATCH', token, body: { available: true } })).status, 404)
+    assert.equal((await call('/api/restaurant/pos-menu/items/r1', { method: 'PATCH', token, body: { price: -1 } })).status, 400)
+    assert.equal((await call('/api/restaurant/pos-menu/items/r1', { method: 'PATCH', token, body: { available: 'yes' } })).status, 400)
+    assert.equal((await call('/api/restaurant/pos-menu/items/r1', { method: 'PATCH', body: { available: true } })).status, 401)
+    assert.ok(!fake.requests.slice(before).some((r) => r.method === 'frappe.client.set_value'), 'no write for refused edits')
+  } finally {
+    DOCS['URY Menu']['Demo Menu'].items = saved
+  }
+})
+
+test('guest takeaway order tracks Draft payment status; request-bill marks billed without losing the order', async () => {
+  const id = newSubmission()
+  const placed = await order(id, [{ code: 'GR', qty: 1 }])
+  assert.equal(placed.status, 201, placed.text)
+  assert.equal(placed.json.data.status, 'placed')
+  assert.equal(placed.json.data.guestDetailsStoredInPos, true)
+  assert.equal(placed.json.data.customerName, 'Thandi Guest')
+  const inv = DOCS['POS Invoice'][placed.json.data.invoice]
+  assert.equal(inv.customer, 'Thandi Guest')
+  assert.equal(inv.mobile_number, '+27825550101')
+
+  const st = await status(id)
+  assert.equal(st.status, 200, st.text)
+  assert.equal(st.json.data.live.state, 'draft', 'Take Away draft maps to URY Draft')
+  assert.equal(st.json.data.live.orderType, 'Take Away')
+  assert.equal(st.json.data.live.canRequestBill, true)
+
+  const bill = await call(`/api/public/${SLUG}/ury-orders/${id}/request-bill`, { method: 'POST', body: {} })
+  assert.equal(bill.status, 200, bill.text)
+  assert.equal(bill.json.data.status, 'placed')
+  assert.equal(bill.json.data.live.billed, true)
+  assert.equal(bill.json.data.invoice, placed.json.data.invoice)
+
+  const acct = await call(`/api/public/${SLUG}/ury-account?phone=${encodeURIComponent('+27 82 555 0101')}`)
+  assert.equal(acct.status, 200, acct.text)
+  assert.equal(acct.json.data.customer?.name, 'Thandi Guest')
+  assert.ok(acct.json.data.orders.some((o) => o.id === placed.json.data.invoice))
+  assert.equal(acct.json.data.orders.find((o) => o.id === placed.json.data.invoice).orderType, 'Take Away')
+
+  const created = await call(`/api/public/${SLUG}/ury-account`, {
+    method: 'POST',
+    body: { name: 'New Guest', phone: '+27829990001' },
+  })
+  assert.equal(created.status, 201, created.text)
+  assert.equal(created.json.data.customer.name, 'New Guest')
+  assert.equal(created.json.data.customer.created, true)
+  const again = await call(`/api/public/${SLUG}/ury-account`, {
+    method: 'POST',
+    body: { name: 'Ignored', phone: '+27829990001' },
+  })
+  assert.equal(again.status, 200)
+  assert.equal(again.json.data.customer.created, false)
+  assert.equal(again.json.data.customer.name, 'New Guest')
+
+  const missing = await call(`/api/public/${SLUG}/ury-orders/${newSubmission()}/request-bill`, { method: 'POST', body: {} })
+  assert.equal(missing.status, 404)
+
+  const invName = placed.json.data.invoice
+  const track = await call(
+    `/api/public/${SLUG}/ury-track?invoice=${encodeURIComponent(invName)}&phone=${encodeURIComponent('+27825550101')}`,
+  )
+  assert.equal(track.status, 200, track.text)
+  assert.equal(track.json.data.id, invName)
+  assert.equal(track.json.data.state, 'draft')
+  assert.equal(track.json.data.orderType, 'Take Away')
+  assert.ok(Array.isArray(track.json.data.items))
+
+  const badPhone = await call(
+    `/api/public/${SLUG}/ury-track?invoice=${encodeURIComponent(invName)}&phone=${encodeURIComponent('+27820000000')}`,
+  )
+  assert.equal(badPhone.status, 404)
+  const badInv = await call(
+    `/api/public/${SLUG}/ury-track?invoice=NOPE&phone=${encodeURIComponent('+27825550101')}`,
+  )
+  assert.equal(badInv.status, 404)
+})
+
+test('staff can advance POS kitchen steps without changing URY payment state', async () => {
+  const token = await ownerToken()
+  const id = newSubmission()
+  const placed = await order(id, [{ code: 'GR', qty: 1 }])
+  assert.equal(placed.status, 201, placed.text)
+  const invoice = placed.json.data.invoice
+
+  const list1 = await call('/api/restaurant/pos-orders', { token })
+  assert.equal(list1.status, 200, list1.text)
+  const row = list1.json.data.orders.find((o) => o.id === invoice)
+  assert.ok(row)
+  assert.equal(row.kitchenStep, 'received')
+  assert.equal(row.state, 'draft')
+
+  const adv = await call(`/api/restaurant/pos-orders/${encodeURIComponent(invoice)}/kitchen`, {
+    method: 'PATCH',
+    token,
+    body: { advance: true },
+  })
+  assert.equal(adv.status, 200, adv.text)
+  assert.equal(adv.json.data.kitchenStep, 'accepted')
+
+  const list2 = await call('/api/restaurant/pos-orders', { token })
+  const row2 = list2.json.data.orders.find((o) => o.id === invoice)
+  assert.equal(row2.kitchenStep, 'accepted')
+  assert.equal(row2.state, 'draft', 'payment lane unchanged')
+})
+
+test('sign-in finds desk customers when phone format differs (+91 vs local digits)', async () => {
+  DOCS.Customer['Desk Guest'] = {
+    name: 'Desk Guest',
+    customer_name: 'Desk Guest',
+    mobile_number: '9837462817',
+    disabled: 0,
+  }
+  LISTS.Customer = Object.values(DOCS.Customer)
+  try {
+    const res = await call(`/api/public/${SLUG}/ury-account?phone=${encodeURIComponent('+91 98374 62817')}`)
+    assert.equal(res.status, 200, res.text)
+    assert.equal(res.json.data.customer?.name, 'Desk Guest')
+    assert.equal(res.json.data.customer?.phone, '9837462817')
+  } finally {
+    delete DOCS.Customer['Desk Guest']
+    LISTS.Customer = Object.values(DOCS.Customer)
+  }
+})
+
+test('POS item availability matches the register (sellable), not leftover warehouse qty', async () => {
+  DOCS['POS Profile'] = {
+    'Demo Profile': {
+      name: 'Demo Profile',
+      restaurant: 'Demo Restaurant',
+      branch: 'Demo Branch',
+      company: 'Co',
+      warehouse: 'Finished Goods - IR',
+      disabled: 0,
+    },
+  }
+  LISTS.Bin = [
+    { item_code: 'GR', actual_qty: 11, warehouse: 'Finished Goods - IR' },
+    { item_code: 'WNG', actual_qty: 0, warehouse: 'Finished Goods - IR' },
+  ]
+  fake.availability = {
+    GR: { item_code: 'GR', sellable: false, available_qty: 0 },
+    WNG: { item_code: 'WNG', sellable: true, available_qty: 4 },
+    MOM: { item_code: 'MOM', sellable: false, available_qty: 0 },
+  }
+  try {
+    const { clearUryMenuCache } = await import('../src/integrations/ury/uryMenu.js')
+    clearUryMenuCache()
+    const res = await call(`/api/public/${SLUG}`)
+    const items = res.json.ury.menu.categories.flatMap((c) => c.items)
+    assert.equal(items.find((i) => i.code === 'GR').available, false)
+    assert.equal(items.find((i) => i.code === 'GR').stockQty, 0)
+    assert.equal(items.find((i) => i.code === 'WNG').available, true)
+    assert.equal(items.find((i) => i.code === 'WNG').stockQty, 4)
+    assert.equal(items.find((i) => i.code === 'MOM').available, false)
+    fake.availability = {
+      GR: { item_code: 'GR', sellable: true, available_qty: 3 },
+      WNG: { item_code: 'WNG', sellable: false, available_qty: 0 },
+      MOM: { item_code: 'MOM', sellable: true, available_qty: 2 },
+    }
+    const again = await call(`/api/public/${SLUG}`)
+    const next = again.json.ury.menu.categories.flatMap((c) => c.items)
+    assert.equal(next.find((i) => i.code === 'GR').available, true)
+    assert.equal(next.find((i) => i.code === 'GR').stockQty, 3)
+    assert.equal(next.find((i) => i.code === 'WNG').available, false)
+  } finally {
+    delete DOCS['POS Profile']
+    delete LISTS.Bin
+    delete fake.availability
+    const { clearUryMenuCache } = await import('../src/integrations/ury/uryMenu.js')
+    clearUryMenuCache()
+  }
+})
+
+test('a guest cannot order an item that is not on today’s plan', async () => {
+  DOCS['POS Profile'] = {
+    'Demo Profile': { name: 'Demo Profile', branch: 'Demo Branch', company: 'Co', disabled: 0 },
+  }
+  fake.availability = { GR: { item_code: 'GR', sellable: false, available_qty: 0 } }
+  try {
+    const res = await order(newSubmission(), [{ code: 'GR', qty: 1 }])
+    assert.equal(res.status, 422, res.text)
+    assert.equal(res.json.code, 'item_unavailable')
+  } finally {
+    delete DOCS['POS Profile']
+    delete fake.availability
+  }
+})
+
+test('POS warehouse stock marks zero-qty items unavailable (URY “Not available today”)', async () => {
+  DOCS['POS Profile'] = {
+    'Demo Profile': {
+      name: 'Demo Profile',
+      restaurant: 'Demo Restaurant',
+      branch: 'Demo Branch',
+      warehouse: 'Finished Goods - IR',
+      disabled: 0,
+    },
+  }
+  LISTS.Bin = [
+    { item_code: 'GR', actual_qty: 11, warehouse: 'Finished Goods - IR' },
+    { item_code: 'WNG', actual_qty: 0, warehouse: 'Finished Goods - IR' },
+  ]
+  try {
+    const { clearUryMenuCache } = await import('../src/integrations/ury/uryMenu.js')
+    clearUryMenuCache()
+    const res = await call(`/api/public/${SLUG}`)
+    const items = res.json.ury.menu.categories.flatMap((c) => c.items)
+    assert.equal(items.find((i) => i.code === 'GR').available, true)
+    assert.equal(items.find((i) => i.code === 'GR').stockQty, 11)
+    assert.equal(items.find((i) => i.code === 'WNG').available, false)
+    assert.equal(items.find((i) => i.code === 'WNG').stockQty, 0)
+    // MOM has no Bin row → qty 0 at warehouse
+    assert.equal(items.find((i) => i.code === 'MOM').available, false)
+    assert.equal(items.find((i) => i.code === 'MOM').stockQty, 0)
+  } finally {
+    delete DOCS['POS Profile']
+    delete LISTS.Bin
+    const { clearUryMenuCache } = await import('../src/integrations/ury/uryMenu.js')
+    clearUryMenuCache()
+  }
+})
+
+test('table QR: owner gets signed codes; a scanned code orders to that URY table; forged or foreign codes are refused', async () => {
+  LISTS['URY Table'] = Object.values(DOCS['URY Table'])
+  try {
+    const token = await ownerToken()
+    const qr = await call('/api/restaurant/pos-tables/qr', { token })
+    assert.equal(qr.status, 200, qr.text)
+    assert.deepEqual(qr.json.data.tables.map((t) => t.name), ['T1'], 'only this restaurant’s tables')
+    const code = qr.json.data.tables[0].code
+    assert.match(code, /^u\./)
+
+    const scan = await call(`/api/public/${SLUG}/ury-table/${encodeURIComponent(code)}`)
+    assert.equal(scan.status, 200, scan.text)
+    assert.equal(scan.json.data.table.name, 'T1')
+
+    const forged = code.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A'))
+    assert.equal((await call(`/api/public/${SLUG}/ury-table/${encodeURIComponent(forged)}`)).status, 404)
+    const { signTableCode } = await import('../src/integrations/ury/uryTableQr.js')
+    assert.equal((await call(`/api/public/${SLUG}/ury-table/${encodeURIComponent(signTableCode(restaurantId + 1, 'T1'))}`)).status, 404)
+    assert.equal((await call(`/api/public/${SLUG}/ury-table/${encodeURIComponent(signTableCode(restaurantId, 'X1'))}`)).status, 404, 'other restaurant’s table')
+
+    const id = newSubmission()
+    const placed = await order(id, [{ code: 'GR', qty: 1 }], { tableCode: code })
+    assert.equal(placed.status, 201, placed.text)
+    assert.equal(placed.json.data.table, 'T1')
+    const tokenReq = fake.requests.filter((r) => r.method === `${SO}.generate_qr_token`).at(-1)
+    assert.deepEqual(tokenReq.body, { profile: 'Demo Website', table: 'T1' })
+    assert.ok(!placed.text.includes('TOKEN-Demo'))
+
+    const wrong = await order(newSubmission(), [{ code: 'GR', qty: 1 }], { tableCode: forged })
+    assert.equal(wrong.status, 404)
+    const conflict = await order(id, [{ code: 'GR', qty: 1 }])
+    assert.equal(conflict.status, 409, 'same submission id cannot switch from table to pickup')
+  } finally {
+    LISTS['URY Table'] = []
+  }
+})
+
+test('owner can add a dining table on the mapped branch', async () => {
+  const saved = { ...DOCS['URY Table'] }
+  LISTS['URY Table'] = Object.values(DOCS['URY Table'])
+  LISTS['URY Room'] = [{ name: 'Main', branch: 'Demo Branch' }, { name: 'Other', branch: 'Elsewhere' }]
+  try {
+    const token = await ownerToken()
+    const created = await call('/api/restaurant/pos-tables', {
+      method: 'POST',
+      token,
+      body: { name: 'T2', seats: 4, minimumSeating: 1, room: 'Main', shape: 'Rectangle', takeAway: false },
+    })
+    assert.equal(created.status, 201, created.text)
+    assert.equal(DOCS['URY Table'].T2.table_name, 'T2')
+    assert.equal(DOCS['URY Table'].T2.restaurant, 'Demo Restaurant')
+    assert.equal(DOCS['URY Table'].T2.branch, 'Demo Branch')
+    assert.equal(DOCS['URY Table'].T2.restaurant_room, 'Main')
+    assert.equal(DOCS['URY Table'].T2.no_of_seats, 4)
+    assert.equal(DOCS['URY Table'].T2.minimum_seating, 1)
+    assert.equal(DOCS['URY Table'].T2.table_shape, 'Rectangle')
+    LISTS['URY Table'] = Object.values(DOCS['URY Table'])
+    const again = await call('/api/restaurant/pos-tables', {
+      method: 'POST',
+      token,
+      body: { name: 'T2', seats: 4, minimumSeating: 1, room: 'Main', shape: 'Square' },
+    })
+    assert.equal(again.status, 409)
+  } finally {
+    DOCS['URY Table'] = saved
+    LISTS['URY Table'] = []
+    delete LISTS['URY Room']
+  }
 })

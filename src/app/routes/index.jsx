@@ -57,6 +57,7 @@ const PlatformSettings = lazy(() => import('@/features/platform-admin/PlatformAd
 const PlatformFeatureFlags = lazy(() => import('@/features/platform-admin/PlatformAdmin/FeatureFlags'))
 const Menu = lazy(() => import('@/features/dashboard/Menu/Menu'))
 const Orders = lazy(() => import('@/features/dashboard/Orders/Orders'))
+const PosShift = lazy(() => import('@/features/dashboard/PosShift/PosShift'))
 const Reservations = lazy(() => import('@/features/dashboard/Reservations/Reservations'))
 const Tables = lazy(() => import('@/features/dashboard/Tables/Tables'))
 const Staff = lazy(() => import('@/features/dashboard/Staff/Staff'))
@@ -197,6 +198,7 @@ export function AppRoutes() {
         <Route path={ROUTES.ONE_LINK} element={withProtection(OneLink, LIVE_ONLY)} />
         <Route path={ROUTES.MENU} element={withProtection(Menu, LIVE_ONLY)} />
         <Route path={ROUTES.ORDERS} element={withProtection(Orders, LIVE_ONLY)} />
+        <Route path={ROUTES.POS_SHIFT} element={withProtection(PosShift, LIVE_ONLY)} />
         <Route path={ROUTES.RESERVATIONS} element={withProtection(Reservations, LIVE_ONLY)} />
         <Route path={ROUTES.TABLES} element={withProtection(Tables, LIVE_ONLY)} />
         <Route path={ROUTES.STAFF} element={withProtection(Staff, LIVE_ONLY)} />

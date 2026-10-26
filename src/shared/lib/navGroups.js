@@ -51,6 +51,12 @@ export const NAV_GROUPS = [
         badge: '12',
       },
       {
+        key: 'pos-shift',
+        label: 'POS Shift',
+        icon: '/images/payments.svg',
+        route: ROUTES.POS_SHIFT,
+      },
+      {
         key: 'reservations',
         label: 'Reservations',
         icon: '/images/breserve.svg',

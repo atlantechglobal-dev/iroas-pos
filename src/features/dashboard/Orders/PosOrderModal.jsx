@@ -6,12 +6,29 @@ function money(value) {
   return Number(value || 0).toFixed(2)
 }
 
+/** Match IROAS / URY table labels (T08 ↔ T8 ↔ t08). */
+function fuzzyTableKey(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .replace(/^t0+(\d)/, 't$1')
+    .replace(/^0+(\d)/, '$1')
+}
+
+function findTableByName(list, name) {
+  if (!name || !list?.length) return null
+  const key = fuzzyTableKey(name)
+  return list.find((t) => fuzzyTableKey(t.name) === key || fuzzyTableKey(t.id) === key) || null
+}
+
 /**
- * Sends a new order for a free table to the URY POS kitchen.
- * `initial` may prefill { guestName, phone, pax, notes } (e.g. from a reservation).
+ * Sends a new order to the URY POS kitchen.
+ * `initial` may prefill { guestName, phone, pax, notes, table, orderMode }.
+ * orderMode: 'dinein' | 'takeaway'
  */
 function PosOrderModal({ initial = {}, onClose, onPlaced }) {
   const [tables, setTables] = useState({ status: 'loading', list: [] })
+  const [orderMode, setOrderMode] = useState(initial.orderMode === 'takeaway' ? 'takeaway' : 'dinein')
   const [table, setTable] = useState('')
   const [menu, setMenu] = useState({ status: 'idle', items: [], orderType: '' })
   const [qty, setQty] = useState({})
@@ -21,6 +38,7 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
   const [notes, setNotes] = useState(initial.notes || '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const tableLocked = Boolean(initial.table)
 
   useEffect(() => {
     let cancelled = false
@@ -41,8 +59,37 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
     }
   }, [])
 
+  // Prefill / auto-pick table when POS tables load or mode changes
   useEffect(() => {
-    if (!table) return undefined
+    if (tables.status !== 'ready') return
+
+    const preferred = findTableByName(tables.list, initial.table)
+    if (preferred) {
+      setOrderMode(preferred.takeAway ? 'takeaway' : 'dinein')
+      setTable(preferred.id)
+      return
+    }
+
+    if (orderMode === 'takeaway') {
+      const takeAway = tables.list.find((t) => t.takeAway)
+      setTable(takeAway?.id || '')
+      return
+    }
+
+    setTable((prev) => {
+      if (prev) {
+        const current = tables.list.find((t) => t.id === prev)
+        if (current && !current.takeAway) return prev
+      }
+      return ''
+    })
+  }, [tables.status, tables.list, orderMode, initial.table])
+
+  useEffect(() => {
+    if (!table) {
+      setMenu({ status: 'idle', items: [], orderType: '' })
+      return undefined
+    }
     let cancelled = false
     setMenu({ status: 'loading', items: [], orderType: '' })
     setQty({})
@@ -60,6 +107,14 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
     }
   }, [table])
 
+  const modeTables = useMemo(() => {
+    if (orderMode === 'takeaway') return tables.list.filter((t) => t.takeAway)
+    return tables.list.filter((t) => !t.takeAway)
+  }, [tables.list, orderMode])
+
+  const freeInMode = modeTables.filter((t) => t.status !== 'occupied')
+  const selectedMeta = tables.list.find((t) => t.id === table)
+
   const courses = useMemo(() => {
     const groups = new Map()
     for (const item of menu.items) {
@@ -72,15 +127,23 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
 
   const lines = menu.items.filter((it) => qty[it.code] > 0)
   const total = lines.reduce((sum, it) => sum + (it.rate || 0) * qty[it.code], 0)
-  const freeTables = tables.list.filter((t) => t.status !== 'occupied')
 
   const bump = (code, delta) =>
     setQty((prev) => ({ ...prev, [code]: Math.max(0, Math.min(99, (prev[code] || 0) + delta)) }))
 
+  const switchMode = (mode) => {
+    if (tableLocked) return
+    setError('')
+    setOrderMode(mode)
+    setTable('')
+    setQty({})
+    setMenu({ status: 'idle', items: [], orderType: '' })
+  }
+
   const submit = async (event) => {
     event.preventDefault()
     setError('')
-    if (!table) return setError('Choose a table.')
+    if (!table) return setError(orderMode === 'takeaway' ? 'No Take Away table is available in POS.' : 'Choose a table.')
     if (!lines.length) return setError('Add at least one item.')
     if (!phone.trim()) return setError('Enter the guest’s phone number.')
     setSubmitting(true)
@@ -94,7 +157,7 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
         comments: notes,
         items: lines.map((it) => ({ item: it.code, qty: qty[it.code] })),
       })
-      onPlaced?.({ ...orderRes?.data, customer })
+      onPlaced?.({ ...orderRes?.data, customer, orderMode })
     } catch (err) {
       setError(err.message || 'The order was not sent. Please try again.')
     } finally {
@@ -112,7 +175,9 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
             ×
           </button>
         </div>
-        <p className="pos-order-sub">Sent straight to the kitchen in your POS. The table shows as occupied there.</p>
+        <p className="pos-order-sub">
+          Same as URY POS: Dine In books the table (Unbilled); Take Away creates a Draft order until paid.
+        </p>
 
         {error ? (
           <p className="pos-order-error" role="alert">
@@ -120,21 +185,67 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
           </p>
         ) : null}
 
+        <div className="pos-order-mode" role="tablist" aria-label="Order type">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={orderMode === 'dinein'}
+            className={`pos-order-mode-btn${orderMode === 'dinein' ? ' is-active' : ''}`}
+            onClick={() => switchMode('dinein')}
+            disabled={tableLocked && orderMode !== 'dinein'}
+          >
+            Dine In
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={orderMode === 'takeaway'}
+            className={`pos-order-mode-btn${orderMode === 'takeaway' ? ' is-active' : ''}`}
+            onClick={() => switchMode('takeaway')}
+            disabled={tableLocked && orderMode !== 'takeaway'}
+          >
+            Take Away
+          </button>
+        </div>
+
         <div className="pos-order-grid">
-          <label>
-            Table
-            <select value={table} onChange={(e) => setTable(e.target.value)} required>
-              <option value="">{tables.status === 'loading' ? 'Loading tables…' : 'Choose a free table'}</option>
-              {tables.list.map((t) => (
-                <option key={t.id} value={t.id} disabled={t.status === 'occupied'}>
-                  {t.name}
-                  {t.room ? ` · ${t.room}` : ''}
-                  {t.seats ? ` · ${t.seats} seats` : ''}
-                  {t.status === 'occupied' ? ' · occupied' : ''}
+          {orderMode === 'dinein' ? (
+            <label>
+              Table
+              <select
+                value={table}
+                onChange={(e) => setTable(e.target.value)}
+                required
+                disabled={tableLocked}
+              >
+                <option value="">
+                  {tables.status === 'loading' ? 'Loading tables…' : 'Choose a free table'}
                 </option>
-              ))}
-            </select>
-          </label>
+                {modeTables.map((t) => (
+                  <option key={t.id} value={t.id} disabled={t.status === 'occupied' && t.id !== table}>
+                    {t.name}
+                    {t.room ? ` · ${t.room}` : ''}
+                    {t.seats ? ` · ${t.seats} seats` : ''}
+                    {t.status === 'occupied' ? ' · occupied' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              Take Away
+              <input
+                readOnly
+                value={
+                  selectedMeta
+                    ? `${selectedMeta.name}${selectedMeta.room ? ` · ${selectedMeta.room}` : ''}`
+                    : tables.status === 'loading'
+                      ? 'Loading…'
+                      : 'No Take Away table in POS'
+                }
+              />
+            </label>
+          )}
           <label>
             Guests
             <input type="number" min={1} max={50} value={pax} onChange={(e) => setPax(e.target.value)} />
@@ -148,17 +259,44 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
             <input value={phone} onChange={(e) => setPhone(e.target.value)} required placeholder="+27…" />
           </label>
         </div>
-        {tables.status === 'ready' && freeTables.length === 0 ? (
-          <p className="pos-order-note">All tables are occupied right now.</p>
+
+        {tableLocked && selectedMeta ? (
+          <p className="pos-order-note">
+            Reserved table <strong>{selectedMeta.name}</strong>
+            {selectedMeta.room ? ` · ${selectedMeta.room}` : ''} — sending this order books it in POS like a dine-in
+            seat.
+          </p>
+        ) : null}
+
+        {tables.status === 'ready' && orderMode === 'dinein' && freeInMode.length === 0 ? (
+          <p className="pos-order-note">All dine-in tables are occupied right now.</p>
         ) : null}
         {tables.status === 'error' ? <p className="pos-order-note">{tables.message || 'Could not load tables.'}</p> : null}
 
         <div className="pos-order-menu">
-          {!table ? <p className="pos-order-note">Choose a table to see its menu.</p> : null}
+          {!table ? (
+            <p className="pos-order-note">
+              {orderMode === 'takeaway' ? 'Take Away menu loads when a takeaway table is available.' : 'Choose a table to see its menu.'}
+            </p>
+          ) : null}
+          {menu.status === 'ready' && menu.orderType ? (
+            <p className="pos-order-note">
+              POS menu: <strong>{menu.orderType}</strong>
+              {selectedMeta?.room ? (
+                <>
+                  {' '}
+                  · room <strong>{selectedMeta.room}</strong>
+                </>
+              ) : null}
+              {menu.orderType === 'Take Away'
+                ? ' — Draft until paid.'
+                : ' — table shows occupied / Unbilled until paid.'}
+            </p>
+          ) : null}
           {menu.status === 'loading' ? <p className="pos-order-note">Loading menu…</p> : null}
           {menu.status === 'error' ? <p className="pos-order-note">{menu.message || 'Could not load the menu.'}</p> : null}
           {menu.status === 'ready' && menu.items.length === 0 ? (
-            <p className="pos-order-note">No items are available for this table.</p>
+            <p className="pos-order-note">No items are available for this order type.</p>
           ) : null}
           {courses.map(([course, items]) => (
             <div key={course} className="pos-order-course">
@@ -198,7 +336,7 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
               Cancel
             </button>
             <button type="submit" className="pos-order-btn" disabled={submitting || !table || !lines.length}>
-              {submitting ? 'Sending…' : 'Send to kitchen'}
+              {submitting ? 'Sending…' : orderMode === 'dinein' ? 'Book table & send' : 'Send takeaway'}
             </button>
           </div>
         </div>

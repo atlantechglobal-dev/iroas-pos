@@ -47,6 +47,41 @@ export const publicApi = {
       `/public/${encodeURIComponent(slug)}/ury-orders/${encodeURIComponent(submissionId)}`,
       { auth: false },
     ),
+  trackUryOrder: (slug, { invoice, phone }) => {
+    const q = new URLSearchParams({
+      invoice: String(invoice || '').trim(),
+      phone: String(phone || '').trim(),
+    })
+    return apiRequest(`/public/${encodeURIComponent(slug)}/ury-track?${q}`, { auth: false })
+  },
+  requestUryBill: (slug, submissionId) =>
+    apiRequest(
+      `/public/${encodeURIComponent(slug)}/ury-orders/${encodeURIComponent(submissionId)}/request-bill`,
+      { method: 'POST', body: {}, auth: false },
+    ),
+  getUryAccount: (slug, phone, { customerId } = {}) => {
+    const q = new URLSearchParams({ phone: String(phone || '').trim() })
+    if (customerId) q.set('customerId', String(customerId))
+    return apiRequest(`/public/${encodeURIComponent(slug)}/ury-account?${q}`, { auth: false })
+  },
+  createUryAccount: (slug, payload) =>
+    apiRequest(`/public/${encodeURIComponent(slug)}/ury-account`, {
+      method: 'POST',
+      body: payload,
+      auth: false,
+    }),
+  getUryTable: (slug, code) =>
+    apiRequest(`/public/${encodeURIComponent(slug)}/ury-table/${encodeURIComponent(code)}`, {
+      auth: false,
+    }),
+  listUryDineTables: (slug) =>
+    apiRequest(`/public/${encodeURIComponent(slug)}/ury-dine-tables`, { auth: false }),
+  createUryDineOrder: (slug, payload) =>
+    apiRequest(`/public/${encodeURIComponent(slug)}/ury-dine-orders`, {
+      method: 'POST',
+      body: payload,
+      auth: false,
+    }),
   listTables: (slug) =>
     apiRequest(`/public/${encodeURIComponent(slug)}/tables`, { auth: false }),
   getPlatformCard: (slug) =>

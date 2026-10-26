@@ -24,13 +24,40 @@ export const restaurantApi = {
   updateReservation: (id, payload) =>
     apiRequest(`/restaurant/reservations/${id}`, { method: 'PATCH', body: payload }),
   listTables: () => apiRequest('/restaurant/tables'),
+  syncTablesFromPos: () => apiRequest('/restaurant/tables/sync-from-pos', { method: 'POST', body: {} }),
   createTable: (payload) => apiRequest('/restaurant/tables', { method: 'POST', body: payload }),
   updateTable: (id, payload) =>
     apiRequest(`/restaurant/tables/${id}`, { method: 'PATCH', body: payload }),
   deleteTable: (id) => apiRequest(`/restaurant/tables/${id}`, { method: 'DELETE' }),
   listPosTables: () => apiRequest('/restaurant/pos-tables'),
+  getPosTableOptions: () => apiRequest('/restaurant/pos-tables/options'),
+  createPosTable: (payload) => apiRequest('/restaurant/pos-tables', { method: 'POST', body: payload }),
   getPosMenu: () => apiRequest('/restaurant/pos-menu'),
+  getPosMenuOptions: () => apiRequest('/restaurant/pos-menu/options'),
+  createPosMenuItem: (payload) => apiRequest('/restaurant/pos-menu/items', { method: 'POST', body: payload }),
+  createPosCourse: (payload) => apiRequest('/restaurant/pos-menu/courses', { method: 'POST', body: payload }),
+  createPosMenu: (payload) => apiRequest('/restaurant/pos-menu/menus', { method: 'POST', body: payload }),
+  updatePosMenuItem: (id, payload) =>
+    apiRequest(`/restaurant/pos-menu/items/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
+  listPosTableQr: () => apiRequest('/restaurant/pos-tables/qr'),
+  getPosShift: () => apiRequest('/restaurant/pos-shift'),
+  openPosShift: (payload = {}) => apiRequest('/restaurant/pos-shift/open', { method: 'POST', body: payload }),
+  closePosShift: () => apiRequest('/restaurant/pos-shift/close', { method: 'POST', body: {} }),
   listPosOrders: () => apiRequest('/restaurant/pos-orders'),
+  getPosOrderBill: (invoiceId) =>
+    apiRequest(`/restaurant/pos-orders/${encodeURIComponent(invoiceId)}/bill`),
+  payPosOrder: (invoiceId, payments) =>
+    apiRequest(`/restaurant/pos-orders/${encodeURIComponent(invoiceId)}/pay`, {
+      method: 'POST',
+      body: { payments },
+    }),
+  printPosOrder: (invoiceId) =>
+    apiRequest(`/restaurant/pos-orders/${encodeURIComponent(invoiceId)}/print`, { method: 'POST', body: {} }),
+  advancePosKitchen: (invoiceId, body = { advance: true }) =>
+    apiRequest(`/restaurant/pos-orders/${encodeURIComponent(invoiceId)}/kitchen`, {
+      method: 'PATCH',
+      body,
+    }),
   listPosCustomers: () => apiRequest('/restaurant/pos-customers'),
   listPosStaff: () => apiRequest('/restaurant/pos-staff'),
   getPosOrderMenu: (table) =>
