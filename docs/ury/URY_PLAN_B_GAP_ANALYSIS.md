@@ -2,7 +2,7 @@
 
 Date: 2026-10-13 · Status: **analysis only — Plan B is NOT implemented.** No application code, mappings or URY data were changed while producing this document.
 
-Companion documents: `docs/URY_API_DISCOVERY.md` (endpoint contracts), `docs/URY_MENU_API_DISCOVERY.md` (menu/table detail).
+Companion documents: `docs/ury/URY_API_DISCOVERY.md` (endpoint contracts), `docs/ury/URY_MENU_API_DISCOVERY.md` (menu/table detail).
 
 ---
 

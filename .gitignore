@@ -12,3 +12,11 @@ server/data/*.db-journal
 server/data/*.db-wal
 server/data/*.db-shm
 server/data/ury-captures/
+# Editor / local artefacts
+.cursor/
+*.zip
+*.bak
+*.bak-*
+
+# Raw URY discovery exports that may contain captured tokens (curated copies live in docs/ury/discovery/)
+docs/ury/*.xlsx

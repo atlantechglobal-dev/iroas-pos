@@ -1,4 +1,4 @@
-// URY Menu READ for a mapped URY Restaurant. Verified chain (docs/URY_MENU_API_DISCOVERY.md):
+// URY Menu READ for a mapped URY Restaurant. Verified chain (docs/ury/URY_MENU_API_DISCOVERY.md):
 //   getdoc URY Restaurant <mapped>  -> active_menu, branch, room_wise_menu, order_type_wise_menu
 //   getdoc URY Menu <active_menu>   -> branch, enabled, price_list, items[] (URY Menu Item rows)
 //   getdoc Price List <price_list>  -> currency

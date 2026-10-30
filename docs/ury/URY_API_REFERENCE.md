@@ -3,7 +3,7 @@
 Date: 2026-10-15 · Every exported function in `server/src/integrations/ury/*.js`,
 the exact URY (Frappe) API it calls, its parameters, the IROAS route that
 exposes it, and its real status (live-tested today, code-complete-but-untested,
-not built, or blocked on URY). Companion to `docs/URY_API_STATUS.md` (that one
+not built, or blocked on URY). Companion to `docs/ury/URY_API_STATUS.md` (that one
 is the short summary + onboarding checklist; this one is the full function-level
 reference).
 

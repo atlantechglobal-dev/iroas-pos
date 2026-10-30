@@ -56,7 +56,7 @@ a bench address with or without DNS.
 - table-reservation module is missing in URY v16; IROAS keeps its own
 - no idempotency key on order submission (IROAS keeps its own submission id)
 - guest name/phone cannot be attached to self-orders
-- see `docs/URY_API_STATUS.md` for the full list
+- see `../docs/ury/URY_API_STATUS.md` for the full list
 
 ## Secrets
 
