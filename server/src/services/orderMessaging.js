@@ -1,6 +1,7 @@
 import { db } from '../infra/db.js'
 import { queueEmail, createNotification } from './identityService.js'
 import { isSmtpConfigured, sendEmail } from './emailService.js'
+import { formatMoney } from '../shared/money.js'
 
 function parseSettings(restaurant) {
   if (!restaurant?.settings_json) return {}
@@ -51,7 +52,7 @@ export async function onOrderCreated(restaurant, order) {
       : `Cash · ${order.paymentStatus === 'paid' ? 'Paid' : 'Pay on collection'}`
 
   const itemLines = (order.items || [])
-    .map((it) => `${it.qty}× ${it.name} — ₹${Math.round(it.unitPrice * it.qty)}`)
+    .map((it) => `${it.qty}× ${it.name} — ${formatMoney(it.unitPrice * it.qty)}`)
     .join('\n')
 
   const guestBody = [
@@ -59,7 +60,7 @@ export async function onOrderCreated(restaurant, order) {
     `Order #${order.publicCode}`,
     `Type: ${modeLabel}`,
     `Payment: ${payLabel}`,
-    `Total: ₹${Math.round(order.total)}`,
+    `Total: ${formatMoney(order.total)}`,
     '',
     itemLines,
     order.notes ? `\nNotes: ${order.notes}` : '',
@@ -92,14 +93,14 @@ export async function onOrderCreated(restaurant, order) {
       `${order.guestName} · ${order.phone}`,
       modeLabel,
       payLabel,
-      `Total ₹${Math.round(order.total)}`,
+      `Total ${formatMoney(order.total)}`,
       itemLines,
     ].join('\n')
 
     createNotification({
       userId: restaurant.owner_id,
       title: `New order #${order.publicCode}`,
-      body: `${modeLabel} · ₹${Math.round(order.total)} · ${order.guestName}`,
+      body: `${modeLabel} · ${formatMoney(order.total)} · ${order.guestName}`,
       type: 'order',
       meta: { orderId: order.id, publicCode: order.publicCode },
     })

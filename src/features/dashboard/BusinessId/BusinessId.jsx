@@ -312,7 +312,7 @@ function BusinessId() {
                 </label>
                 <label>
                   Phone
-                  <input value={form.phone} onChange={patch('phone')} placeholder="+91 98765 43210" />
+                  <input value={form.phone} onChange={patch('phone')} placeholder="+27 82 123 4567" />
                 </label>
                 <label>
                   Email

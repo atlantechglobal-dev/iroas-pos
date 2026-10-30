@@ -488,10 +488,6 @@
     box-shadow: -16px 0 40px rgba(23, 23, 26, 0.16);
     animation: menu-drawer-in 0.18s ease-out;
   }
-  @keyframes menu-drawer-in {
-    from { transform: translateX(24px); }
-    to { transform: translateX(0); }
-  }
   .menu-drawer-head {
     display: flex;
     align-items: center;
@@ -593,4 +589,10 @@
     cursor: pointer;
   }
   .menu-drop input { display: none; }
+}
+
+/* Top-level on purpose: @keyframes cannot be nested inside .menu-page (CSS nesting). */
+@keyframes menu-drawer-in {
+  from { transform: translateX(24px); }
+  to { transform: translateX(0); }
 }
