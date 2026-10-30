@@ -46,8 +46,9 @@ import { TableEditError, createUryTable, getUryTableOptions, listUryTables } fro
 import { MenuEditError, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
 import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
 import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
+import { placeOnce } from '../../integrations/ury/staffOrderGuard.js'
 import { getPosProfileOverlay, syncProfileToPos } from '../../integrations/ury/uryProfileSync.js'
-import { getUryInvoiceBill, listUryCustomers, listUryOrders, payUryInvoice, printUryInvoice } from '../../integrations/ury/uryOrders.js'
+import { cancelUryInvoice, getUryInvoiceBill, listUryCustomers, listUryOrders, payUryInvoice, printUryInvoice } from '../../integrations/ury/uryOrders.js'
 import { attachKitchenProgress, setKitchenStep } from '../../integrations/ury/uryKitchenFlow.js'
 import { listUryStaff } from '../../integrations/ury/uryStaff.js'
 import {
@@ -1198,6 +1199,23 @@ router.post('/pos-orders/:invoiceId/pay', async (req, res) => {
   }
 })
 
+router.post('/pos-orders/:invoiceId/cancel', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await cancelUryInvoice(tenant, req.params.invoiceId, req.body || {})
+    console.info(`[pos-orders:cancel] restaurant=${restaurant.id} invoice=${data.invoice}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-orders:cancel',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not cancel this order. Nothing was changed.',
+    })
+  }
+})
+
 router.post('/pos-orders/:invoiceId/print', async (req, res) => {
   const restaurant = getPosRestaurant(req, res)
   if (!restaurant) return
@@ -1235,10 +1253,12 @@ router.post('/pos-orders', async (req, res) => {
   if (!restaurant) return
   try {
     const tenant = await resolveUryTenant(restaurant.id)
-    const { table, customer, items, pax, comments } = req.body || {}
-    const data = await placeUryOrder(tenant, { table, customer, items, pax, comments })
-    console.info(`[pos-orders] restaurant=${restaurant.id} placed invoice=${data.invoice || '?'} table=${data.table}`)
-    res.status(201).json({ success: true, data })
+    const { table, customer, items, pax, comments, requestId } = req.body || {}
+    const data = await placeOnce(restaurant.id, requestId, () =>
+      placeUryOrder(tenant, { table, customer, items, pax, comments }),
+    )
+    console.info(`[pos-orders] restaurant=${restaurant.id} placed invoice=${data.invoice || '?'} table=${data.table}${data.replayed ? ' replayed' : ''}`)
+    res.status(data.replayed ? 200 : 201).json({ success: true, data })
   } catch (err) {
     sendPosError(res, err, {
       label: 'pos-orders:create',

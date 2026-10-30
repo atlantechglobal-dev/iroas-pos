@@ -50,6 +50,7 @@ export const api = {
   getPosOrderBill: restaurantApi.getPosOrderBill,
   payPosOrder: restaurantApi.payPosOrder,
   printPosOrder: restaurantApi.printPosOrder,
+  cancelPosOrder: restaurantApi.cancelPosOrder,
   advancePosKitchen: restaurantApi.advancePosKitchen,
   getPosCustomers: restaurantApi.listPosCustomers,
   getPosStaff: restaurantApi.listPosStaff,

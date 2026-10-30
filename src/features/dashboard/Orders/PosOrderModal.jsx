@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/shared/lib/api'
 import '@/features/dashboard/Orders/PosOrderModal.css'
+
+function newRequestId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}-${Math.random().toString(36).slice(2, 12)}`
+}
 
 function money(value) {
   return Number(value || 0).toFixed(2)
@@ -27,6 +32,7 @@ function findTableByName(list, name) {
  * orderMode: 'dinein' | 'takeaway'
  */
 function PosOrderModal({ initial = {}, onClose, onPlaced }) {
+  const requestId = useRef(newRequestId())
   const [tables, setTables] = useState({ status: 'loading', list: [] })
   const [orderMode, setOrderMode] = useState(initial.orderMode === 'takeaway' ? 'takeaway' : 'dinein')
   const [table, setTable] = useState('')
@@ -156,6 +162,7 @@ function PosOrderModal({ initial = {}, onClose, onPlaced }) {
         pax: Number(pax) || 1,
         comments: notes,
         items: lines.map((it) => ({ item: it.code, qty: qty[it.code] })),
+        requestId: requestId.current,
       })
       onPlaced?.({ ...orderRes?.data, customer, orderMode })
     } catch (err) {

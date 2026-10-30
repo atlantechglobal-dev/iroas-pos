@@ -177,6 +177,30 @@ export async function payUryInvoice(tenant, invoiceId, input = {}) {
   return { invoice: doc.name, paid: true }
 }
 
+/** Cancels an open (draft) order through URY's own cancel_order, which also frees the table. */
+export async function cancelUryInvoice(tenant, invoiceId, input = {}) {
+  const reason = String(input.reason || '').trim().slice(0, 140)
+  if (reason.length < 3) throw new OrderingError('reason_required', 'Enter a reason for cancelling this order.')
+  const doc = await loadOwnInvoice(tenant, invoiceId)
+  if (doc.docstatus !== 0 || PAID_STATUSES.has(doc.status) || doc.status === 'Cancelled') {
+    throw new OrderingError('not_cancellable', 'Only an open order can be cancelled.', { status: 409 })
+  }
+  let body
+  try {
+    body = await tenant.client.post('ury.ury.doctype.ury_order.ury_order.cancel_order', { invoice_id: doc.name, reason })
+  } catch (err) {
+    if (err instanceof UryError && err.code === 'validation') {
+      throw new OrderingError('cancel_rejected', err.message, { status: 422 })
+    }
+    throw err
+  }
+  const message = body?.message
+  if (message && typeof message === 'object' && message.status === 'Failure') {
+    throw new OrderingError('cancel_failed', 'The POS could not cancel this order.', { status: 502 })
+  }
+  return { invoice: doc.name, cancelled: true }
+}
+
 /** Marks the invoice printed in URY (`qz_print_update`), which is what the POS print button calls. */
 export async function printUryInvoice(tenant, invoiceId) {
   const doc = await loadOwnInvoice(tenant, invoiceId)

@@ -51,6 +51,8 @@ export const restaurantApi = {
       method: 'POST',
       body: { payments },
     }),
+  cancelPosOrder: (invoiceId, reason) =>
+    apiRequest(`/restaurant/pos-orders/${encodeURIComponent(invoiceId)}/cancel`, { method: 'POST', body: { reason } }),
   printPosOrder: (invoiceId) =>
     apiRequest(`/restaurant/pos-orders/${encodeURIComponent(invoiceId)}/print`, { method: 'POST', body: {} }),
   advancePosKitchen: (invoiceId, body = { advance: true }) =>
