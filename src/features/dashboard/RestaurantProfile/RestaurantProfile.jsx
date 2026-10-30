@@ -361,7 +361,7 @@ function RestaurantProfile() {
         ? { ...profileSetup, [markTab]: true }
         : { ...profileSetup, [activeTab]: true }
 
-      await api.updateProfile({
+      const profileRes = await api.updateProfile({
         restaurantName: name,
         cuisine,
         description,
@@ -374,6 +374,13 @@ function RestaurantProfile() {
         address,
         hours,
       })
+      // Hours and contact are also written to your POS; tell the owner if that part failed.
+      const posFailures = Object.values(profileRes?.posSync || {})
+        .filter((part) => part.status === 'failed')
+        .map((part) => part.message)
+      if (posFailures.length) {
+        toast.error(`Saved here, but your POS was not updated. ${posFailures.join(' ')}`)
+      }
       await api.updateSettings(buildSettingsPayload(nextSetup))
       if (logoDataUrl) {
         await api.updateBrand({ logoDataUrl })
@@ -407,12 +414,12 @@ function RestaurantProfile() {
         const next = TABS[idx + 1]
         if (next) {
           setActiveTab(next.key)
-          toast.success(`${TABS[idx].label} saved — continue to ${next.label}.`)
+          if (!posFailures.length) toast.success(`${TABS[idx].label} saved — continue to ${next.label}.`)
         } else {
-          toast.success('Restaurant profile complete — 100%.')
+          if (!posFailures.length) toast.success('Restaurant profile complete — 100%.')
         }
       } else {
-        toast.success('Restaurant profile saved.')
+        if (!posFailures.length) toast.success('Restaurant profile saved.')
       }
     } catch (err) {
       toast.error(err.message || 'Failed to save profile.')

@@ -52,11 +52,7 @@ function cleanBaseUrl(value) {
   return /^https?:\/\/[^\s/]+(\/[^\s]*)?$/i.test(url) ? url : ''
 }
 
-/**
- * A URY client authenticated as the tenant's own integration user, or null if
- * unavailable. `site` ({ baseUrl, siteName }) comes from the tenant's mapping
- * row; without it the global URY_BASE_URL (single-site demo) is used.
- */
+// `site` comes from the tenant's mapping row; without it the global URY_BASE_URL is used.
 export function getTenantClient(ref, site = {}) {
   const baseUrl = site.baseUrl ? cleanBaseUrl(site.baseUrl) : getUryBaseUrl()
   const siteName = site.siteName || ''

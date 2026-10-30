@@ -25,7 +25,6 @@ export function requireAdmin(req, res, next) {
   next()
 }
 
-/** Platform console users: Super Admin ('admin') and Onboarding Specialist ('specialist'). */
 export function isPlatformStaffRole(role) {
   return role === 'admin' || role === 'specialist'
 }

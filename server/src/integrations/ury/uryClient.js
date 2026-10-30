@@ -58,12 +58,7 @@ export function isValidSiteName(name) {
   return typeof name === 'string' && SITE_NAME_RE.test(name)
 }
 
-/**
- * fetch() cannot override the Host header, and a multi-site bench picks the
- * site from Host (nginx server_name). When a tenant has its own site we go
- * through node:http(s) so we can connect to the bench's address and still ask
- * for that site by name. Returns a standard Response.
- */
+// fetch() cannot set Host, and a multi-site bench picks the site from Host.
 function requestWithHost(url, init, siteName, signal) {
   return new Promise((resolve, reject) => {
     const target = new URL(url)
@@ -155,7 +150,6 @@ async function toUryWriteError(res) {
 /**
  * A URY client bound to one credential, with its own session cookie.
  * `cfg`: { baseUrl, siteName?, apiKey?, apiSecret?, username?, password? }.
- * `siteName` selects one Frappe site on a multi-site bench (sent as Host).
  */
 export function createUryClient(rawCfg) {
   const cfg = withAuthMode({ ...rawCfg, baseUrl: String(rawCfg.baseUrl || '').replace(/\/+$/, '') })

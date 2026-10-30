@@ -66,9 +66,7 @@ import {
 
 const router = Router()
 
-// Onboarding Specialists may follow tenants through onboarding but cannot
-// approve/reject/delete tenants or change platform configuration. Default-deny:
-// anything not listed here is Super Admin only.
+// Specialists get this allowlist only; everything else here is Super Admin only.
 const SPECIALIST_ALLOWED = [
   ['GET', /^\/stats$/],
   ['GET', /^\/tenants$/],
@@ -1044,7 +1042,6 @@ router.get('/health', (_req, res) => {
   res.json(getPlatformHealth())
 })
 
-// ---- POS provisioning (status is derived from the real integration row)
 function provisioningError(res, err) {
   res.status(err.status || 400).json({ error: err.message || 'Provisioning request failed.' })
 }

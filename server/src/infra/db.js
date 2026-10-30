@@ -161,8 +161,7 @@ if (!userColumns.some((col) => col.name === 'google_id')) {
   }
 }
 
-// Migration: add the 'specialist' (onboarding specialist) platform role. SQLite
-// cannot alter a CHECK constraint, so rebuild users when it lacks the new role.
+// SQLite cannot alter a CHECK constraint, so rebuild users to allow 'specialist'.
 {
   const usersSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'`).get()?.sql || ''
   if (usersSql && !usersSql.includes("'specialist'")) {
@@ -596,8 +595,7 @@ db.exec(`
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_credential
       ON restaurant_integrations(provider, credential_ref) WHERE credential_ref IS NOT NULL;
-    -- A URY user / restaurant name is only unique within one URY site (each
-    -- customer gets its own site), so uniqueness is scoped by site.
+    -- unique per URY site, not globally (each customer has its own site)
     DROP INDEX IF EXISTS idx_restaurant_integrations_verified_user;
     DROP INDEX IF EXISTS idx_restaurant_integrations_external;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_ri_site_verified_user

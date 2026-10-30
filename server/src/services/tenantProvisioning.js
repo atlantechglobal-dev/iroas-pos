@@ -1,14 +1,5 @@
-// POS provisioning status per tenant.
-//
-// A tenant's URY site is created outside the app (ury/provision/provision_tenant.sh)
-// and then linked (scripts/ury-link-restaurant.js). This module records the
-// admin's request and derives the rest from the real integration row, so the
-// status can never disagree with what is actually connected:
-//
-//   not_requested  no request, no integration
-//   requested      admin asked for a site; waiting for the operator to run the script
-//   linked         an active, verified integration exists (shown with enabled features)
-//   disabled       an integration exists but is switched off
+// Only the admin's request is stored; the rest of the status is derived from the
+// real integration row so it cannot disagree with what is connected.
 
 import { db } from '../infra/db.js'
 import { isValidSiteName } from '../integrations/ury/uryClient.js'
@@ -68,7 +59,6 @@ function steps(state, integration) {
   return { list: STEP_LABELS.map(([key, label]) => ({ key, label, done: done[key] })), features }
 }
 
-/** Commands the operator runs. Placeholders only: never secrets. */
 function operatorPlan(restaurant, siteName) {
   const site = siteName || '<site-name>'
   return [

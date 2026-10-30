@@ -81,7 +81,7 @@ export async function verifyUryMapping(mapping, client, { restaurantId } = {}) {
   const user = await check(() => client.getLoggedUser(), 'credentials_rejected')
   if (user === 'Administrator' && !administratorAllowed()) throw invalid('administrator_credential')
 
-  // A user name is only unique within one URY site, so compare per site.
+  // user names are only unique within one URY site
   const sharedWith = db
     .prepare(
       `SELECT restaurant_id FROM restaurant_integrations

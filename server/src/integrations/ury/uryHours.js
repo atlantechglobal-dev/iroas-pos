@@ -6,6 +6,7 @@
 // disabled schedule is reported as such so the site can show a warning.
 
 import { UryError } from './uryClient.js'
+import { PosEditError, rejectedByPos } from './uryEdit.js'
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 const CACHE_TTL_MS = 15 * 60_000
@@ -112,4 +113,107 @@ export async function getUryHours(tenant) {
 
 export function clearUryHoursCache() {
   cache.clear()
+}
+
+const SHORT_DAYS = { mon: 'monday', tue: 'tuesday', wed: 'wednesday', thu: 'thursday', fri: 'friday', sat: 'saturday', sun: 'sunday' }
+const DEFAULT_TIMEZONE = 'Africa/Johannesburg'
+
+function strictTime(value) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(value || '').trim())
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return null
+  return `${m[1].padStart(2, '0')}:${m[2]}`
+}
+
+function validTimezone(tz) {
+  if (typeof tz !== 'string' || !tz) return false
+  try {
+    return Intl.supportedValuesOf('timeZone').includes(tz)
+  } catch {
+    return false
+  }
+}
+
+function windowRows(doc, day) {
+  return (Array.isArray(doc?.[day]) ? doc[day] : [])
+    .filter((row) => row.parent === doc.name)
+    .sort((a, b) => (a.idx ?? 0) - (b.idx ?? 0))
+}
+
+// A day whose overall open/close already matches URY is left untouched, so split
+// shifts (Lunch + Dinner) survive a profile save.
+export async function pushUryHours(tenant, { hours, timezone } = {}) {
+  if (!Array.isArray(hours)) throw new PosEditError('invalid_hours', 'Opening hours are missing.')
+  const wanted = {}
+  for (const row of hours) {
+    const day = SHORT_DAYS[String(row?.day || '').slice(0, 3).toLowerCase()]
+    if (!day) continue
+    if (row.closed || !row.open || !row.close) {
+      wanted[day] = null
+      continue
+    }
+    const open = strictTime(row.open)
+    const close = strictTime(row.close)
+    if (!open || !close || open === close) {
+      throw new PosEditError('invalid_hours', `Check the ${row.day} opening and closing times (use HH:MM).`)
+    }
+    wanted[day] = { open, close }
+  }
+
+  const { client, branch } = tenant
+  let doc = null
+  try {
+    doc = (await client.getDoc('URY Branch Operating Schedule', branch)).docs[0]
+    if (doc.branch !== branch) throw new PosEditError('mapping_invalid', 'Opening hours in the POS do not belong to this branch.', { status: 409 })
+  } catch (err) {
+    if (!(err instanceof UryError && err.code === 'not_found')) throw err
+  }
+
+  const tz = validTimezone(timezone) ? timezone : doc?.timezone || DEFAULT_TIMEZONE
+  let changed = !doc || doc.enabled !== 1 || doc.timezone !== tz
+  const next = {}
+  for (const day of DAYS) {
+    const current = windowRows(doc, day)
+    const enabled = current.filter((row) => row.enabled === 1)
+    const want = wanted[day]
+    if (want === undefined) {
+      next[day] = current
+      continue
+    }
+    if (want === null) {
+      if (enabled.length) changed = true
+      next[day] = []
+      continue
+    }
+    const haveOpen = enabled.length ? hhmm(enabled[0].open_time) : null
+    const haveClose = enabled.length ? hhmm(enabled[enabled.length - 1].close_time) : null
+    if (haveOpen === want.open && haveClose === want.close) {
+      next[day] = current
+    } else {
+      changed = true
+      next[day] = [{ service_name: 'Open', open_time: `${want.open}:00`, close_time: `${want.close}:00`, enabled: 1 }]
+    }
+  }
+  if (!changed) return { changed: false }
+
+  const body = { doctype: 'URY Branch Operating Schedule', branch, enabled: 1, timezone: tz }
+  for (const day of DAYS) {
+    body[day] = next[day].map((row) => ({
+      ...(row.name ? { name: row.name } : {}),
+      doctype: 'URY Branch Service Window',
+      parentfield: day,
+      parenttype: 'URY Branch Operating Schedule',
+      service_name: row.service_name || 'Open',
+      open_time: row.open_time,
+      close_time: row.close_time,
+      enabled: row.enabled === 0 ? 0 : 1,
+    }))
+  }
+  try {
+    if (doc) await client.post('frappe.client.save', { doc: { ...doc, ...body } })
+    else await client.post('frappe.client.insert', { doc: body })
+  } catch (err) {
+    throw rejectedByPos(err)
+  }
+  clearUryHoursCache()
+  return { changed: true }
 }

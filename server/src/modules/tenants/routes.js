@@ -46,6 +46,7 @@ import { TableEditError, createUryTable, getUryTableOptions, listUryTables } fro
 import { MenuEditError, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
 import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
 import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
+import { syncProfileToPos } from '../../integrations/ury/uryProfileSync.js'
 import { getUryInvoiceBill, listUryCustomers, listUryOrders, payUryInvoice, printUryInvoice } from '../../integrations/ury/uryOrders.js'
 import { attachKitchenProgress, setKitchenStep } from '../../integrations/ury/uryKitchenFlow.js'
 import { listUryStaff } from '../../integrations/ury/uryStaff.js'
@@ -89,7 +90,7 @@ router.get('/', (req, res) => {
   res.json({ restaurant: { ...restaurant, settings: parseSettings(restaurant) } })
 })
 
-router.put('/profile', (req, res) => {
+router.put('/profile', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
   if (!assertNotAwaitingAccountApproval(restaurant, res)) return
@@ -131,7 +132,18 @@ router.put('/profile', (req, res) => {
     restaurant.id,
   )
 
-  res.json({ ok: true })
+  // Opening hours and contact live in the customer's POS when those features are on.
+  const posSync = await syncProfileToPos(restaurant.id, {
+    hours: hours ? normalizeOperatingHours(hours) : undefined,
+    timezone: timezone ?? restaurant.timezone,
+    phone: phone ?? restaurant.phone,
+    email: email ?? restaurant.email,
+    address: address ?? restaurant.address,
+    city: city ?? restaurant.city,
+    country: country ?? restaurant.country,
+  })
+
+  res.json({ ok: true, ...(posSync ? { posSync } : {}) })
 })
 
 router.put('/domain', (req, res) => {
