@@ -201,3 +201,18 @@ there rather than dropping the database.
 - Restart after editing `.env`: `pm2 restart iroas-pos --update-env`
 - To reset to a clean demo state: stop the app, delete
   `server/data/iroas.db*`, run `npm run seed` again, restart.
+
+---
+
+## Updating a running server (GCP VM, PM2)
+
+`deploy/deploy.sh` backs up the SQLite database to `~/backups/<timestamp>/`, fast-forwards to
+`origin/main`, installs, builds, restarts PM2 and checks `/api/health`. It refuses to run
+if the working tree has local changes and prints the rollback command.
+
+```bash
+cd /var/www/iroas-pos && ./deploy/deploy.sh
+```
+
+Database migrations run automatically when the app starts and are additive, so rolling the
+code back does not need the database restored.
