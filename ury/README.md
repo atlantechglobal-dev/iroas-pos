@@ -34,6 +34,10 @@ Apply it on the bench before installing `ury` on any new site:
 cd ~/frappe-bench/apps/ury && git apply ../../../path/to/0001-ury-3.0.0-beta1-hooks.patch
 ```
 
+## Custom app `iroas_ury_ext`
+
+`ury/apps/iroas_ury_ext` holds server-side methods IROAS needs. Today: `cancel_open_order`, because URY's own `cancel_order` submits the draft first and ERPNext rejects that when nothing is paid. Installed on the test URY site on 2026-10-30; every new site installs it (see `provision/provision_tenant.sh`). The integration user needs the URY Manager and URY Cashier roles (`server/scripts/ury-integration-user.js`).
+
 ## Adding a customer
 
 `provision/provision_tenant.sh` (dry run by default; **not yet run on a fresh

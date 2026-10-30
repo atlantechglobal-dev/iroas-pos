@@ -132,7 +132,7 @@ test('placeOnce: old records are purged', async () => {
 function seedInvoice(overrides = {}) {
   bench.put({ doctype: 'POS Invoice', name: 'INV-1', restaurant: 'Resto', status: 'Draft', docstatus: 0, restaurant_table: 'T1', ...overrides })
   bench.onRequest(({ method, body, reply, get }) => {
-    if (method !== 'ury.ury.doctype.ury_order.ury_order.cancel_order') return false
+    if (method !== 'iroas_ury_ext.api.orders.cancel_open_order') return false
     const inv = get('POS Invoice', body.invoice_id)
     inv.status = 'Cancelled'
     reply(200, { message: { status: 'Success' } })
@@ -152,7 +152,7 @@ test('cancel: an open order is cancelled in the POS with the reason', async () =
   const res = await cancel('INV-1', { reason: 'Guest left' })
   assert.equal(res.status, 200)
   assert.deepEqual((await res.json()).data, { invoice: 'INV-1', cancelled: true })
-  const call = bench.calls.find((c) => c.method.endsWith('cancel_order'))
+  const call = bench.calls.find((c) => c.method.endsWith('cancel_open_order'))
   assert.deepEqual(call.body, { invoice_id: 'INV-1', reason: 'Guest left' })
   assert.equal(bench.get('POS Invoice', 'INV-1').status, 'Cancelled')
 })
@@ -164,7 +164,7 @@ test('cancel: a reason is required and nothing is sent without one', async () =>
     assert.equal(res.status, 400)
     assert.equal((await res.json()).code, 'reason_required')
   }
-  assert.equal(bench.calls.some((c) => c.method.endsWith('cancel_order')), false)
+  assert.equal(bench.calls.some((c) => c.method.endsWith('cancel_open_order')), false)
 })
 
 test('cancel: paid, consolidated and already-cancelled orders are refused', async () => {
@@ -174,7 +174,7 @@ test('cancel: paid, consolidated and already-cancelled orders are refused', asyn
     const res = await cancel('INV-1', { reason: 'mistake' })
     assert.equal(res.status, 409, status)
     assert.equal((await res.json()).code, 'not_cancellable')
-    assert.equal(bench.calls.some((c) => c.method.endsWith('cancel_order')), false)
+    assert.equal(bench.calls.some((c) => c.method.endsWith('cancel_open_order')), false)
   }
 })
 
@@ -182,7 +182,7 @@ test('cancel: an order of another restaurant is not found and never cancelled', 
   seedInvoice({ restaurant: 'Someone Else' })
   const res = await cancel('INV-1', { reason: 'mistake' })
   assert.equal(res.status, 404)
-  assert.equal(bench.calls.some((c) => c.method.endsWith('cancel_order')), false)
+  assert.equal(bench.calls.some((c) => c.method.endsWith('cancel_open_order')), false)
 })
 
 test('cancel: a POS rejection is reported and a POS outage changes nothing', async () => {

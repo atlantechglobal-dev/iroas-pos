@@ -177,7 +177,7 @@ export async function payUryInvoice(tenant, invoiceId, input = {}) {
   return { invoice: doc.name, paid: true }
 }
 
-/** Cancels an open (draft) order through URY's own cancel_order, which also frees the table. */
+/** Cancels an open (draft) order with iroas_ury_ext, since URY's cancel_order fails on an unpaid draft. */
 export async function cancelUryInvoice(tenant, invoiceId, input = {}) {
   const reason = String(input.reason || '').trim().slice(0, 140)
   if (reason.length < 3) throw new OrderingError('reason_required', 'Enter a reason for cancelling this order.')
@@ -187,7 +187,7 @@ export async function cancelUryInvoice(tenant, invoiceId, input = {}) {
   }
   let body
   try {
-    body = await tenant.client.post('ury.ury.doctype.ury_order.ury_order.cancel_order', { invoice_id: doc.name, reason })
+    body = await tenant.client.post('iroas_ury_ext.api.orders.cancel_open_order', { invoice_id: doc.name, reason })
   } catch (err) {
     if (err instanceof UryError && err.code === 'validation') {
       throw new OrderingError('cancel_rejected', err.message, { status: 422 })

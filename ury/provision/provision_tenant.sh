@@ -10,7 +10,8 @@
 #     ... APPLY=1 ./provision_tenant.sh  # really do it
 #
 # Required env: SITE, ADMIN_PASSWORD, DB_ROOT_PASSWORD
-# Optional env: BENCH_DIR (default ~/frappe-bench), APPLY (1 = execute)
+# Optional env: BENCH_DIR (default ~/frappe-bench), APPLY (1 = execute),
+#   IROAS_URY_EXT_SRC (path to ury/apps/iroas_ury_ext, needed the first time on a bench)
 #
 # Re-runnable: every step checks whether it is already done.
 set -euo pipefail
@@ -47,8 +48,11 @@ else
     --no-mariadb-socket
 fi
 
-# 2. Apps, in dependency order.
-for app in erpnext hrms ury; do
+# 2. Apps, in dependency order. iroas_ury_ext (order cancel) is fetched once per bench.
+if [ ! -d "apps/iroas_ury_ext" ] && [ -n "${IROAS_URY_EXT_SRC:-}" ]; then
+  run bench get-app "$IROAS_URY_EXT_SRC" --skip-assets
+fi
+for app in erpnext hrms ury iroas_ury_ext; do
   if [ "$APPLY" = "1" ] && bench --site "$SITE" list-apps 2>/dev/null | grep -qx "$app"; then
     echo "app $app already installed on $SITE"
   else
