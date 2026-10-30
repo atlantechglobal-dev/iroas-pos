@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ProvisioningPanel } from '@/shared/ui/admin/ProvisioningPanel'
 import { createPortal } from 'react-dom'
 import { api } from '@/shared/lib/api'
 import { QrCodePreview } from '@/shared/ui/QrCodePreview'
@@ -10,6 +11,7 @@ import '@/shared/ui/admin/TenantReviewDrawer.css'
 const TABS = [
   { id: 'profile', label: 'Profile' },
   { id: 'domain', label: 'Domain' },
+  { id: 'pos', label: 'POS setup' },
   { id: 'brand', label: 'Brand' },
   { id: 'preview', label: 'Preview' },
   { id: 'activity', label: 'Activity' },
@@ -463,6 +465,8 @@ export function TenantReviewDrawer({
                   </div>
                 </div>
               )}
+
+              {tab === 'pos' && <ProvisioningPanel tenantId={tenantId} tenantStatus={tenant.status} />}
 
               {tab === 'brand' && (
                 <div className="tenant-review-brand">

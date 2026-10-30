@@ -25,6 +25,12 @@ import {
 } from '../../services/tenantReview.js'
 import { sendApprovalEmails } from '../../services/onboardingMessaging.js'
 import {
+  cancelProvisioning,
+  getProvisioning,
+  listProvisioning,
+  requestProvisioning,
+} from '../../services/tenantProvisioning.js'
+import {
   getPublicEmailSettings,
   saveEmailSettings,
   sendEmail,
@@ -71,6 +77,8 @@ const SPECIALIST_ALLOWED = [
   ['GET', /^\/identities\/\d+$/],
   ['POST', /^\/identities\/\d+\/notes$/],
   ['GET', /^\/feed$/],
+  ['GET', /^\/provisioning$/],
+  ['GET', /^\/tenants\/\d+\/provisioning$/],
 ]
 
 function specialistGuard(req, res, next) {
@@ -1034,6 +1042,45 @@ router.get('/feed', (req, res) => {
 
 router.get('/health', (_req, res) => {
   res.json(getPlatformHealth())
+})
+
+// ---- POS provisioning (status is derived from the real integration row)
+function provisioningError(res, err) {
+  res.status(err.status || 400).json({ error: err.message || 'Provisioning request failed.' })
+}
+
+router.get('/provisioning', (_req, res) => {
+  res.json({ tenants: listProvisioning() })
+})
+
+router.get('/tenants/:id/provisioning', (req, res) => {
+  try {
+    res.json({ provisioning: getProvisioning(Number(req.params.id)) })
+  } catch (err) {
+    provisioningError(res, err)
+  }
+})
+
+router.post('/tenants/:id/provisioning', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const provisioning = requestProvisioning(id, req.body || {}, req.user.id)
+    auditFromReq(req, 'provisioning.request', 'restaurant', id, provisioning.request?.siteName)
+    res.status(201).json({ provisioning })
+  } catch (err) {
+    provisioningError(res, err)
+  }
+})
+
+router.delete('/tenants/:id/provisioning', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const provisioning = cancelProvisioning(id)
+    auditFromReq(req, 'provisioning.cancel', 'restaurant', id, '')
+    res.json({ provisioning })
+  } catch (err) {
+    provisioningError(res, err)
+  }
 })
 
 router.get('/staff', (_req, res) => {
