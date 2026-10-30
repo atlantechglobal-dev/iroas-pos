@@ -263,3 +263,65 @@ test('PUT /profile still saves when the POS is down, and says the POS was not up
   assert.equal(body.posSync.contact.status, 'failed')
   assert.equal(db.prepare('SELECT city FROM restaurants WHERE id = ?').get(restaurantId).city, 'Durban')
 })
+
+function seedPosProfile() {
+  put({
+    doctype: 'URY Branch Operating Schedule', name: 'B', branch: 'B', enabled: 1, timezone: 'Africa/Johannesburg',
+    monday: [
+      { doctype: 'URY Branch Service Window', parent: 'B', idx: 1, service_name: 'Lunch', open_time: '12:00:00', close_time: '15:00:00', enabled: 1 },
+      { doctype: 'URY Branch Service Window', parent: 'B', idx: 2, service_name: 'Dinner', open_time: '18:00:00', close_time: '22:00:00', enabled: 1 },
+    ],
+    tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [],
+  })
+  put({
+    doctype: 'Address', name: 'Resto-Office', address_line1: '9 Beach Road', address_line2: 'Unit 4', city: 'Durban',
+    country: 'South Africa', phone: '+27 31 555 0000', email_id: 'pos@resto.test',
+    links: [{ doctype: 'Dynamic Link', parent: 'Resto-Office', link_doctype: 'URY Restaurant', link_name: 'Resto' }],
+  })
+  docs.get(key('URY Restaurant', 'Resto')).address = 'Resto-Office'
+}
+
+const getProfile = async () =>
+  (await (await fetch(`${appBase}/api/restaurant`, { headers: { Authorization: `Bearer ${ownerToken}` } })).json()).restaurant
+
+test('profile load shows the POS values, not stale local ones', async () => {
+  seedPosProfile()
+  db.prepare(`UPDATE restaurants SET phone = '+91 stale', city = 'Mumbai' WHERE id = ?`).run(restaurantId)
+  const r = await getProfile()
+  assert.equal(r.city, 'Durban')
+  assert.equal(r.phone, '+27 31 555 0000')
+  assert.equal(r.email, 'pos@resto.test')
+  assert.equal(r.timezone, 'Africa/Johannesburg')
+  const hours = JSON.parse(r.operating_hours)
+  assert.deepEqual(hours[0], { day: 'Mon', open: '12:00', close: '22:00', closed: false })
+  assert.equal(hours[1].closed, true)
+})
+
+test('opening the profile and saving it unchanged writes nothing to the POS', async () => {
+  seedPosProfile()
+  const r = await getProfile()
+  writes.length = 0
+  const res = await fetch(`${appBase}/api/restaurant/profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({
+      restaurantName: r.name, phone: r.phone, email: r.email, address: r.address, city: r.city,
+      country: r.country, timezone: r.timezone, hours: JSON.parse(r.operating_hours),
+    }),
+  })
+  const body = await res.json()
+  assert.equal(body.posSync.hours.status, 'unchanged')
+  assert.equal(body.posSync.contact.status, 'unchanged')
+  assert.equal(writes.length, 0)
+  assert.deepEqual(docs.get(key('URY Branch Operating Schedule', 'B')).monday.map((w) => w.service_name), ['Lunch', 'Dinner'])
+})
+
+test('profile load falls back to local values when the POS is down or the switches are off', async () => {
+  seedPosProfile()
+  db.prepare(`UPDATE restaurants SET city = 'Local City' WHERE id = ?`).run(restaurantId)
+  down = true
+  assert.equal((await getProfile()).city, 'Local City')
+  down = false
+  db.prepare(`UPDATE restaurant_integrations SET feature_hours = 0, feature_contact = 0 WHERE restaurant_id = ?`).run(restaurantId)
+  assert.equal((await getProfile()).city, 'Local City')
+})

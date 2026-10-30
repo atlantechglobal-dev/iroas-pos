@@ -46,7 +46,7 @@ import { TableEditError, createUryTable, getUryTableOptions, listUryTables } fro
 import { MenuEditError, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
 import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
 import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
-import { syncProfileToPos } from '../../integrations/ury/uryProfileSync.js'
+import { getPosProfileOverlay, syncProfileToPos } from '../../integrations/ury/uryProfileSync.js'
 import { getUryInvoiceBill, listUryCustomers, listUryOrders, payUryInvoice, printUryInvoice } from '../../integrations/ury/uryOrders.js'
 import { attachKitchenProgress, setKitchenStep } from '../../integrations/ury/uryKitchenFlow.js'
 import { listUryStaff } from '../../integrations/ury/uryStaff.js'
@@ -81,13 +81,14 @@ function assertNotAwaitingAccountApproval(restaurant, res) {
   return true
 }
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
   if (restaurant.status === 'deleted') {
     return res.status(403).json({ error: 'This account has been closed.' })
   }
-  res.json({ restaurant: { ...restaurant, settings: parseSettings(restaurant) } })
+  const posProfile = await getPosProfileOverlay(restaurant.id)
+  res.json({ restaurant: { ...restaurant, ...(posProfile || {}), settings: parseSettings(restaurant) } })
 })
 
 router.put('/profile', async (req, res) => {

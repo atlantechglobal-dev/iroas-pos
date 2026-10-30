@@ -94,7 +94,7 @@ export async function pushUryContact(tenant, input = {}) {
 
   const { client, uryRestaurant } = tenant
   const country = await resolveCountry(client, input.country)
-  const wanted = { address_line1: line1, city, country, phone, email_id: email }
+  const wanted = { address_line1: line1, address_line2: '', city, country, phone, email_id: email }
 
   const restaurant = (await client.getDoc('URY Restaurant', uryRestaurant)).docs[0]
   let doc = null
@@ -110,9 +110,12 @@ export async function pushUryContact(tenant, input = {}) {
 
   try {
     if (doc) {
-      const same = Object.entries(wanted).every(([k, v]) => String(doc[k] || '') === v)
+      const shown = [doc.address_line1, doc.address_line2].filter(Boolean).join(', ')
+      const { address_line1: _l1, address_line2: _l2, ...withoutLines } = wanted
+      const next = line1 === shown ? withoutLines : wanted
+      const same = Object.entries(next).every(([k, v]) => String(doc[k] || '') === v)
       if (same && doc.disabled !== 1) return { changed: false }
-      await client.post('frappe.client.save', { doc: { ...doc, ...wanted, disabled: 0 } })
+      await client.post('frappe.client.save', { doc: { ...doc, ...next, disabled: 0 } })
     } else {
       const created = await client.post('frappe.client.insert', {
         doc: {

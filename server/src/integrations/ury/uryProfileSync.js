@@ -6,8 +6,8 @@ import { UryError } from './uryClient.js'
 import { IntegrationError, resolveUryTenant } from './uryTenant.js'
 import { getUryFeatures } from './uryPublic.js'
 import { PosEditError } from './uryEdit.js'
-import { pushUryHours } from './uryHours.js'
-import { pushUryContact } from './uryContact.js'
+import { getUryHours, pushUryHours, toSiteHours } from './uryHours.js'
+import { getUryContact, pushUryContact } from './uryContact.js'
 
 const BUDGET_MS = 8000
 
@@ -78,4 +78,41 @@ export async function syncProfileToPos(restaurantId, profile = {}) {
     return { ...(features.hours ? { hours: failed } : {}), ...(features.contact ? { contact: failed } : {}) }
   }
   return result
+}
+
+const SHORT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+/** The POS values the owner should see in their profile, or null when the POS is not the source. */
+export async function getPosProfileOverlay(restaurantId) {
+  const features = getUryFeatures(restaurantId)
+  if (!features || (!features.hours && !features.contact)) return null
+  try {
+    const tenant = await withBudget(resolveUryTenant(restaurantId))
+    if (tenant.timedOut) return null
+    const overlay = {}
+    if (features.hours) {
+      const hours = await getUryHours(tenant)
+      if (hours.status === 'ok') {
+        overlay.operating_hours = JSON.stringify(
+          toSiteHours(hours.weekly).map((row, i) => ({ day: SHORT_DAYS[i], open: row.open, close: row.close, closed: row.closed })),
+        )
+        if (hours.timezone) overlay.timezone = hours.timezone
+      }
+    }
+    if (features.contact) {
+      const contact = await getUryContact(tenant)
+      if (contact.status === 'ok') {
+        Object.assign(overlay, {
+          phone: contact.phone,
+          email: contact.email,
+          address: contact.address,
+          city: contact.city,
+          country: contact.country,
+        })
+      }
+    }
+    return Object.keys(overlay).length ? overlay : null
+  } catch {
+    return null
+  }
 }
