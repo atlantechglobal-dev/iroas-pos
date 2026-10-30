@@ -113,6 +113,7 @@ function withProtection(
   Component,
   {
     adminOnly = false,
+    superAdminOnly = false,
     requireLive = false,
     onboardingOnly = false,
     allowPending = false,
@@ -122,6 +123,7 @@ function withProtection(
   return (
     <ProtectedRoute
       adminOnly={adminOnly}
+      superAdminOnly={superAdminOnly}
       requireLive={requireLive}
       onboardingOnly={onboardingOnly}
       allowPending={allowPending}
@@ -227,7 +229,7 @@ export function AppRoutes() {
         <Route path={ROUTES.SETTINGS_AUDIT} element={withProtection(SettingsAudit, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_PRIVACY} element={withProtection(SettingsPrivacy, LIVE_ONLY)} />
         <Route path={ROUTES.PLATFORM_ADMIN} element={withProtection(PlatformAdmin, { adminOnly: true })} />
-        <Route path={ROUTES.PLATFORM_PLANS} element={withProtection(PlatformPlans, { adminOnly: true })} />
+        <Route path={ROUTES.PLATFORM_PLANS} element={withProtection(PlatformPlans, { adminOnly: true, superAdminOnly: true })} />
         <Route
           path={ROUTES.PLATFORM_CUSTOMERS}
           element={withProtection(PlatformCustomers, { adminOnly: true })}
@@ -243,11 +245,11 @@ export function AppRoutes() {
         <Route path={ROUTES.PLATFORM_APPROVE_PROFILE} element={<RedirectLegacyApproveProfile />} />
         <Route
           path={ROUTES.PLATFORM_ACCOUNT_APPROVE}
-          element={withProtection(PlatformAccountApprove, { adminOnly: true })}
+          element={withProtection(PlatformAccountApprove, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_ACCOUNT_APPROVE_PROFILE}
-          element={withProtection(PlatformAccountApproveProfile, { adminOnly: true })}
+          element={withProtection(PlatformAccountApproveProfile, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_IDENTITIES}
@@ -261,35 +263,35 @@ export function AppRoutes() {
           path={ROUTES.PLATFORM_NOTIFICATIONS}
           element={withProtection(PlatformNotifications, { adminOnly: true })}
         />
-        <Route path={ROUTES.PLATFORM_AUDIT} element={withProtection(PlatformAudit, { adminOnly: true })} />
-        <Route path={ROUTES.PLATFORM_STAFF} element={withProtection(PlatformStaff, { adminOnly: true })} />
+        <Route path={ROUTES.PLATFORM_AUDIT} element={withProtection(PlatformAudit, { adminOnly: true, superAdminOnly: true })} />
+        <Route path={ROUTES.PLATFORM_STAFF} element={withProtection(PlatformStaff, { adminOnly: true, superAdminOnly: true })} />
         <Route
           path={ROUTES.PLATFORM_PROFESSIONAL}
-          element={withProtection(PlatformProfessional, { adminOnly: true })}
+          element={withProtection(PlatformProfessional, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS}
-          element={withProtection(PlatformSettings, { adminOnly: true })}
+          element={withProtection(PlatformSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_EMAIL}
-          element={withProtection(EmailSettings, { adminOnly: true })}
+          element={withProtection(EmailSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_PAYMENT}
-          element={withProtection(PaymentSettings, { adminOnly: true })}
+          element={withProtection(PaymentSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_GOOGLE}
-          element={withProtection(GoogleAuthSettings, { adminOnly: true })}
+          element={withProtection(GoogleAuthSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_CATEGORIES}
-          element={withProtection(BusinessCategoriesSettings, { adminOnly: true })}
+          element={withProtection(BusinessCategoriesSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_FLAGS}
-          element={withProtection(PlatformFeatureFlags, { adminOnly: true })}
+          element={withProtection(PlatformFeatureFlags, { adminOnly: true, superAdminOnly: true })}
         />
 
         <Route path={ROUTES.UNAUTHORIZED} element={<Unauthorized />} />

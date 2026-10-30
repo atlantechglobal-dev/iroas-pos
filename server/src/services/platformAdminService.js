@@ -215,7 +215,7 @@ export function listPlatformStaff() {
   return db
     .prepare(
       `SELECT id, name, email, phone, role, created_at
-       FROM users WHERE role = 'admin' ORDER BY created_at ASC`,
+       FROM users WHERE role IN ('admin', 'specialist') ORDER BY created_at ASC`,
     )
     .all()
     .map((row) => ({
@@ -399,7 +399,8 @@ export function getPublishedAdminCardBySlug(slug) {
   return null
 }
 
-export function createPlatformStaff({ name, email, password, phone }) {
+export function createPlatformStaff({ name, email, password, phone, role }) {
+  const cleanRole = role === 'specialist' ? 'specialist' : 'admin'
   const cleanName = String(name || '').trim()
   const cleanEmail = String(email || '').trim().toLowerCase()
   const cleanPassword = String(password || '')
@@ -417,9 +418,9 @@ export function createPlatformStaff({ name, email, password, phone }) {
   const hash = bcrypt.hashSync(cleanPassword, 10)
   const result = db
     .prepare(
-      `INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, 'admin')`,
+      `INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(cleanName, cleanEmail, phone ? String(phone).trim() : null, hash)
+    .run(cleanName, cleanEmail, phone ? String(phone).trim() : null, hash, cleanRole)
   return listPlatformStaff().find((u) => u.id === result.lastInsertRowid)
 }
 

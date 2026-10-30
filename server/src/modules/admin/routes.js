@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { db } from '../../infra/db.js'
-import { requireAuth, requireAdmin } from '../../middleware/auth.js'
+import { requireAuth, requireStaff } from '../../middleware/auth.js'
 import {
   appendIdentityEvent,
   appendProductEvent,
@@ -60,7 +60,27 @@ import {
 
 const router = Router()
 
-router.use(requireAuth, requireAdmin)
+// Onboarding Specialists may follow tenants through onboarding but cannot
+// approve/reject/delete tenants or change platform configuration. Default-deny:
+// anything not listed here is Super Admin only.
+const SPECIALIST_ALLOWED = [
+  ['GET', /^\/stats$/],
+  ['GET', /^\/tenants$/],
+  ['GET', /^\/tenants\/\d+$/],
+  ['GET', /^\/identities$/],
+  ['GET', /^\/identities\/\d+$/],
+  ['POST', /^\/identities\/\d+\/notes$/],
+  ['GET', /^\/feed$/],
+]
+
+function specialistGuard(req, res, next) {
+  if (req.user.role === 'admin') return next()
+  const allowed = SPECIALIST_ALLOWED.some(([method, re]) => req.method === method && re.test(req.path))
+  if (!allowed) return res.status(403).json({ error: 'Super Admin access required.' })
+  next()
+}
+
+router.use(requireAuth, requireStaff, specialistGuard)
 
 function auditFromReq(req, action, entityType, entityId, detail) {
   appendPlatformAudit({
@@ -1023,7 +1043,7 @@ router.get('/staff', (_req, res) => {
 router.post('/staff', (req, res) => {
   try {
     const user = createPlatformStaff(req.body || {})
-    auditFromReq(req, 'staff.create', 'user', user.id, user.email)
+    auditFromReq(req, 'staff.create', 'user', user.id, `${user.email} (${user.role})`)
     res.status(201).json({ ok: true, user, staff: listPlatformStaff() })
   } catch (err) {
     res.status(err.status || 400).json({ error: err.message || 'Unable to create staff user.' })

@@ -10,7 +10,7 @@ function PlatformStaff() {
   const [staff, setStaff] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', role: 'admin' })
 
   const load = () => {
     setLoading(true)
@@ -34,7 +34,7 @@ function PlatformStaff() {
     try {
       await api.adminCreateStaff(form)
       toast.success('Staff account created')
-      setForm({ name: '', email: '', password: '', phone: '' })
+      setForm({ name: '', email: '', password: '', phone: '', role: 'admin' })
       load()
     } catch (err) {
       toast.error(err.message || 'Unable to create staff.')
@@ -59,7 +59,7 @@ function PlatformStaff() {
       </div>
 
       <section className="tenants-card" style={{ marginBottom: 20, padding: 20 }}>
-        <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Invite admin</h2>
+        <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Invite platform staff</h2>
         <form
           onSubmit={create}
           className="pa-invite-form"
@@ -95,8 +95,17 @@ function PlatformStaff() {
             onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
             style={{ height: 42, borderRadius: 12, border: '1px solid var(--border)', padding: '0 12px' }}
           />
+          <select
+            value={form.role}
+            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+            aria-label="Role"
+            style={{ height: 42, borderRadius: 12, border: '1px solid var(--border)', padding: '0 12px' }}
+          >
+            <option value="admin">Super Admin (full access)</option>
+            <option value="specialist">Onboarding Specialist (view tenants, add notes)</option>
+          </select>
           <button className="new-tenant" type="submit" disabled={saving} style={{ gridColumn: '1 / -1', width: 'fit-content' }}>
-            {saving ? 'Creating…' : 'Create admin'}
+            {saving ? 'Creating…' : 'Create account'}
           </button>
         </form>
       </section>
@@ -114,6 +123,7 @@ function PlatformStaff() {
               <tr>
                 <th>NAME</th>
                 <th>EMAIL</th>
+                <th>ROLE</th>
                 <th>PHONE</th>
                 <th>CREATED</th>
               </tr>
@@ -125,6 +135,7 @@ function PlatformStaff() {
                     <strong>{row.name}</strong>
                   </td>
                   <td>{row.email}</td>
+                  <td>{row.role === 'specialist' ? 'Onboarding Specialist' : 'Super Admin'}</td>
                   <td>{row.phone || '—'}</td>
                   <td>
                     {row.createdAt

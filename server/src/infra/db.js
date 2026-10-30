@@ -24,7 +24,7 @@ db.exec(`
     phone TEXT,
     password_hash TEXT NOT NULL,
     google_id TEXT UNIQUE,
-    role TEXT NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'admin')),
+    role TEXT NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'admin', 'specialist')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -158,6 +158,42 @@ if (!userColumns.some((col) => col.name === 'google_id')) {
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL')
   } catch {
     // ignore if index already exists / SQLite variant
+  }
+}
+
+// Migration: add the 'specialist' (onboarding specialist) platform role. SQLite
+// cannot alter a CHECK constraint, so rebuild users when it lacks the new role.
+{
+  const usersSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'`).get()?.sql || ''
+  if (usersSql && !usersSql.includes("'specialist'")) {
+    const known = ['id', 'name', 'email', 'phone', 'password_hash', 'google_id', 'role', 'created_at']
+    const shared = db
+      .prepare('PRAGMA table_info(users)')
+      .all()
+      .map((col) => col.name)
+      .filter((name) => known.includes(name))
+    db.pragma('foreign_keys = OFF')
+    try {
+      db.transaction(() => {
+        db.exec(`
+          CREATE TABLE users__role_mig (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            phone TEXT,
+            password_hash TEXT NOT NULL,
+            google_id TEXT UNIQUE,
+            role TEXT NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'admin', 'specialist')),
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `)
+        db.exec(`INSERT INTO users__role_mig (${shared.join(', ')}) SELECT ${shared.join(', ')} FROM users`)
+        db.exec('DROP TABLE users')
+        db.exec('ALTER TABLE users__role_mig RENAME TO users')
+      })()
+    } finally {
+      db.pragma('foreign_keys = ON')
+    }
   }
 }
 

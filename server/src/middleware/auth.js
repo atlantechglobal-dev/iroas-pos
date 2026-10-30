@@ -25,6 +25,18 @@ export function requireAdmin(req, res, next) {
   next()
 }
 
+/** Platform console users: Super Admin ('admin') and Onboarding Specialist ('specialist'). */
+export function isPlatformStaffRole(role) {
+  return role === 'admin' || role === 'specialist'
+}
+
+export function requireStaff(req, res, next) {
+  if (!isPlatformStaffRole(req.user?.role)) {
+    return res.status(403).json({ error: 'Platform staff access required.' })
+  }
+  next()
+}
+
 export function signToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, name: user.name, role: user.role },
