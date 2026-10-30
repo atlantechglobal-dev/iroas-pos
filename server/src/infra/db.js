@@ -530,8 +530,6 @@ db.exec(`
     UNIQUE (restaurant_id, provider)
   );
 
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_external
-    ON restaurant_integrations(provider, external_restaurant);
 `)
 
 // Migration: per-tenant URY identity. credential_ref names server-side env
@@ -544,6 +542,8 @@ db.exec(`
     'ury_pos_profile',
     'ury_self_ordering_profile',
     'credential_ref',
+    'ury_base_url',
+    'ury_site_name',
     'verified_user',
     'verified_at',
   ]) {
@@ -560,8 +560,15 @@ db.exec(`
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_credential
       ON restaurant_integrations(provider, credential_ref) WHERE credential_ref IS NOT NULL;
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_verified_user
-      ON restaurant_integrations(provider, verified_user) WHERE verified_user IS NOT NULL;
+    -- A URY user / restaurant name is only unique within one URY site (each
+    -- customer gets its own site), so uniqueness is scoped by site.
+    DROP INDEX IF EXISTS idx_restaurant_integrations_verified_user;
+    DROP INDEX IF EXISTS idx_restaurant_integrations_external;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ri_site_verified_user
+      ON restaurant_integrations(provider, COALESCE(ury_base_url, ''), COALESCE(ury_site_name, ''), verified_user)
+      WHERE verified_user IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ri_site_external
+      ON restaurant_integrations(provider, COALESCE(ury_base_url, ''), COALESCE(ury_site_name, ''), external_restaurant);
   `)
 }
 

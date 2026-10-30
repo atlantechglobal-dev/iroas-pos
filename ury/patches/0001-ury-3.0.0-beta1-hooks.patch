@@ -1,0 +1,24 @@
+--- a/ury/hooks.py
++++ b/ury/hooks.py
+@@ -208,7 +208,7 @@ permission_query_conditions = {
+ # Override standard doctype classes
+
+ override_doctype_class = {
+-	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
++	"POS Invoice Merge Log": "ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
+ }
+
+ # HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
+@@ -289,10 +289,10 @@ doc_events = {
+             # the branch has `closing_reconciliation_enabled` (tier gate 3).
+             "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
+             "ury.ury.hooks.pos_closing.validate_daily_checklists",
+-            "ury.ury.hooks.pos_closing.validate_stock_correction",
++            # "ury.ury.hooks.pos_closing.validate_stock_correction",  # disabled: function not implemented in this beta
+         ],
+         "on_submit": [
+-            "ury.ury.hooks.pos_closing.submit_stock_correction",
++            # "ury.ury.hooks.pos_closing.submit_stock_correction",  # disabled: function not implemented in this beta
+         ],
+         },
+     "Quality Review": {

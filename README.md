@@ -92,7 +92,7 @@ See `server/.env.example` — **JWT_SECRET is required**.
 
 ### Demo accounts
 
-**Platform Admin:** `admin@iroas.com` / `IroasAdmin@123`
+**Platform Admin:** `admin@iroas.com` / the value of `ADMIN_PASSWORD` in `server/.env` (see `npm run seed`).
 
 **Owners** (password `Demo@1234`):
 

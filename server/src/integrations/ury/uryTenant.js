@@ -81,12 +81,14 @@ export async function verifyUryMapping(mapping, client, { restaurantId } = {}) {
   const user = await check(() => client.getLoggedUser(), 'credentials_rejected')
   if (user === 'Administrator' && !administratorAllowed()) throw invalid('administrator_credential')
 
+  // A user name is only unique within one URY site, so compare per site.
   const sharedWith = db
     .prepare(
       `SELECT restaurant_id FROM restaurant_integrations
-       WHERE provider = 'ury' AND status = 'active' AND verified_user = ? AND restaurant_id != ?`,
+       WHERE provider = 'ury' AND status = 'active' AND verified_user = ? AND restaurant_id != ?
+         AND COALESCE(ury_base_url, '') = ? AND COALESCE(ury_site_name, '') = ?`,
     )
-    .get(user, restaurantId ?? -1)
+    .get(user, restaurantId ?? -1, mapping.ury_base_url || '', mapping.ury_site_name || '')
   if (sharedWith) throw invalid('credential_shared')
 
   const uryRestaurant = (await check(() => client.getDoc('URY Restaurant', restaurant), 'restaurant_not_found')).docs[0]
@@ -155,6 +157,8 @@ function cacheKey(row) {
     row.ury_pos_profile,
     row.ury_self_ordering_profile,
     row.credential_ref,
+    row.ury_base_url,
+    row.ury_site_name,
   ].join('\u0000')
 }
 
@@ -165,16 +169,18 @@ function cacheKey(row) {
  * Throws IntegrationError('not_connected' | 'mapping_invalid').
  */
 export async function resolveUryTenant(restaurantId) {
-  if (!getUryBaseUrl()) throw notConnected()
   const row = getUryIntegration(restaurantId)
   if (!row || row.status !== 'active') throw notConnected()
+  if (!row.ury_base_url && !getUryBaseUrl()) throw notConnected()
 
   const key = cacheKey(row)
   const hit = verifiedTenants.get(restaurantId)
   if (hit && hit.key === key && hit.expires > Date.now()) return hit.tenant
 
   verifiedTenants.delete(restaurantId)
-  const client = isValidCredentialRef(row.credential_ref) ? getTenantClient(row.credential_ref) : null
+  const client = isValidCredentialRef(row.credential_ref)
+    ? getTenantClient(row.credential_ref, { baseUrl: row.ury_base_url, siteName: row.ury_site_name })
+    : null
   let user
   try {
     ;({ user } = await verifyUryMapping(row, client, { restaurantId }))
@@ -216,14 +222,17 @@ export function linkUryRestaurant(restaurantId, mapping, { verifiedUser }) {
   db.prepare(
     `INSERT INTO restaurant_integrations
        (restaurant_id, provider, external_restaurant, ury_branch, ury_pos_profile,
-        ury_self_ordering_profile, credential_ref, verified_user, verified_at, status)
-     VALUES (?, 'ury', ?, ?, ?, ?, ?, ?, datetime('now'), 'active')
+        ury_self_ordering_profile, credential_ref, ury_base_url, ury_site_name,
+        verified_user, verified_at, status)
+     VALUES (?, 'ury', ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 'active')
      ON CONFLICT (restaurant_id, provider)
      DO UPDATE SET external_restaurant = excluded.external_restaurant,
                    ury_branch = excluded.ury_branch,
                    ury_pos_profile = excluded.ury_pos_profile,
                    ury_self_ordering_profile = excluded.ury_self_ordering_profile,
                    credential_ref = excluded.credential_ref,
+                   ury_base_url = excluded.ury_base_url,
+                   ury_site_name = excluded.ury_site_name,
                    verified_user = excluded.verified_user,
                    verified_at = excluded.verified_at,
                    status = 'active',
@@ -235,6 +244,8 @@ export function linkUryRestaurant(restaurantId, mapping, { verifiedUser }) {
     mapping.ury_pos_profile,
     mapping.ury_self_ordering_profile || null,
     mapping.credential_ref,
+    mapping.ury_base_url || null,
+    mapping.ury_site_name || null,
     verifiedUser,
   )
   invalidateUryTenant(restaurantId)

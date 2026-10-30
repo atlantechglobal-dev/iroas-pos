@@ -7,7 +7,7 @@
 
 import { createHash } from 'node:crypto'
 import { getEnv } from '../../config/env.js'
-import { createUryClient, getUryBaseUrl } from './uryClient.js'
+import { createUryClient, getUryBaseUrl, isValidSiteName } from './uryClient.js'
 
 const CREDENTIAL_REF_RE = /^[A-Z][A-Z0-9_]{0,47}$/
 
@@ -41,21 +41,32 @@ export function getTenantCredential(ref) {
 
 const clients = new Map()
 
-function fingerprint(baseUrl, cred) {
+function fingerprint(baseUrl, siteName, cred) {
   return createHash('sha256')
-    .update([baseUrl, cred.apiKey, cred.apiSecret, cred.username, cred.password].join('\u0000'))
+    .update([baseUrl, siteName, cred.apiKey, cred.apiSecret, cred.username, cred.password].join('\u0000'))
     .digest('hex')
 }
 
-/** A URY client authenticated as the tenant's own integration user, or null if unavailable. */
-export function getTenantClient(ref) {
-  const baseUrl = getUryBaseUrl()
+function cleanBaseUrl(value) {
+  const url = String(value || '').trim().replace(/\/+$/, '')
+  return /^https?:\/\/[^\s/]+(\/[^\s]*)?$/i.test(url) ? url : ''
+}
+
+/**
+ * A URY client authenticated as the tenant's own integration user, or null if
+ * unavailable. `site` ({ baseUrl, siteName }) comes from the tenant's mapping
+ * row; without it the global URY_BASE_URL (single-site demo) is used.
+ */
+export function getTenantClient(ref, site = {}) {
+  const baseUrl = site.baseUrl ? cleanBaseUrl(site.baseUrl) : getUryBaseUrl()
+  const siteName = site.siteName || ''
   const cred = getTenantCredential(ref)
   if (!baseUrl || !cred) return null
-  const fp = fingerprint(baseUrl, cred)
+  if (siteName && !isValidSiteName(siteName)) return null
+  const fp = fingerprint(baseUrl, siteName, cred)
   const hit = clients.get(ref)
   if (hit && hit.fp === fp) return hit.client
-  const client = createUryClient({ baseUrl, ...cred })
+  const client = createUryClient({ baseUrl, siteName, ...cred })
   clients.set(ref, { fp, client })
   return client
 }
