@@ -38,6 +38,7 @@ export const api = {
   createPosTable: restaurantApi.createPosTable,
   getPosMenu: restaurantApi.getPosMenu,
   getPosMenuOptions: restaurantApi.getPosMenuOptions,
+  getDashboard: restaurantApi.getDashboard,
   createPosMenuItem: restaurantApi.createPosMenuItem,
   addPosItemStock: restaurantApi.addPosItemStock,
   createPosCourse: restaurantApi.createPosCourse,

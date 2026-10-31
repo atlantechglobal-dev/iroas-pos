@@ -47,6 +47,7 @@ import { TableEditError, createUryTable, getUryTableOptions, listUryTables } fro
 import { MenuEditError, addUryItemStock, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
 import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
 import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
+import { buildDashboardSummary } from '../../services/dashboardSummary.js'
 import { placeOnce } from '../../integrations/ury/staffOrderGuard.js'
 import { getPosProfileOverlay, syncProfileToPos } from '../../integrations/ury/uryProfileSync.js'
 import { cancelUryInvoice, getUryInvoiceBill, listUryCustomers, listUryOrders, payUryInvoice, printUryInvoice } from '../../integrations/ury/uryOrders.js'
@@ -956,6 +957,28 @@ router.get('/pos-tables', async (req, res) => {
       label: 'pos-tables',
       restaurantId: restaurant.id,
       unavailableMessage: 'Table service is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
+router.get('/dashboard', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const [orders, tables, menu] = await Promise.all([
+      listUryOrders(tenant),
+      listUryTables(tenant),
+      getUryMenu(tenant).catch(() => null),
+    ])
+    const items = (menu?.categories || []).flatMap((category) => category.items || [])
+    const currency = menu?.currency || orders.find((order) => order.currency)?.currency || ''
+    res.json({ success: true, data: buildDashboardSummary({ orders, tables, items, currency, timezone: restaurant.timezone }) })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'dashboard',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'The dashboard is temporarily unavailable. Please try again.',
     })
   }
 })

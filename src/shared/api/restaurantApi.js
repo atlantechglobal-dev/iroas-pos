@@ -32,6 +32,7 @@ export const restaurantApi = {
   listPosTables: () => apiRequest('/restaurant/pos-tables'),
   getPosTableOptions: () => apiRequest('/restaurant/pos-tables/options'),
   createPosTable: (payload) => apiRequest('/restaurant/pos-tables', { method: 'POST', body: payload }),
+  getDashboard: () => apiRequest('/restaurant/dashboard'),
   getPosMenu: () => apiRequest('/restaurant/pos-menu'),
   getPosMenuOptions: () => apiRequest('/restaurant/pos-menu/options'),
   addPosItemStock: (code, qty) =>
