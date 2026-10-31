@@ -114,12 +114,18 @@ function PosShift() {
             URY POS.
           </p>
         </div>
-        <span className={`shift-pill${shift?.open ? ' is-open' : ''}`}>
-          {status === 'loading' ? 'Checking…' : shift?.open ? 'Open' : 'Closed'}
+        <span className={`shift-pill${shift?.open && !shift.outdated ? ' is-open' : ''}`}>
+          {status === 'loading' ? 'Checking…' : shift?.outdated ? 'Outdated' : shift?.open ? 'Open' : 'Closed'}
         </span>
       </div>
 
       {status === 'error' ? <p className="shift-error">{error}</p> : null}
+      {status === 'ready' && shift?.outdated ? (
+        <p className="shift-error">
+          This session started on {formatSession(shift.entry?.startedAt || shift.sessionStart)}. The POS will not take orders
+          until you close it and open today&apos;s session.
+        </p>
+      ) : null}
 
       {status === 'ready' && shift ? (
         <section className="shift-card">
