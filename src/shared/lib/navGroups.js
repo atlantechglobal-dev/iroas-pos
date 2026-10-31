@@ -77,7 +77,6 @@ export const NAV_GROUPS = [
   {
     label: 'Growth',
     items: [
-      { key: 'analytics', label: 'Analytics', icon: '/images/analy.png', route: ROUTES.ANALYTICS },
       { key: 'payments', label: 'Payments', icon: '/images/payments.svg', route: ROUTES.PAYMENTS },
       { key: 'marketing', label: 'Marketing', icon: '/images/market.svg', route: ROUTES.MARKETING },
       { key: 'reviews', label: 'Reviews', icon: '/images/breview.svg', route: ROUTES.REVIEWS },

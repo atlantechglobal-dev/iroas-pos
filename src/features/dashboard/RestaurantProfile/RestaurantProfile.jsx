@@ -121,7 +121,7 @@ function RestaurantProfile() {
   const [name, setName] = useState('Saffron & Fig')
   const [legalEntity, setLegalEntity] = useState('Saffron Hospitality Pvt Ltd')
   const [cuisine, setCuisine] = useState('Modern Indian - Mediterranean')
-  const [priceRange, setPriceRange] = useState('₹₹₹ · 800–1500 / head')
+  const [priceRange, setPriceRange] = useState('RR · R150–R300 / head')
   const [tagline, setTagline] = useState('A coastal kitchen, with fire and saffron')
   const [yearEstablished, setYearEstablished] = useState('2019')
   const [description, setDescription] = useState('')
@@ -145,8 +145,8 @@ function RestaurantProfile() {
   const [cgst, setCgst] = useState('2.5%')
   const [sgst, setSgst] = useState('2.5%')
   const [serviceCharge, setServiceCharge] = useState('0%')
-  const [currency, setCurrency] = useState('INR (₹)')
-  const [rounding, setRounding] = useState('Nearest ₹1')
+  const [currency, setCurrency] = useState('ZAR (R)')
+  const [rounding, setRounding] = useState('Nearest R1')
   const [invoicePrefix, setInvoicePrefix] = useState('SF-2026-')
   const [instagram, setInstagram] = useState('@saffronandfig')
   const [facebook, setFacebook] = useState('facebook.com/saffronandfig')
@@ -532,7 +532,7 @@ function RestaurantProfile() {
                     </div>
                     <div className="field">
                       <label>PRICE RANGE</label>
-                      <input type="text" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} placeholder="₹₹₹ · 800–1500 / head" />
+                      <input type="text" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} placeholder="RR · R150–R300 / head" />
                     </div>
                     <div className="field">
                       <label>TAGLINE</label>
@@ -987,19 +987,19 @@ function RestaurantProfile() {
                     </div>
                     <div className="field">
                       <label>MIN ORDER</label>
-                      <input type="text" value={deliveryMinOrder} onChange={(e) => setDeliveryMinOrder(e.target.value)} placeholder="₹250" />
+                      <input type="text" value={deliveryMinOrder} onChange={(e) => setDeliveryMinOrder(e.target.value)} placeholder="R250" />
                     </div>
                     <div className="field">
                       <label>BASE FEE</label>
-                      <input type="text" value={deliveryBaseFee} onChange={(e) => setDeliveryBaseFee(e.target.value)} placeholder="₹49" />
+                      <input type="text" value={deliveryBaseFee} onChange={(e) => setDeliveryBaseFee(e.target.value)} placeholder="R49" />
                     </div>
                     <div className="field">
                       <label>PER-KM FEE</label>
-                      <input type="text" value={deliveryPerKmFee} onChange={(e) => setDeliveryPerKmFee(e.target.value)} placeholder="₹8" />
+                      <input type="text" value={deliveryPerKmFee} onChange={(e) => setDeliveryPerKmFee(e.target.value)} placeholder="R8" />
                     </div>
                     <div className="field">
                       <label>FREE DELIVERY ABOVE</label>
-                      <input type="text" value={deliveryFreeAbove} onChange={(e) => setDeliveryFreeAbove(e.target.value)} placeholder="₹999" />
+                      <input type="text" value={deliveryFreeAbove} onChange={(e) => setDeliveryFreeAbove(e.target.value)} placeholder="R999" />
                     </div>
                     <div className="field">
                       <label>AVG PREP TIME</label>
@@ -1223,71 +1223,10 @@ function RestaurantProfile() {
                 <div className="plan-card-box">
                   <div className="plan-info-left">
                     <div className="plan-title-row">
-                      <span className="plan-name">Pro Plan</span>
+                      <span className="plan-name">{restaurantMeta?.plan || 'Starter'} plan</span>
                       <span className="plan-active-badge">Active</span>
                     </div>
-                    <span className="plan-price">₹3,999 / month · Billed annually. Next renewal on Sep 15, 2026.</span>
-                    <div className="plan-features">
-                      <span className="feature-pill">POS Sync</span>
-                      <span className="feature-pill">Unlimited Orders</span>
-                      <span className="feature-pill">Multi-location</span>
-                      <span className="feature-pill">24/7 Priority Support</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="billing-subgrid">
-                  <div>
-                    <h2 style={{ fontSize: '15px', marginBottom: '12px' }}>Payment method</h2>
-                    <div className="payment-card-box">
-                      <div className="card-left">
-                        <div className="card-ico-box">VISA</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2' }}>
-                          <strong style={{ fontSize: '13px' }}>•••• •••• •••• 4242</strong>
-                          <small style={{ fontSize: '11px', color: 'var(--muted)' }}>Expires 08/28</small>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span className="paid-badge">Primary</span>
-                        <button type="button" className="btn-manage">Edit</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h2 style={{ fontSize: '15px', marginBottom: '12px' }}>Billing history</h2>
-                    <div className="invoice-table">
-                      <div className="invoice-row">
-                        <div>
-                          <span className="invoice-num">INV-2026-008</span>
-                          <span className="invoice-date" style={{ marginLeft: '8px' }}>Aug 15, 2026</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span className="invoice-amount">₹3,999</span>
-                          <span className="paid-badge">Paid</span>
-                        </div>
-                      </div>
-                      <div className="invoice-row">
-                        <div>
-                          <span className="invoice-num">INV-2026-007</span>
-                          <span className="invoice-date" style={{ marginLeft: '8px' }}>Jul 15, 2026</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span className="invoice-amount">₹3,999</span>
-                          <span className="paid-badge">Paid</span>
-                        </div>
-                      </div>
-                      <div className="invoice-row">
-                        <div>
-                          <span className="invoice-num">INV-2026-006</span>
-                          <span className="invoice-date" style={{ marginLeft: '8px' }}>Jun 15, 2026</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span className="invoice-amount">₹3,999</span>
-                          <span className="paid-badge">Paid</span>
-                        </div>
-                      </div>
-                    </div>
+                    <span className="plan-price">Your plan is managed by IROAS. Invoices and payment methods will appear here once subscription billing is enabled.</span>
                   </div>
                 </div>
                 {tabActions}

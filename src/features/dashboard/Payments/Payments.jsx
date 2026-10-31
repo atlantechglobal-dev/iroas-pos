@@ -1,96 +1,48 @@
 import { useMemo, useState } from 'react'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
-import { useToast } from '@/shared/ui/feedback/ToastProvider'
+import { usePosResource } from '@/shared/hooks/usePosResource'
+import { api } from '@/shared/lib/api'
 import '@/features/dashboard/Payments/Payments.css'
 
-const TRANSACTIONS = [
-  {
-    txn: 'TXN-58812',
-    order: '#10428',
-    time: '2 min ago',
-    method: 'Card · Visa ••42',
-    amount: '₹2,480',
-    status: 'Captured',
-  },
-  {
-    txn: 'TXN-58811',
-    order: '#10427',
-    time: '5 min ago',
-    method: 'Cash',
-    amount: '₹860',
-    status: 'Captured',
-  },
-  {
-    txn: 'TXN-58809',
-    order: '#10424',
-    time: '12 min ago',
-    method: 'UPI · GPay',
-    amount: '₹1,240',
-    status: 'Captured',
-  },
-  {
-    txn: 'TXN-58805',
-    order: '#10419',
-    time: '48 min ago',
-    method: 'Card · MC ••08',
-    amount: '₹540',
-    status: 'Refunded',
-  },
-  {
-    txn: 'TXN-58801',
-    order: '#10411',
-    time: '1 hr ago',
-    method: 'UPI · PhonePe',
-    amount: '₹1,690',
-    status: 'Captured',
-  },
-  {
-    txn: 'TXN-58796',
-    order: '#10406',
-    time: '2 hr ago',
-    method: 'Wallet · Paytm',
-    amount: '₹2,180',
-    status: 'Failed',
-  },
-  {
-    txn: 'TXN-58788',
-    order: '#10399',
-    time: '3 hr ago',
-    method: 'Card · Amex ••11',
-    amount: '₹3,120',
-    status: 'Captured',
-  },
-]
-
-function statusClass(status) {
-  return `status-pill status-${status.toLowerCase()}`
+function formatMoney(value, currency) {
+  const amount = Number(value) || 0
+  try {
+    return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: currency || 'ZAR' }).format(amount)
+  } catch {
+    return amount.toFixed(2)
+  }
 }
 
 function Payments() {
-  const toast = useToast()
   const [query, setQuery] = useState('')
+  const orders = usePosResource(api.getPosOrders, { refreshMs: 60_000 })
+  const summary = usePosResource(api.getDashboard, { refreshMs: 60_000 })
 
-  const filtered = useMemo(
+  const paid = useMemo(
     () =>
-      TRANSACTIONS.filter((row) =>
-        `${row.txn} ${row.order} ${row.method}`.toLowerCase().includes(query.trim().toLowerCase()),
-      ),
-    [query],
+      (orders.data?.orders || [])
+        .filter((order) => order.state === 'paid')
+        .sort((a, b) => String(b.postedAt || '').localeCompare(String(a.postedAt || ''))),
+    [orders.data],
   )
+  const filtered = paid.filter((order) =>
+    `${order.id} ${order.customer} ${order.orderType} ${order.table}`.toLowerCase().includes(query.trim().toLowerCase()),
+  )
+  const currency = summary.data?.currency || paid[0]?.currency || ''
+  const weekTotal = (summary.data?.series || []).reduce((sum, day) => sum + day.revenue, 0)
+  const notConnected = orders.status === 'not_connected' || summary.status === 'not_connected'
 
   const exportCsv = () => {
-    const header = 'Transaction,Order,Time,Method,Amount,Status'
-    const lines = filtered.map(
-      (row) => `${row.txn},${row.order},${row.time},${row.method.replaceAll(',', ' ')},${row.amount},${row.status}`,
+    const lines = filtered.map((order) =>
+      [order.id, order.postedAt || '', order.customer, order.orderType, order.table, order.total ?? ''].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','),
     )
-    const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([['Order,Time,Customer,Type,Table,Total', ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = 'iroas-payments.csv'
     link.click()
     URL.revokeObjectURL(url)
-    toast.info('Statement downloaded.')
   }
 
   return (
@@ -99,74 +51,63 @@ function Payments() {
         <div>
           <p className="eyebrow">Finance</p>
           <h1>Payments</h1>
-          <p className="page-desc">
-            Transactions, refunds, settlements and tax. Pull statements for accounting in one click.
-          </p>
+          <p className="page-desc">Orders settled at your POS. Download the list for your accountant.</p>
         </div>
-        <button className="btn btn-outline export-btn" type="button" onClick={exportCsv}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M12 4v10M8 10l4 4 4-4M5 18h14"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+        <button className="btn btn-outline export-btn" type="button" disabled={!filtered.length} onClick={exportCsv}>
           Export
         </button>
       </div>
 
+      {notConnected ? <p className="empty-note">Your POS is not connected yet. Payments will appear here once it is.</p> : null}
+
       <div className="stat-cards">
         <div className="stat-card">
-          <span>Gross volume · today</span>
-          <strong>₹1,28,450</strong>
+          <span>Takings today</span>
+          <strong>{summary.data ? formatMoney(summary.data.today.revenue, currency) : '—'}</strong>
         </div>
         <div className="stat-card">
-          <span>Net after fees</span>
-          <strong>₹1,23,716</strong>
+          <span>Last 7 days</span>
+          <strong>{summary.data ? formatMoney(weekTotal, currency) : '—'}</strong>
         </div>
         <div className="stat-card">
-          <span>Refunds</span>
-          <strong>₹540</strong>
+          <span>Paid orders today</span>
+          <strong>{summary.data ? summary.data.today.paidOrders : '—'}</strong>
         </div>
         <div className="stat-card">
-          <span>Next settlement</span>
-          <strong>Tomorrow</strong>
+          <span>Open orders (unpaid)</span>
+          <strong>{summary.data ? formatMoney(summary.data.today.openValue, currency) : '—'}</strong>
         </div>
       </div>
 
       <section className="card">
         <div className="card-head">
           <div>
-            <h2>Recent transactions</h2>
-            <span>Across all channels</span>
+            <h2>Paid orders</h2>
+            <span>Latest from your POS</span>
           </div>
           <input
             className="txn-search"
             type="search"
-            placeholder="Search txn or order…"
+            placeholder="Search order, guest or table…"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            aria-label="Search transactions"
+            aria-label="Search paid orders"
           />
         </div>
 
         {filtered.length === 0 ? (
-          <p className="empty-note">No transactions match that search.</p>
+          <p className="empty-note">{paid.length ? 'No paid orders match that search.' : 'No paid orders yet.'}</p>
         ) : (
           <ul className="txn-list">
-            {filtered.map((row) => (
-              <li key={row.txn}>
+            {filtered.map((order) => (
+              <li key={order.id}>
                 <div className="txn-main">
-                  <strong>
-                    {row.txn} / Order {row.order}
-                  </strong>
-                  <p>{row.time}</p>
+                  <strong>{order.id}</strong>
+                  <p>{order.postedAt || ''}</p>
                 </div>
-                <div className="txn-method">{row.method}</div>
-                <div className="txn-amount">{row.amount}</div>
-                <span className={statusClass(row.status)}>{row.status}</span>
+                <div className="txn-method">{order.table ? `Table ${order.table}` : order.orderType || 'Order'} · {order.customer || 'Guest'}</div>
+                <div className="txn-amount">{formatMoney(order.total, order.currency || currency)}</div>
+                <span className="status-pill status-captured">Paid</span>
               </li>
             ))}
           </ul>

@@ -63,7 +63,6 @@ const Tables = lazy(() => import('@/features/dashboard/Tables/Tables'))
 const Staff = lazy(() => import('@/features/dashboard/Staff/Staff'))
 const Customers = lazy(() => import('@/features/dashboard/Customers/Customers'))
 const RolePermissions = lazy(() => import('@/features/dashboard/RolePermissions/RolePermissions'))
-const Analytics = lazy(() => import('@/features/dashboard/Analytics/Analytics'))
 const Payments = lazy(() => import('@/features/dashboard/Payments/Payments'))
 const Marketing = lazy(() => import('@/features/dashboard/Marketing/Marketing'))
 const Reviews = lazy(() => import('@/features/dashboard/Reviews/Reviews'))
@@ -206,7 +205,7 @@ export function AppRoutes() {
         <Route path={ROUTES.STAFF} element={withProtection(Staff, LIVE_ONLY)} />
         <Route path={ROUTES.CUSTOMERS} element={withProtection(Customers, LIVE_ONLY)} />
         <Route path={ROUTES.ROLE_PERMISSIONS} element={withProtection(RolePermissions, LIVE_ONLY)} />
-        <Route path={ROUTES.ANALYTICS} element={withProtection(Analytics, LIVE_ONLY)} />
+        <Route path={ROUTES.ANALYTICS} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
         <Route path={ROUTES.PAYMENTS} element={withProtection(Payments, LIVE_ONLY)} />
         <Route path={ROUTES.MARKETING} element={withProtection(Marketing, LIVE_ONLY)} />
         <Route path={ROUTES.REVIEWS} element={withProtection(Reviews, LIVE_ONLY)} />
