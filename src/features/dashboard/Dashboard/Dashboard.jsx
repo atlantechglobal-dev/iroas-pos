@@ -22,6 +22,7 @@ function formatMoney(value, currency) {
 }
 
 function buildAreaPath(values, width, height, padding = 6) {
+  if (!values.length) return { linePath: '', areaPath: '' }
   const max = Math.max(...values, 0)
   const min = Math.min(...values, 0)
   const range = max - min || 1
