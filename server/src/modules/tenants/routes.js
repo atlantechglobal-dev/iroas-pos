@@ -44,7 +44,7 @@ import {
 import { UryError } from '../../integrations/ury/uryClient.js'
 import { IntegrationError, invalidateUryTenant, resolveUryTenant } from '../../integrations/ury/uryTenant.js'
 import { TableEditError, createUryTable, getUryTableOptions, listUryTables } from '../../integrations/ury/uryTables.js'
-import { MenuEditError, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
+import { MenuEditError, addUryItemStock, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
 import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
 import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
 import { placeOnce } from '../../integrations/ury/staffOrderGuard.js'
@@ -1041,6 +1041,24 @@ router.post('/pos-menu/menus', async (req, res) => {
       label: 'pos-menu:create-menu',
       restaurantId: restaurant.id,
       unavailableMessage: 'Could not add the menu. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-menu/items/:code/stock', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await addUryItemStock(tenant, req.params.code, req.body?.qty)
+    console.info(`[pos-menu:stock] restaurant=${restaurant.id} item=${req.params.code}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    sendPosError(res, err, {
+      label: 'pos-menu:stock',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not update stock. Nothing was changed.',
     })
   }
 })

@@ -87,7 +87,7 @@ function PosMenuActions({ onCreated }) {
   const [options, setOptions] = useState(null)
   const [dialog, setDialog] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [item, setItem] = useState({ menu: '', name: '', course: '', rate: '', image: null })
+  const [item, setItem] = useState({ menu: '', name: '', course: '', rate: '', stock: '10', image: null })
   const [courseName, setCourseName] = useState('')
   const [courseIcon, setCourseIcon] = useState('')
   const [menuName, setMenuName] = useState('')
@@ -128,11 +128,12 @@ function PosMenuActions({ onCreated }) {
         name: item.name,
         course: item.course,
         rate: Number(item.rate),
+        openingStock: Number(item.stock) || 0,
         ...(item.image ? { image: item.image } : {}),
       })
       onCreated(res?.data || null)
       toast.success(`${item.name.trim()} was added to ${item.menu}.`)
-      setItem({ menu: item.menu, name: '', course: item.course, rate: '', image: null })
+      setItem({ menu: item.menu, name: '', course: item.course, rate: '', stock: '10', image: null })
       setDialog(null)
     } catch (err) {
       toast.error(err?.message || 'Could not add the item.')
@@ -294,6 +295,17 @@ function PosMenuActions({ onCreated }) {
                 onChange={(event) => setItem({ ...item, rate: event.target.value })}
                 required
               />
+            </label>
+            <label>
+              Opening stock
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={item.stock}
+                onChange={(event) => setItem({ ...item, stock: event.target.value })}
+              />
+              <small>How many you can sell today. Add more any time from the item.</small>
             </label>
             <div className="menu-modal-actions">
               <button className="btn btn-outline" type="button" disabled={busy} onClick={close}>

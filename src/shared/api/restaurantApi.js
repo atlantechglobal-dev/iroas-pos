@@ -34,6 +34,8 @@ export const restaurantApi = {
   createPosTable: (payload) => apiRequest('/restaurant/pos-tables', { method: 'POST', body: payload }),
   getPosMenu: () => apiRequest('/restaurant/pos-menu'),
   getPosMenuOptions: () => apiRequest('/restaurant/pos-menu/options'),
+  addPosItemStock: (code, qty) =>
+    apiRequest(`/restaurant/pos-menu/items/${encodeURIComponent(code)}/stock`, { method: 'POST', body: { qty } }),
   createPosMenuItem: (payload) => apiRequest('/restaurant/pos-menu/items', { method: 'POST', body: payload }),
   createPosCourse: (payload) => apiRequest('/restaurant/pos-menu/courses', { method: 'POST', body: payload }),
   createPosMenu: (payload) => apiRequest('/restaurant/pos-menu/menus', { method: 'POST', body: payload }),

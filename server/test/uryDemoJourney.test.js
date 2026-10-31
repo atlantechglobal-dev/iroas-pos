@@ -197,6 +197,7 @@ const fakeServer = http.createServer((req, res) => {
       fake.sessions.set(session, { invoice: null, table: table || null })
       return send(res, 200, { message: { session, source: table ? 'table' : 'pickup', restaurant: 'Demo Restaurant' } })
     }
+    if (method === 'iroas_ury_ext.api.menu.stock_menu_item') return send(res, 200, { message: { status: 'Success' } })
     if (method === 'frappe.client.insert') {
       const doc = body.doc || {}
       if (doc.doctype === 'Item') {

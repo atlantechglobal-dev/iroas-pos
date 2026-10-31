@@ -12,6 +12,18 @@ function stamp(doc) {
   return doc
 }
 
+const OPS = {
+  '=': (a, b) => a === b,
+  '!=': (a, b) => a !== b,
+  in: (a, b) => Array.isArray(b) && b.includes(a),
+  '>=': (a, b) => a >= b,
+}
+
+function matches(doc, filters) {
+  const rows = Array.isArray(filters) ? filters : Object.entries(filters).map(([k, v]) => [k, '=', v])
+  return rows.every(([field, op, value]) => (OPS[op] || OPS['='])(doc[field], value))
+}
+
 /** In-memory Frappe site that satisfies the tenant verification calls and generic doc reads/writes. */
 export function createFakeBench({ restaurant = 'Resto', branch = 'B', profile = 'P', user = 'int@site' } = {}) {
   const docs = new Map()
@@ -57,7 +69,7 @@ export function createFakeBench({ restaurant = 'Resto', branch = 'B', profile = 
       if (method === 'frappe.desk.reportview.get_list') {
         const doctype = url.searchParams.get('doctype')
         const filters = JSON.parse(url.searchParams.get('filters') || '{}')
-        const rows = [...docs.values()].filter((d) => d.doctype === doctype && Object.entries(filters).every(([k, v]) => d[k] === v))
+        const rows = [...docs.values()].filter((d) => d.doctype === doctype && matches(d, filters))
         return reply(200, { message: structuredClone(rows) })
       }
       if (method === 'frappe.client.save') {
@@ -67,7 +79,7 @@ export function createFakeBench({ restaurant = 'Resto', branch = 'B', profile = 
       }
       if (method === 'frappe.client.insert') {
         const doc = { ...body.doc }
-        doc.name = doc.name || `${doc.address_title || doc.branch}-${doc.address_type || ''}`.replace(/-$/, '')
+        doc.name = doc.name || doc.item_code || `${doc.address_title || doc.branch}-${doc.address_type || ''}`.replace(/-$/, '')
         writes.push({ method, doc })
         put(stamp(doc))
         return reply(200, { message: doc })
