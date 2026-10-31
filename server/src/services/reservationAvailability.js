@@ -3,6 +3,8 @@
 export const DEFAULT_MAX_COVERS = 40
 export const DEFAULT_SLOT_MINUTES = 30
 export const DEFAULT_DWELL_MINUTES = 90
+export const DEFAULT_ADVANCE_DAYS = 90
+export const DEFAULT_TIMEZONE = 'Africa/Johannesburg'
 
 const DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -21,6 +23,58 @@ export function maxCoversFromSettings(settings) {
   const n = Number(settings?.reservationMaxCovers)
   if (Number.isFinite(n) && n > 0) return Math.floor(n)
   return DEFAULT_MAX_COVERS
+}
+
+export function advanceDaysFromSettings(settings) {
+  const n = Number(settings?.reservationAdvanceDays)
+  if (Number.isFinite(n) && n >= 1) return Math.min(365, Math.floor(n))
+  return DEFAULT_ADVANCE_DAYS
+}
+
+function validTimezone(tz) {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Today's date and minutes-since-midnight in the restaurant's timezone. */
+export function zonedNow(timezone, now = new Date()) {
+  const timeZone = timezone && validTimezone(timezone) ? timezone : DEFAULT_TIMEZONE
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(now)
+      .map((p) => [p.type, p.value]),
+  )
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) }
+}
+
+/** Booking rules shared by every caller: restaurant timezone and advance window. */
+export function bookingRules(restaurant, settings) {
+  return { timezone: restaurant?.timezone || '', advanceDays: advanceDaysFromSettings(settings) }
+}
+
+/** Null when the date can be booked, else { status, error }. */
+export function checkBookingDate(date, { timezone, advanceDays = DEFAULT_ADVANCE_DAYS, now = new Date() } = {}) {
+  const value = String(date || '')
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const parsed = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null
+  if (!parsed || parsed.toISOString().slice(0, 10) !== value) return { status: 400, error: 'Invalid date.' }
+  const today = zonedNow(timezone, now).date
+  if (value < today) return { status: 400, error: 'That date has already passed.' }
+  const last = new Date(Date.parse(`${today}T00:00:00Z`) + advanceDays * 86_400_000).toISOString().slice(0, 10)
+  if (value > last) return { status: 400, error: `Bookings can be made up to ${advanceDays} days ahead.` }
+  return null
 }
 
 /** Parse "11:00", "11:00 AM", "11a", "23:30" → minutes from midnight, or null. */
@@ -161,8 +215,15 @@ export function listSlots({
   dwellMinutes = DEFAULT_DWELL_MINUTES,
   excludeReservationId = null,
   includePast = false,
+  timezone = '',
+  advanceDays = DEFAULT_ADVANCE_DAYS,
+  now = new Date(),
 }) {
   const party = Math.max(1, Math.min(20, Number(guests) || 2))
+  const dateProblem = checkBookingDate(date, { timezone, advanceDays, now })
+  if (dateProblem && !(includePast && dateProblem.error === 'That date has already passed.')) {
+    return { slots: [], closed: true, reason: dateProblem.error }
+  }
   const day = dayRowForDate(hours, date)
 
   if (!day) {
@@ -197,9 +258,9 @@ export function listSlots({
   const slots = []
   // Last start must leave room for dwell before close
   const lastStart = closeMin - dwellMinutes
-  const today = localDateIso()
-  const isToday = String(date) === today
-  const nowMinutes = isToday && !includePast ? localNowMinutes() : null
+  const zoned = zonedNow(timezone, now)
+  const isToday = String(date) === zoned.date
+  const nowMinutes = isToday && !includePast ? zoned.minutes : null
 
   for (let t = openMin; t <= lastStart; t += slotMinutes) {
     // Hide past starts for today (grace: still allow current slot until it starts)
@@ -239,10 +300,15 @@ export function assertBookable({
   slotMinutes = DEFAULT_SLOT_MINUTES,
   dwellMinutes = DEFAULT_DWELL_MINUTES,
   excludeReservationId = null,
+  timezone = '',
+  advanceDays = DEFAULT_ADVANCE_DAYS,
+  now = new Date(),
 }) {
   if (!date || !time) {
     return { ok: false, status: 400, error: 'Date and time are required.' }
   }
+  const dateProblem = checkBookingDate(date, { timezone, advanceDays, now })
+  if (dateProblem) return { ok: false, ...dateProblem }
 
   const party = Math.max(1, Math.min(20, Number(guests) || 2))
   const requestedMinutes = parseTimeToMinutes(time)
@@ -250,7 +316,8 @@ export function assertBookable({
     return { ok: false, status: 400, error: 'Invalid time.' }
   }
 
-  if (String(date) === localDateIso() && requestedMinutes <= localNowMinutes()) {
+  const zoned = zonedNow(timezone, now)
+  if (String(date) === zoned.date && requestedMinutes <= zoned.minutes) {
     return {
       ok: false,
       status: 400,
@@ -267,6 +334,9 @@ export function assertBookable({
     slotMinutes,
     dwellMinutes,
     excludeReservationId,
+    timezone,
+    advanceDays,
+    now,
   })
 
   if (closed) {

@@ -2,6 +2,7 @@ import express, { Router } from 'express'
 import { db } from '../../infra/db.js'
 import {
   assertBookable,
+  bookingRules,
   listSlots,
   maxCoversFromSettings,
   parseHoursJson,
@@ -684,6 +685,7 @@ router.get('/:slug/availability', (req, res) => {
     guests,
     existingRows: existing,
     maxCovers: maxCoversFromSettings(settings),
+    ...bookingRules(restaurant, settings),
   })
 
   res.json({
@@ -736,6 +738,7 @@ router.post('/:slug/reservations', (req, res) => {
         guests: guestCount,
         existingRows: existing,
         maxCovers: maxCoversFromSettings(settings),
+        ...bookingRules(restaurant, settings),
       })
       if (!check.ok) {
         const err = new Error(check.error)

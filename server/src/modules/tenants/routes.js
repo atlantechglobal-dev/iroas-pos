@@ -3,6 +3,7 @@ import { db } from '../../infra/db.js'
 import { requireAuth } from '../../middleware/auth.js'
 import {
   assertBookable,
+  bookingRules,
   listSlots,
   maxCoversFromSettings,
   normalizeOperatingHours,
@@ -603,6 +604,7 @@ router.get('/availability', (req, res) => {
     existingRows: existing,
     maxCovers: maxCoversFromSettings(settings),
     includePast,
+    ...bookingRules(restaurant, settings),
   })
 
   res.json({
@@ -651,6 +653,7 @@ router.post('/reservations', (req, res) => {
         guests: guestCount,
         existingRows: existing,
         maxCovers: maxCoversFromSettings(settings),
+        ...bookingRules(restaurant, settings),
       })
       if (!check.ok) {
         const err = new Error(check.error)
@@ -764,6 +767,7 @@ router.patch('/reservations/:id', (req, res) => {
           existingRows: existing,
           maxCovers: maxCoversFromSettings(settings),
           excludeReservationId: row.id,
+          ...bookingRules(restaurant, settings),
         })
         if (!check.ok) {
           const err = new Error(check.error)
