@@ -434,7 +434,7 @@ function OneLink() {
             <div className="growth-label">GROWTH</div>
             <h1>One Link</h1>
             <p>
-              One shareable website link for your restaurant — menu, ordering,
+              One shareable link for your restaurant — menu, ordering,
               bookings and socials.
               <br />
               Put it in your bio, on receipts and on table cards.
@@ -480,8 +480,8 @@ function OneLink() {
               </div>
 
               <div className="available">
-                QR and link open your restaurant website at <code>/s/{linkSlug}</code>. Toggle
-                destinations below to show Menu, Order, Book and more on that site.
+                The QR and link open your One Link page at <code>/l/{linkSlug}</code>. Toggle
+                the destinations below to choose which buttons it shows.
               </div>
 
               <div className="one-link-qr-row">
@@ -489,12 +489,12 @@ function OneLink() {
                 <div>
                   <strong>Scan preview</strong>
                   <p>
-                    One link only — guests land on your website. Live destinations control what
-                    they can open from there.
+                    Guests land on your One Link page. Live destinations are the buttons they see,
+                    with a link on to your full website.
                   </p>
                   <div className="one-link-qr-actions">
                     <button type="button" className="open-link-btn" onClick={() => persistAndOpen()}>
-                      Open website
+                      Open link
                     </button>
                   </div>
                 </div>
@@ -724,13 +724,13 @@ function OneLink() {
               />
               <div className="modal-qr">
                 <QrCodePreview value={siteUrl} size={160} alt="Website QR" />
-                <p>Open your restaurant website in a new tab.</p>
+                <p>Open your One Link page in a new tab.</p>
                 <div className="modal-actions">
                   <button type="button" className="download-qr" onClick={handleDownloadQR}>
                     Download QR
                   </button>
                   <button type="button" className="publish-button" onClick={() => persistAndOpen()}>
-                    Open website
+                    Open link
                   </button>
                 </div>
               </div>

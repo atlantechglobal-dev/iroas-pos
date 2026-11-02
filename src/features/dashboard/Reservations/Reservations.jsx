@@ -633,16 +633,15 @@ function Reservations() {
                 <span className={`status-badge ${res.status.replace('_', '-')}`}>{statusLabel(res.status)}</span>
 
                 <div className="res-actions">
-                  {res.status === 'pending' || res.status === 'confirmed' ? (
-                    posLinked ? (
-                      <button type="button" className="btn-manage-res" onClick={() => setSeatingRes(res)}>
-                        Seat in POS
-                      </button>
-                    ) : res.status === 'confirmed' ? (
-                      <button type="button" className="btn-manage-res" onClick={() => setStatus(res.id, 'seated')}>
-                        Seated
-                      </button>
-                    ) : null
+                  {(res.status === 'pending' || res.status === 'confirmed') && posLinked ? (
+                    <button type="button" className="btn-manage-res" onClick={() => setSeatingRes(res)}>
+                      Seat in POS
+                    </button>
+                  ) : null}
+                  {res.status === 'confirmed' && res.date <= todayIso() ? (
+                    <button type="button" className="btn-manage-res" onClick={() => setStatus(res.id, 'seated')}>
+                      Seated
+                    </button>
                   ) : null}
                   <button type="button" className="btn-manage-res" onClick={() => openEditBooking(res)}>
                     Edit
