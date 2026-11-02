@@ -224,7 +224,7 @@ function PosOrderSheet({ invoiceId, onClose, onPaid, onCancelled }) {
                 <button type="button" disabled={busy} onClick={() => setPrintPrompt(false)}>
                   Back
                 </button>
-                <button type="button" className="order-pay-btn" disabled={busy} onClick={printThenPay}>
+                <button type="button" className="is-primary" disabled={busy} onClick={printThenPay}>
                   {busy ? 'Printing…' : 'Print bill and continue'}
                 </button>
               </div>
