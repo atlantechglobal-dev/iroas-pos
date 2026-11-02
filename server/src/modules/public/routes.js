@@ -20,7 +20,7 @@ import {
   getOrderByPublicCode,
   listOrdersByPhone,
 } from '../../services/orders.js'
-import { onOrderCreated } from '../../services/orderMessaging.js'
+import { notifyPosGuestOrder, onOrderCreated } from '../../services/orderMessaging.js'
 import { listDiningTables } from '../../services/diningTables.js'
 import { verifyNotifySignature } from '../../services/addpayClient.js'
 import { getPaymentSettings } from '../../services/paymentSettings.js'
@@ -457,6 +457,7 @@ router.post('/:slug/ury-dine-orders', uryOrderLimiter, async (req, res) => {
     console.info(
       `[public-ury-dine] restaurant=${restaurantId} invoice=${placed.invoice || '?'} table=${placed.table} customer=${customer.id}`,
     )
+    notifyPosGuestOrder(ctx.restaurant, { invoice: placed.invoice, table: placed.table, guestName: customer.name })
     res.status(201).json({
       success: true,
       data: {
@@ -494,11 +495,23 @@ router.post('/:slug/ury-orders', uryOrderLimiter, async (req, res) => {
       `[public-ury-orders] restaurant=${restaurantId} submission=${data?.submissionId || '?'} status=${data?.status || result.body.code}` +
         `${table ? ` table=${table}` : ''}${data?.invoice ? ` invoice=${data.invoice}` : ''}`,
     )
+    notifyGuestOrderResult(ctx.restaurant, data, table)
     res.status(result.httpStatus).json(result.body)
   } catch (err) {
     sendGuestOrderError(res, err, restaurantId)
   }
 })
+
+function notifyGuestOrderResult(restaurant, data, table) {
+  if (data?.status !== 'placed' || !data.invoice) return
+  notifyPosGuestOrder(restaurant, {
+    invoice: data.invoice,
+    table: data.table || table,
+    guestName: data.customerName,
+    total: data.total,
+    source: 'pickup',
+  })
+}
 
 /** Resolves a scanned URY table QR code (signed by IROAS) to the table, re-checked in URY. */
 router.get('/:slug/ury-table/:code', uryOrderLimiter, async (req, res) => {
@@ -522,6 +535,7 @@ router.get('/:slug/ury-orders/:submissionId', async (req, res) => {
     if (!ctx) return
     restaurantId = ctx.restaurant.id
     const result = await getGuestOrder(ctx.tenant, req.params.submissionId)
+    notifyGuestOrderResult(ctx.restaurant, result.body?.data)
     res.status(result.httpStatus === 201 ? 200 : result.httpStatus).json(result.body)
   } catch (err) {
     sendGuestOrderError(res, err, restaurantId)

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { ProvisioningPanel } from '@/shared/ui/admin/ProvisioningPanel'
 import { createPortal } from 'react-dom'
 import { api } from '@/shared/lib/api'
+import { useAuth } from '@/shared/hooks/useAuth'
+import { isSuperAdmin } from '@/shared/constants/roles'
 import { QrCodePreview } from '@/shared/ui/QrCodePreview'
 import { restaurantHostname } from '@/shared/utils/restaurantUrl'
 import { guestSiteUrl, restaurantPublicSlug } from '@/shared/utils/guestLinks'
@@ -79,6 +81,7 @@ export function TenantReviewDrawer({
 }) {
   const toast = useToast()
   const isPage = variant === 'page'
+  const mayApprove = isSuperAdmin(useAuth().user)
   const [tab, setTab] = useState('profile')
   const [loading, setLoading] = useState(true)
   const [tenant, setTenant] = useState(null)
@@ -294,7 +297,7 @@ export function TenantReviewDrawer({
               ) : null}
             </header>
 
-            {tenant.status === 'pending_approval' && isAccountApproval ? (
+            {tenant.status === 'pending_approval' && isAccountApproval && mayApprove ? (
               <div className="tenant-review-approve-banner">
                 <div>
                   <strong>New signup awaiting approval</strong>

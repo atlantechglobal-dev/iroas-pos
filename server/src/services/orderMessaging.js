@@ -123,3 +123,30 @@ export async function onOrderCreated(restaurant, order) {
     }
   }
 }
+
+/** Staff alert for a guest order placed straight in the POS (self-ordering or table QR). One alert per invoice. */
+export function notifyPosGuestOrder(restaurant, { invoice, table, guestName, total, source }) {
+  try {
+    const settings = parseSettings(restaurant)
+    if (!invoice || settings.newOrderAlert === false) return
+    const already = db
+      .prepare(`SELECT 1 FROM notifications WHERE user_id = ? AND type = 'pos_order' AND meta_json LIKE ?`)
+      .get(restaurant.owner_id, `%"invoice":${JSON.stringify(invoice)}%`)
+    if (already) return
+
+    const where = table ? `Table ${table}` : source === 'pickup' ? 'Pickup' : 'Online'
+    const who = guestName ? ` · ${guestName}` : ''
+    const amount = total != null ? ` · ${formatMoney(total)}` : ''
+    const title = `New order ${invoice}`
+    const body = `${where}${who}${amount}`
+    createNotification({ userId: restaurant.owner_id, type: 'pos_order', title, body, meta: { invoice, table: table || null } })
+
+    if (ownerWantsEmail(settings)) {
+      const owner = db.prepare('SELECT email FROM users WHERE id = ?').get(restaurant.owner_id)
+      const to = restaurant.email || owner?.email
+      if (to) queueEmail({ to, subject: `${title} — ${restaurant.name || 'your restaurant'}`, body: `${body}\n\nOpen Orders in your dashboard to see the items.` })
+    }
+  } catch (err) {
+    console.error('[pos-order-alert] failed', err)
+  }
+}

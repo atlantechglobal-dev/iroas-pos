@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
+import { useAuth } from '@/shared/hooks/useAuth'
+import { isSuperAdmin } from '@/shared/constants/roles'
 import { ROUTES } from '@/shared/constants/routes'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdmin.css'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdminExtra.css'
@@ -38,6 +40,7 @@ function AccountApproveProfile() {
   const { tenantId } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const canApprove = isSuperAdmin(useAuth().user)
   const [tenant, setTenant] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
@@ -164,7 +167,7 @@ function AccountApproveProfile() {
               </li>
             </ul>
 
-            {isWaiting ? (
+            {isWaiting && canApprove ? (
               <div className="aa-identity-actions">
                 <button
                   type="button"

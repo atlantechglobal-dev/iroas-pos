@@ -204,3 +204,52 @@ test('POST /pos-orders requires a request id', async () => {
   assert.equal(res.status, 400)
   assert.equal((await res.json()).code, 'invalid_request')
 })
+
+function seedPayable(printed) {
+  seedInvoice({ invoice_printed: printed ? 1 : 0, grand_total: 100, rounded_total: 100, customer: 'C1', owner: 'o@x', cashier: 'c@x', pos_profile: 'P' })
+  bench.onRequest(({ method, body, reply, get }) => {
+    if (method === 'ury.ury_pos.api.getModeOfPayment') return reply(200, { message: [{ mode_of_payment: 'Cash' }] }) || true
+    if (method === 'ury.ury.api.ury_print.qz_print_update') {
+      get('POS Invoice', body.invoice).invoice_printed = 1
+      return reply(200, { message: { status: 'Success' } }) || true
+    }
+    if (method === 'ury.ury.doctype.ury_order.ury_order.make_invoice') {
+      const inv = get('POS Invoice', body.invoice)
+      if (!inv.invoice_printed) return reply(417, { exc_type: 'ValidationError', _server_messages: JSON.stringify([JSON.stringify({ message: 'Printing the invoice is mandatory before submitting' })]) }) || true
+      inv.status = 'Paid'
+      inv.docstatus = 1
+      return reply(200, { message: {} }) || true
+    }
+    return false
+  })
+}
+
+const pay = (invoiceId) =>
+  fetch(`${appBase}/api/restaurant/pos-orders/${invoiceId}/pay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ payments: [{ mode: 'Cash', amount: 100 }] }),
+  })
+
+test('pay: a bill that was never printed is printed first, then paid', async () => {
+  seedPayable(false)
+  const res = await pay('INV-1')
+  assert.equal(res.status, 200)
+  const order = bench.calls.filter((c) => c.method.endsWith('qz_print_update') || c.method.endsWith('make_invoice')).map((c) => c.method.split('.').pop())
+  assert.deepEqual(order, ['qz_print_update', 'make_invoice'])
+  assert.equal(bench.get('POS Invoice', 'INV-1').status, 'Paid')
+})
+
+test('pay: an already printed bill is not printed again', async () => {
+  seedPayable(true)
+  assert.equal((await pay('INV-1')).status, 200)
+  assert.equal(bench.calls.some((c) => c.method.endsWith('qz_print_update')), false)
+})
+
+test('bill: reports whether it has been printed', async () => {
+  seedPayable(false)
+  const bill = async () => (await (await fetch(`${appBase}/api/restaurant/pos-orders/INV-1/bill`, { headers: { Authorization: `Bearer ${ownerToken}` } })).json()).data
+  assert.equal((await bill()).printed, false)
+  await fetch(`${appBase}/api/restaurant/pos-orders/INV-1/print`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` }, body: '{}' })
+  assert.equal((await bill()).printed, true)
+})

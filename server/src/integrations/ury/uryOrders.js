@@ -14,6 +14,7 @@ const INVOICE_FIELDS = [
   'order_type',
   'restaurant',
   'restaurant_table',
+  'invoice_printed',
   'customer',
   'customer_name',
   'mobile_number',
@@ -125,6 +126,7 @@ function billFromDoc(doc, modes) {
     subtotal: num(doc.net_total) ?? num(doc.grand_total) ?? total,
     total,
     canPay: payable,
+    printed: Boolean(doc.invoice_printed),
     modes,
   }
 }
@@ -156,6 +158,8 @@ export async function payUryInvoice(tenant, invoiceId, input = {}) {
   if (cents(rows.reduce((sum, row) => sum + row.amount, 0)) !== cents(total)) {
     throw new OrderingError('amount_mismatch', 'The amount entered must match the order total.')
   }
+
+  if (!doc.invoice_printed) await markPrinted(tenant, doc)
 
   const profile = (await tenant.client.get('ury.ury_pos.api.getPosProfile'))?.message || {}
   try {
@@ -204,12 +208,17 @@ export async function cancelUryInvoice(tenant, invoiceId, input = {}) {
 /** Marks the invoice printed in URY (`qz_print_update`), which is what the POS print button calls. */
 export async function printUryInvoice(tenant, invoiceId) {
   const doc = await loadOwnInvoice(tenant, invoiceId)
+  await markPrinted(tenant, doc)
+  return billFromDoc({ ...doc, invoice_printed: 1 }, [])
+}
+
+/** URY refuses payment on an unprinted bill, so payment prints it first. */
+async function markPrinted(tenant, doc) {
   const body = await tenant.client.post('ury.ury.api.ury_print.qz_print_update', { invoice: doc.name })
   const message = body?.message
   if (message && message.status === 'Failure') {
     throw new OrderingError('print_failed', 'The POS could not mark this bill as printed.', { status: 502 })
   }
-  return billFromDoc(doc, [])
 }
 
 export async function listUryOrders({ client, uryRestaurant }) {

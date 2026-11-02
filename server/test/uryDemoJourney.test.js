@@ -565,6 +565,10 @@ test('guest order is priced by URY, placed once, and replayed on duplicate submi
   assert.equal(st.json.data.status, 'placed')
   assert.equal(st.json.data.live.state, 'draft')
   assert.equal(st.json.data.live.orderType, 'Take Away')
+
+  const alerts = db.prepare(`SELECT title, body FROM notifications WHERE type = 'pos_order' AND title = ?`).all(`New order ${data.invoice}`)
+  assert.equal(alerts.length, 1, 'staff told once, not again on the replay or the status check')
+  assert.match(alerts[0].body, /Thandi Guest/)
 })
 
 test('concurrent submits with the same id create one URY order', async () => {
