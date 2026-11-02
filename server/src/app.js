@@ -54,16 +54,6 @@ export function createApp() {
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
-  app.get('/l/:slug', (req, res) => {
-    const slug = String(req.params.slug || '')
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/^-|-$/g, '')
-    if (!slug) return res.redirect(301, '/')
-    return res.redirect(301, `/s/${slug}`)
-  })
-
   const distDir = path.join(__dirname, '..', '..', 'dist')
   if (isProd()) {
     app.use(express.static(distDir))
