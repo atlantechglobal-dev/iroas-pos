@@ -135,6 +135,11 @@ function OneLink() {
   const [dishPreviews, setDishPreviews] = useState([])
   const [dragKey, setDragKey] = useState(null)
   const [customModal, setCustomModal] = useState(null) // null | { key?, name, href, meta }
+  const [stats, setStats] = useState({ views: 0, clicks: 0, byKey: {} })
+
+  useEffect(() => {
+    api.getOneLinkStats().then(setStats).catch(() => {})
+  }, [])
 
   const theme = ONE_LINK_THEMES[themeKey] || ONE_LINK_THEMES.lime
   const pageHeadline = headline || `${displayRestaurant}`
@@ -497,16 +502,16 @@ function OneLink() {
 
               <div className="stats">
                 <div className="stat-box">
-                  <span>Total views</span>
-                  <strong>18,204</strong>
+                  <span>Views (30d)</span>
+                  <strong>{stats.views.toLocaleString()}</strong>
                 </div>
                 <div className="stat-box">
                   <span>Link clicks (30d)</span>
-                  <strong>9,842</strong>
+                  <strong>{stats.clicks.toLocaleString()}</strong>
                 </div>
                 <div className="stat-box">
                   <span>Click-through</span>
-                  <strong>54%</strong>
+                  <strong>{stats.views ? `${Math.min(100, Math.round((stats.clicks / stats.views) * 100))}%` : '—'}</strong>
                 </div>
               </div>
             </div>
@@ -532,10 +537,7 @@ function OneLink() {
                     !['review', 'instagram', 'directions', 'call'].includes(destination.key)
                   const isLive = Boolean(destination.live)
                   const meta = destination.meta || destination.href || ''
-                  const clicks =
-                    typeof destination.clicks === 'number'
-                      ? destination.clicks.toLocaleString()
-                      : destination.clicks
+                  const clicks = (stats.byKey[destination.key] || 0).toLocaleString()
                   return (
                     <div
                       className={`destination${dragKey === destination.key ? ' dragging' : ''}${

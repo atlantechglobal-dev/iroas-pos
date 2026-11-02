@@ -585,6 +585,29 @@ router.get('/reservations', (req, res) => {
   res.json({ reservations: rows.map(mapReservation) })
 })
 
+router.get('/one-link/stats', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const rows = db
+    .prepare(
+      `SELECT kind, dest_key AS key, COUNT(*) AS n FROM link_events
+       WHERE restaurant_id = ? AND created_at >= datetime('now', '-30 days')
+       GROUP BY kind, dest_key`,
+    )
+    .all(restaurant.id)
+  const byKey = {}
+  let views = 0
+  let clicks = 0
+  for (const r of rows) {
+    if (r.kind === 'view') views += r.n
+    else {
+      clicks += r.n
+      byKey[r.key] = r.n
+    }
+  }
+  res.json({ views, clicks, byKey })
+})
+
 router.get('/guests', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })

@@ -8,6 +8,8 @@ export const publicApi = {
       `/public/${encodeURIComponent(slug)}/availability?date=${encodeURIComponent(date)}&guests=${encodeURIComponent(guests)}`,
       { auth: false },
     ),
+  recordLinkEvent: (slug, body) =>
+    apiRequest(`/public/${encodeURIComponent(slug)}/link-events`, { method: 'POST', body, auth: false }),
   getBooking: (slug, token) =>
     apiRequest(`/public/${encodeURIComponent(slug)}/bookings/${encodeURIComponent(token)}`, { auth: false }),
   cancelBooking: (slug, token) =>

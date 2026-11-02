@@ -368,6 +368,23 @@ async function sendPublicSite(req, res) {
   })
 }
 
+const linkEventLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  message: 'Too many requests.',
+})
+
+/** One Link hub: a page view or a tap on one of its links. */
+router.post('/:slug/link-events', linkEventLimiter, (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+  const kind = req.body?.kind === 'click' ? 'click' : req.body?.kind === 'view' ? 'view' : null
+  const key = String(req.body?.key || '').slice(0, 60)
+  if (!kind || (kind === 'click' && !key)) return res.status(400).json({ error: 'Invalid event.' })
+  db.prepare('INSERT INTO link_events (restaurant_id, kind, dest_key) VALUES (?, ?, ?)').run(restaurant.id, kind, key)
+  res.status(204).end()
+})
+
 const uryOrderLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 30,

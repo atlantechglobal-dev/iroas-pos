@@ -230,8 +230,9 @@ export function oneLinkDisplayHost(slug) {
 }
 
 export function oneLinkPublicUrl(slug) {
-  // One shareable link = the guest restaurant website (not a separate hub URL).
-  return guestSiteUrl(slug, 'website')
+  // The shareable link is the One Link hub (/l/:slug), which points to the site pages.
+  const origin = publicOrigin()
+  return origin ? `${origin}/l/${slug}` : `/l/${slug}`
 }
 
 export function cardPublicUrl(slug) {
