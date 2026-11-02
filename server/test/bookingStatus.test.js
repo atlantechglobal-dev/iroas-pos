@@ -146,3 +146,35 @@ test('a token from one restaurant does not open a booking under another slug', a
   assert.equal((await fetch(`${base}/api/public/other/bookings/${token}`)).status, 404)
   assert.equal((await fetch(`${base}/api/public/resto/bookings/${token}`)).status, 200)
 })
+
+test('a booking creates the guest once; phone formats match; no-shows and cancellations are counted', async () => {
+  const day = dayFromNow(8)
+  const make = (phone, name) =>
+    fetch(`${base}/api/public/resto/reservations`, {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ name, phone, email: name === 'Lerato M' ? 'lerato@t.local' : '', guests: 2, date: day, time: '12:00' }),
+    })
+  assert.equal((await make('071 555 0101', 'Lerato')).status, 201)
+  assert.equal((await make('+27715550101', 'Lerato M')).status, 201)
+  assert.equal((await make('0829990000', 'Thabo')).status, 201)
+
+  const list = async () => (await (await fetch(`${base}/api/restaurant/guests`, { headers: auth })).json()).guests
+  const lerato = (await list()).find((g) => g.name === 'Lerato M')
+  assert.ok(lerato)
+  assert.equal(lerato.bookings, 2)
+  assert.equal(lerato.email, 'lerato@t.local')
+  assert.equal((await list()).filter((g) => g.name.startsWith('Lerato')).length, 1)
+
+  const rows = db.prepare(`SELECT id FROM reservations WHERE phone IN ('071 555 0101', '+27715550101') ORDER BY id`).all()
+  db.prepare(`UPDATE reservations SET status = 'no_show' WHERE id = ?`).run(rows[0].id)
+  db.prepare(`UPDATE reservations SET status = 'cancelled' WHERE id = ?`).run(rows[1].id)
+  const after = (await list()).find((g) => g.name === 'Lerato M')
+  assert.equal(after.noShows, 1)
+  assert.equal(after.cancellations, 1)
+  assert.equal((await list()).find((g) => g.name === 'Thabo').noShows, 0)
+})
+
+test('guest list is private to the owner of the restaurant', async () => {
+  assert.equal((await fetch(`${base}/api/restaurant/guests`)).status, 401)
+})

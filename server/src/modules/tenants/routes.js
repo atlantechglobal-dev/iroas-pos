@@ -19,6 +19,7 @@ import {
   onReservationCreated,
   onReservationStatusChange,
 } from '../../services/reservationMessaging.js'
+import { listGuests, upsertGuest } from '../../services/guestRecords.js'
 import {
   assignTableForParty,
   assertTableAvailable,
@@ -584,6 +585,12 @@ router.get('/reservations', (req, res) => {
   res.json({ reservations: rows.map(mapReservation) })
 })
 
+router.get('/guests', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  res.json({ guests: listGuests(restaurant.id) })
+})
+
 router.get('/availability', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
@@ -720,6 +727,7 @@ router.post('/reservations', (req, res) => {
   }
 
   const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(insertedId)
+  upsertGuest(restaurant.id, { name: row.guest_name, phone: row.phone, email: row.guest_email })
   onReservationCreated(restaurant, row, { source: 'staff' })
   res.status(201).json({ reservation: mapReservation(row) })
 })

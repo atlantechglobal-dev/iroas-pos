@@ -55,6 +55,7 @@ export const api = {
   cancelPosOrder: restaurantApi.cancelPosOrder,
   advancePosKitchen: restaurantApi.advancePosKitchen,
   getPosCustomers: restaurantApi.listPosCustomers,
+  getGuests: restaurantApi.listGuests,
   getPosStaff: restaurantApi.listPosStaff,
   getPosOrderMenu: restaurantApi.getPosOrderMenu,
   createPosOrder: restaurantApi.createPosOrder,

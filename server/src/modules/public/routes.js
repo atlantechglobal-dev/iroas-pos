@@ -13,6 +13,7 @@ import {
 } from '../../services/reservationAvailability.js'
 import { onReservationCreated, onReservationStatusChange } from '../../services/reservationMessaging.js'
 import { assignTableForParty } from '../../services/diningTables.js'
+import { upsertGuest } from '../../services/guestRecords.js'
 import {
   createGuestOrder,
   findTableByPublicCode,
@@ -783,6 +784,7 @@ router.post('/:slug/reservations', (req, res) => {
   }
 
   const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(insertedId)
+  upsertGuest(restaurant.id, { name: row.guest_name, phone: row.phone, email: row.guest_email })
   onReservationCreated(restaurant, row, { source: 'public' })
 
   res.status(201).json({

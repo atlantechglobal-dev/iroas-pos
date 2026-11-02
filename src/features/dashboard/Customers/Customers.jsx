@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { usePosResource } from '@/shared/hooks/usePosResource'
 import { api } from '@/shared/lib/api'
@@ -6,6 +7,23 @@ import '@/features/dashboard/Customers/Customers.css'
 
 function Customers() {
   const posCustomers = usePosResource(api.getPosCustomers)
+  const [guests, setGuests] = useState(null)
+
+  const loadGuests = useCallback(() => {
+    api
+      .getGuests()
+      .then((data) => setGuests(data.guests || []))
+      .catch(() => setGuests([]))
+  }, [])
+
+  useEffect(() => {
+    loadGuests()
+  }, [loadGuests])
+
+  const reload = () => {
+    loadGuests()
+    posCustomers.reload()
+  }
 
   return (
     <DashboardLayout pageClassName="customers-page" activeNav="customers">
@@ -13,14 +31,10 @@ function Customers() {
         <div>
           <p className="eyebrow">People</p>
           <h1>Customers</h1>
-          <p className="page-desc">Guests who have ordered at your restaurant, live from your POS bills.</p>
+          <p className="page-desc">Guests who have booked or ordered at your restaurant.</p>
         </div>
       </div>
-      {posCustomers.status === 'not_connected' ? (
-        <p className="empty-note">Your POS is not connected yet. Guests will appear here once it is.</p>
-      ) : (
-        <PosCustomersView posCustomers={posCustomers} />
-      )}
+      <PosCustomersView posCustomers={posCustomers} guests={guests} reload={reload} />
     </DashboardLayout>
   )
 }

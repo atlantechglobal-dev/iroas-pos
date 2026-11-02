@@ -64,6 +64,7 @@ export const restaurantApi = {
       body,
     }),
   listPosCustomers: () => apiRequest('/restaurant/pos-customers'),
+  listGuests: () => apiRequest('/restaurant/guests'),
   listPosStaff: () => apiRequest('/restaurant/pos-staff'),
   getPosOrderMenu: (table) =>
     apiRequest(`/restaurant/pos-order-menu?table=${encodeURIComponent(table)}`),
