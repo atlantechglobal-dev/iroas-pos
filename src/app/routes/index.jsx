@@ -30,6 +30,7 @@ const OneLink = lazy(() => import('@/features/dashboard/OneLink/OneLink'))
 const GuestOneLink = lazy(() => import('@/features/guest/GuestOneLink/GuestOneLink'))
 const GuestBusinessCard = lazy(() => import('@/features/guest/GuestBusinessCard/GuestBusinessCard'))
 const GuestSite = lazy(() => import('@/features/guest/GuestSite/GuestSite'))
+const GuestBooking = lazy(() => import('@/features/guest/GuestBooking/GuestBooking'))
 const PlatformAdmin = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformAdmin'))
 const PlatformPlans = lazy(() => import('@/features/platform-admin/PlatformAdmin/Plans'))
 const PlatformCustomers = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformCustomers'))
@@ -156,6 +157,7 @@ export function AppRoutes() {
         {/* Guest share pages — public, no auth redirect */}
         <Route path={ROUTES.GUEST_ONE_LINK} element={<GuestOneLink />} />
         <Route path={ROUTES.GUEST_BUSINESS_CARD} element={<GuestBusinessCard />} />
+        <Route path={ROUTES.GUEST_BOOKING} element={<GuestBooking />} />
         <Route path={ROUTES.GUEST_SITE_DISH} element={<GuestSite />} />
         <Route path={ROUTES.GUEST_SITE_TABLE} element={<GuestSite />} />
         <Route path={ROUTES.GUEST_SITE_PAGE} element={<GuestSite />} />

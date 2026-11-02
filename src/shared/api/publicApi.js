@@ -8,6 +8,13 @@ export const publicApi = {
       `/public/${encodeURIComponent(slug)}/availability?date=${encodeURIComponent(date)}&guests=${encodeURIComponent(guests)}`,
       { auth: false },
     ),
+  getBooking: (slug, token) =>
+    apiRequest(`/public/${encodeURIComponent(slug)}/bookings/${encodeURIComponent(token)}`, { auth: false }),
+  cancelBooking: (slug, token) =>
+    apiRequest(`/public/${encodeURIComponent(slug)}/bookings/${encodeURIComponent(token)}/cancel`, {
+      method: 'POST',
+      auth: false,
+    }),
   createReservation: (slug, payload) =>
     apiRequest(`/public/${encodeURIComponent(slug)}/reservations`, {
       method: 'POST',

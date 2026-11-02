@@ -20,6 +20,12 @@ function ownerWantsSms(settings) {
   return settings.smsNotifs === true
 }
 
+function cancelLine(restaurant, reservation) {
+  if (!reservation.cancel_token || !restaurant.subdomain) return ''
+  const base = String(process.env.PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:5173').trim().replace(/\/$/, '')
+  return `Need to cancel? ${base}/s/${restaurant.subdomain}/booking/${reservation.cancel_token}`
+}
+
 function reminderSendAt(date, time) {
   const minutes = parseTimeToMinutes(time)
   if (minutes == null || !date) return null
@@ -172,6 +178,7 @@ export function onReservationCreated(restaurant, reservation, { source = 'public
         `When: ${when}`,
         `Party: ${reservation.guests}`,
         reservation.notes ? `Notes: ${reservation.notes}` : '',
+        cancelLine(restaurant, reservation),
       ]
         .filter(Boolean)
         .join('\n'),
@@ -202,13 +209,24 @@ export function onReservationCreated(restaurant, reservation, { source = 'public
   }
 }
 
-export function onReservationStatusChange(restaurant, previous, next) {
+export function onReservationStatusChange(restaurant, previous, next, { byGuest = false } = {}) {
   if (previous.status === next.status && previous.date === next.date && previous.time === next.time) {
     return
   }
 
   const name = restaurant.name || 'the restaurant'
   const when = `${next.date} at ${next.time}`
+
+  if (['seated', 'completed', 'no_show'].includes(next.status)) {
+    cancelPendingReminders(next.id)
+  }
+  if (byGuest && next.status === 'cancelled') {
+    notifyRestaurantOwner(
+      restaurant,
+      'Guest cancelled a booking',
+      `${next.guest_name} · ${when} · ${next.guests} guests`,
+    )
+  }
 
   if (next.status === 'confirmed' && previous.status !== 'confirmed') {
     if (next.guest_email) {
@@ -225,7 +243,10 @@ export function onReservationStatusChange(restaurant, previous, next) {
           `Your table at ${name} is confirmed.`,
           `When: ${when}`,
           `Party: ${next.guests}`,
-        ].join('\n'),
+          cancelLine(restaurant, next),
+        ]
+          .filter(Boolean)
+          .join('\n'),
       })
     }
     if (next.phone) {

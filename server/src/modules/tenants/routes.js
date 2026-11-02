@@ -1,8 +1,14 @@
+import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { db } from '../../infra/db.js'
 import { requireAuth } from '../../middleware/auth.js'
 import {
+  ACTIVE_RESERVATION_STATUSES,
+  ACTIVE_STATUS_SQL,
+  RESERVATION_STATUSES,
   assertBookable,
+  checkStatusChange,
+  zonedNow,
   bookingRules,
   listSlots,
   maxCoversFromSettings,
@@ -591,7 +597,7 @@ router.get('/availability', (req, res) => {
   const existing = db
     .prepare(
       `SELECT id, date, time, guests, status FROM reservations
-       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+       WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
     )
     .all(restaurant.id, date)
 
@@ -643,7 +649,7 @@ router.post('/reservations', (req, res) => {
       const existing = db
         .prepare(
           `SELECT id, date, time, guests, status FROM reservations
-           WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+           WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
         )
         .all(restaurant.id, String(date))
 
@@ -690,8 +696,8 @@ router.post('/reservations', (req, res) => {
       const result = db
         .prepare(
           `INSERT INTO reservations
-            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id, cancel_token)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           restaurant.id,
@@ -704,6 +710,7 @@ router.post('/reservations', (req, res) => {
           String(notes || '').trim() || null,
           desiredStatus,
           assignedTable || null,
+          randomBytes(16).toString('hex'),
         )
       insertedId = result.lastInsertRowid
     })
@@ -727,8 +734,16 @@ router.patch('/reservations/:id', (req, res) => {
   if (!row) return res.status(404).json({ error: 'Reservation not found.' })
 
   const { status, guestName, phone, email, guests, date, time, notes, tableId } = req.body || {}
-  const nextStatus =
-    status && ['pending', 'confirmed', 'cancelled'].includes(status) ? status : row.status
+  if (status && !RESERVATION_STATUSES.includes(status)) {
+    return res.status(400).json({ error: 'Unknown booking status.' })
+  }
+  const nextStatus = status || row.status
+  const statusProblem = checkStatusChange(row.status, nextStatus, {
+    date: row.date,
+    today: zonedNow(restaurant.timezone).date,
+  })
+  if (statusProblem) return res.status(409).json({ error: statusProblem })
+  const nextActive = ACTIVE_RESERVATION_STATUSES.includes(nextStatus)
   const nextGuests =
     guests != null ? Math.max(1, Math.min(20, Number(guests) || 2)) : row.guests
   const nextDate = date != null ? String(date) : row.date
@@ -741,12 +756,12 @@ router.patch('/reservations/:id', (req, res) => {
     notes !== undefined ? String(notes || '').trim() || null : row.notes
 
   const needsCapacityCheck =
-    nextStatus !== 'cancelled' &&
-    (nextStatus === 'confirmed' ||
-      nextDate !== row.date ||
+    nextActive &&
+    (nextDate !== row.date ||
       nextTime !== row.time ||
       nextGuests !== row.guests ||
-      (row.status === 'cancelled' && nextStatus !== 'cancelled'))
+      (row.status === 'pending' && nextStatus === 'confirmed') ||
+      row.status === 'cancelled')
 
   try {
     const run = db.transaction(() => {
@@ -756,7 +771,7 @@ router.patch('/reservations/:id', (req, res) => {
         const existing = db
           .prepare(
             `SELECT id, date, time, guests, status FROM reservations
-             WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+             WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
           )
           .all(restaurant.id, nextDate)
 
@@ -786,7 +801,7 @@ router.patch('/reservations/:id', (req, res) => {
 
       if (
         nextTableId == null &&
-        nextStatus !== 'cancelled' &&
+        nextActive &&
         (nextDate !== row.date || nextTime !== row.time || nextGuests !== row.guests)
       ) {
         nextTableId = assignTableForParty({
@@ -798,7 +813,7 @@ router.patch('/reservations/:id', (req, res) => {
         })
       }
 
-      if (nextTableId != null && nextStatus !== 'cancelled') {
+      if (nextTableId != null && nextActive) {
         const tableCheck = assertTableAvailable({
           restaurantId: restaurant.id,
           tableId: nextTableId,

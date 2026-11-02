@@ -8,6 +8,33 @@ export const DEFAULT_TIMEZONE = 'Africa/Johannesburg'
 
 const DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+export const RESERVATION_STATUSES = ['pending', 'confirmed', 'seated', 'completed', 'no_show', 'cancelled']
+/** Statuses that hold capacity and a table. */
+export const ACTIVE_RESERVATION_STATUSES = ['pending', 'confirmed', 'seated']
+export const ACTIVE_STATUS_SQL = ACTIVE_RESERVATION_STATUSES.map((s) => `'${s}'`).join(', ')
+
+const STATUS_TRANSITIONS = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['seated', 'no_show', 'cancelled', 'pending'],
+  seated: ['completed', 'confirmed'],
+  completed: [],
+  no_show: ['confirmed'],
+  cancelled: ['pending'],
+}
+const STATUSES_NEEDING_BOOKING_DAY = ['seated', 'completed', 'no_show']
+
+/** Null when the move is allowed, else a message. `today` is the restaurant-local date. */
+export function checkStatusChange(from, to, { date, today } = {}) {
+  if (from === to) return null
+  if (!STATUS_TRANSITIONS[from]?.includes(to)) {
+    return `A ${from.replace('_', '-')} booking cannot be changed to ${to.replace('_', '-')}.`
+  }
+  if (STATUSES_NEEDING_BOOKING_DAY.includes(to) && date && today && date > today) {
+    return 'This can only be set on or after the booking date.'
+  }
+  return null
+}
+
 export function parseHoursJson(raw) {
   if (!raw) return null
   if (Array.isArray(raw)) return raw
@@ -183,7 +210,7 @@ function dayRowForDate(hours, dateStr) {
 }
 
 function activeReservations(rows) {
-  return (rows || []).filter((r) => r.status === 'pending' || r.status === 'confirmed')
+  return (rows || []).filter((r) => ACTIVE_RESERVATION_STATUSES.includes(r.status))
 }
 
 function coversUsedAt(slotStart, dwellMinutes, reservations) {

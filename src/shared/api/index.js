@@ -80,6 +80,8 @@ export const api = {
   getPublicSite: publicApi.getSite,
   getPublicAvailability: publicApi.getAvailability,
   createPublicReservation: publicApi.createReservation,
+  getPublicBooking: publicApi.getBooking,
+  cancelPublicBooking: publicApi.cancelBooking,
   getPublicTable: publicApi.getTable,
   createPublicOrder: publicApi.createOrder,
   getPublicOrder: publicApi.getOrder,

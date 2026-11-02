@@ -441,6 +441,42 @@ if (!reservationColumns.some((col) => col.name === 'guest_email')) {
 if (!reservationColumns.some((col) => col.name === 'table_id')) {
   db.exec('ALTER TABLE reservations ADD COLUMN table_id INTEGER')
 }
+if (!reservationColumns.some((col) => col.name === 'cancel_token')) {
+  db.exec('ALTER TABLE reservations ADD COLUMN cancel_token TEXT')
+}
+
+// SQLite cannot alter a CHECK, so widen the status list by rebuilding the table once.
+if (!db.prepare(`SELECT sql FROM sqlite_master WHERE name = 'reservations'`).get().sql.includes('no_show')) {
+  db.pragma('foreign_keys = OFF')
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE reservations_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        guest_name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        guests INTEGER NOT NULL DEFAULT 2,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'seated', 'completed', 'no_show', 'cancelled')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        guest_email TEXT,
+        table_id INTEGER,
+        cancel_token TEXT
+      );
+      INSERT INTO reservations_new
+        (id, restaurant_id, guest_name, phone, guests, date, time, notes, status, created_at, guest_email, table_id, cancel_token)
+        SELECT id, restaurant_id, guest_name, phone, guests, date, time, notes, status, created_at, guest_email, table_id, cancel_token
+        FROM reservations;
+      DROP TABLE reservations;
+      ALTER TABLE reservations_new RENAME TO reservations;
+      CREATE INDEX IF NOT EXISTS idx_reservations_restaurant ON reservations(restaurant_id, date, time);
+    `)
+  })()
+  db.pragma('foreign_keys = ON')
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_reservations_cancel_token ON reservations(cancel_token)')
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS message_jobs (

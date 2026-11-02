@@ -1,5 +1,5 @@
 import { db } from '../infra/db.js'
-import { DEFAULT_DWELL_MINUTES, parseTimeToMinutes } from './reservationAvailability.js'
+import { ACTIVE_STATUS_SQL, DEFAULT_DWELL_MINUTES, parseTimeToMinutes } from './reservationAvailability.js'
 
 export function listDiningTables(restaurantId, { activeOnly = false } = {}) {
   const rows = db
@@ -164,7 +164,7 @@ export function assignTableForParty({
   const bookings = db
     .prepare(
       `SELECT id, table_id, time, guests, status FROM reservations
-       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')
+       WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})
          AND table_id IS NOT NULL`,
     )
     .all(restaurantId, String(date))
@@ -234,7 +234,7 @@ export function assertTableAvailable({
     .prepare(
       `SELECT id, time FROM reservations
        WHERE restaurant_id = ? AND date = ? AND table_id = ?
-         AND status IN ('pending', 'confirmed')`,
+         AND status IN (${ACTIVE_STATUS_SQL})`,
     )
     .all(restaurantId, String(date), id)
     .filter((r) =>

@@ -1,13 +1,17 @@
+import { randomBytes } from 'node:crypto'
 import express, { Router } from 'express'
 import { db } from '../../infra/db.js'
 import {
+  ACTIVE_STATUS_SQL,
   assertBookable,
   bookingRules,
   listSlots,
   maxCoversFromSettings,
   parseHoursJson,
+  parseTimeToMinutes,
+  zonedNow,
 } from '../../services/reservationAvailability.js'
-import { onReservationCreated } from '../../services/reservationMessaging.js'
+import { onReservationCreated, onReservationStatusChange } from '../../services/reservationMessaging.js'
 import { assignTableForParty } from '../../services/diningTables.js'
 import {
   createGuestOrder,
@@ -675,7 +679,7 @@ router.get('/:slug/availability', (req, res) => {
   const existing = db
     .prepare(
       `SELECT id, date, time, guests, status FROM reservations
-       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+       WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
     )
     .all(restaurant.id, date)
 
@@ -727,7 +731,7 @@ router.post('/:slug/reservations', (req, res) => {
       const existing = db
         .prepare(
           `SELECT id, date, time, guests, status FROM reservations
-           WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+           WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
         )
         .all(restaurant.id, String(date))
 
@@ -756,8 +760,8 @@ router.post('/:slug/reservations', (req, res) => {
       const result = db
         .prepare(
           `INSERT INTO reservations
-            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id, cancel_token)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
         )
         .run(
           restaurant.id,
@@ -769,6 +773,7 @@ router.post('/:slug/reservations', (req, res) => {
           String(time),
           String(notes || '').trim() || null,
           tableId || null,
+          randomBytes(16).toString('hex'),
         )
       insertedId = result.lastInsertRowid
     })
@@ -793,8 +798,54 @@ router.post('/:slug/reservations', (req, res) => {
       status: row.status,
       tableId: row.table_id || null,
       createdAt: row.created_at,
+      cancelToken: row.cancel_token,
     },
   })
+})
+
+function guestBookingView(restaurant, row) {
+  const start = parseTimeToMinutes(row.time)
+  const zoned = zonedNow(restaurant.timezone)
+  const started =
+    row.date < zoned.date || (row.date === zoned.date && start != null && start <= zoned.minutes)
+  return {
+    restaurantName: restaurant.name,
+    guestName: row.guest_name,
+    guests: row.guests,
+    date: row.date,
+    time: row.time,
+    status: row.status,
+    canCancel: ['pending', 'confirmed'].includes(row.status) && !started,
+  }
+}
+
+function findGuestBooking(req) {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  const token = String(req.params.token || '')
+  if (!restaurant || !/^[0-9a-f]{32}$/.test(token)) return {}
+  const row = db
+    .prepare('SELECT * FROM reservations WHERE cancel_token = ? AND restaurant_id = ?')
+    .get(token, restaurant.id)
+  return { restaurant, row }
+}
+
+/** Guest looks at their booking through the link in the confirmation message. */
+router.get('/:slug/bookings/:token', (req, res) => {
+  const { restaurant, row } = findGuestBooking(req)
+  if (!row) return res.status(404).json({ error: 'Booking not found.' })
+  res.json({ booking: guestBookingView(restaurant, row) })
+})
+
+router.post('/:slug/bookings/:token/cancel', (req, res) => {
+  const { restaurant, row } = findGuestBooking(req)
+  if (!row) return res.status(404).json({ error: 'Booking not found.' })
+  if (!guestBookingView(restaurant, row).canCancel) {
+    return res.status(409).json({ error: 'This booking can no longer be cancelled online. Please call the restaurant.' })
+  }
+  db.prepare(`UPDATE reservations SET status = 'cancelled' WHERE id = ?`).run(row.id)
+  const updated = db.prepare('SELECT * FROM reservations WHERE id = ?').get(row.id)
+  onReservationStatusChange(restaurant, row, updated, { byGuest: true })
+  res.json({ booking: guestBookingView(restaurant, updated) })
 })
 
 /** Public list of active dining tables (for guest table picker) */
