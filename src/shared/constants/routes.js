@@ -75,6 +75,7 @@ export const ROUTES = {
   GUEST_SITE_PAGE: '/s/:slug/:page',
   GUEST_SITE_DISH: '/s/:slug/dish/:itemId',
   GUEST_SITE_TABLE: '/s/:slug/t/:tableCode',
+  GUEST_BOOKING: '/s/:slug/booking/:token',
   NOT_FOUND: '/404',
   UNAUTHORIZED: '/403',
 }

@@ -20,10 +20,35 @@ function formatTimeLabel(time) {
   return `${h12}:${m || '00'} ${ampm}`
 }
 
+const STATUS_LABELS = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  seated: 'Seated',
+  completed: 'Completed',
+  no_show: 'No-show',
+  cancelled: 'Cancelled',
+}
+const PILL_TONES = { pending: 'amber', confirmed: 'green', seated: 'blue', completed: 'grey', no_show: 'red', cancelled: 'grey' }
+
 function statusLabel(status) {
-  if (status === 'confirmed') return 'Confirmed'
-  if (status === 'cancelled') return 'Cancelled'
-  return 'Pending'
+  return STATUS_LABELS[status] || 'Pending'
+}
+
+function rowActions(res, today) {
+  switch (res.status) {
+    case 'pending':
+      return [['Confirm', 'confirmed'], ['Cancel', 'cancelled']]
+    case 'confirmed':
+      return [...(res.date <= today ? [['No-show', 'no_show']] : []), ['Cancel', 'cancelled']]
+    case 'seated':
+      return [['Complete', 'completed']]
+    case 'no_show':
+      return [['Restore', 'confirmed']]
+    case 'cancelled':
+      return [['Restore', 'pending']]
+    default:
+      return []
+  }
 }
 
 function Reservations() {
@@ -203,7 +228,7 @@ function Reservations() {
     try {
       const { reservation } = await api.updateReservation(id, { status })
       setReservations((prev) => prev.map((r) => (r.id === id ? reservation : r)))
-      toast.success(`Reservation ${status}.`)
+      toast.success(`Marked ${statusLabel(status).toLowerCase()}.`)
     } catch (err) {
       toast.error(err.message || 'Unable to update reservation.')
     }
@@ -440,9 +465,16 @@ function Reservations() {
               <span className="legend-item">
                 <span className="legend-swatch amber" /> Pending
               </span>
-              <span className="legend-item">
-                <span className="legend-swatch green" /> Confirmed
-              </span>
+              {[
+                ['green', 'Confirmed'],
+                ['blue', 'Seated'],
+                ['grey', 'Completed'],
+                ['red', 'No-show'],
+              ].map(([tone, label]) => (
+                <span className="legend-item" key={tone}>
+                  <span className={`legend-swatch ${tone}`} /> {label}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -484,8 +516,8 @@ function Reservations() {
                                 <button
                                   key={res.id}
                                   type="button"
-                                  className={`booking-pill ${res.status === 'confirmed' ? 'green' : 'amber'}`}
-                                  title={`${res.guestName} · ${res.phone}`}
+                                  className={`booking-pill ${PILL_TONES[res.status] || 'amber'}`}
+                                  title={`${res.guestName} · ${res.phone} · ${statusLabel(res.status)}`}
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     openEditBooking(res)
@@ -535,8 +567,8 @@ function Reservations() {
                               <button
                                 key={res.id}
                                 type="button"
-                                className={`booking-pill ${res.status === 'confirmed' ? 'green' : 'amber'}`}
-                                title={`${res.guestName} · ${res.phone}`}
+                                className={`booking-pill ${PILL_TONES[res.status] || 'amber'}`}
+                                title={`${res.guestName} · ${res.phone} · ${statusLabel(res.status)}`}
                                 onClick={() => openEditBooking(res)}
                               >
                                 {formatTimeLabel(res.time)} · {res.guestName} · {res.guests}
@@ -598,54 +630,27 @@ function Reservations() {
                   <small>{res.date}</small>
                 </div>
 
-                <span
-                  className={`status-badge ${
-                    res.status === 'confirmed'
-                      ? 'confirmed'
-                      : res.status === 'cancelled'
-                        ? 'cancelled'
-                        : 'pending'
-                  }`}
-                >
-                  {statusLabel(res.status)}
-                </span>
+                <span className={`status-badge ${res.status.replace('_', '-')}`}>{statusLabel(res.status)}</span>
 
                 <div className="res-actions">
-                  {posLinked && res.status !== 'cancelled' ? (
+                  {(res.status === 'pending' || res.status === 'confirmed') && posLinked ? (
                     <button type="button" className="btn-manage-res" onClick={() => setSeatingRes(res)}>
                       Seat in POS
+                    </button>
+                  ) : null}
+                  {res.status === 'confirmed' && res.date <= todayIso() ? (
+                    <button type="button" className="btn-manage-res" onClick={() => setStatus(res.id, 'seated')}>
+                      Seated
                     </button>
                   ) : null}
                   <button type="button" className="btn-manage-res" onClick={() => openEditBooking(res)}>
                     Edit
                   </button>
-                  {res.status !== 'confirmed' ? (
-                    <button
-                      type="button"
-                      className="btn-manage-res"
-                      onClick={() => setStatus(res.id, 'confirmed')}
-                    >
-                      Confirm
+                  {rowActions(res, todayIso()).map(([label, next]) => (
+                    <button key={next} type="button" className="btn-manage-res" onClick={() => setStatus(res.id, next)}>
+                      {label}
                     </button>
-                  ) : null}
-                  {res.status !== 'cancelled' ? (
-                    <button
-                      type="button"
-                      className="btn-manage-res"
-                      onClick={() => setStatus(res.id, 'cancelled')}
-                    >
-                      Cancel
-                    </button>
-                  ) : null}
-                  {res.status === 'cancelled' ? (
-                    <button
-                      type="button"
-                      className="btn-manage-res"
-                      onClick={() => setStatus(res.id, 'pending')}
-                    >
-                      Restore
-                    </button>
-                  ) : null}
+                  ))}
                 </div>
               </div>
             ))}
@@ -800,9 +805,11 @@ function Reservations() {
                   value={form.status}
                   onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                 >
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="cancelled">Cancelled</option>
+                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </label>
             ) : null}
@@ -906,7 +913,8 @@ function Reservations() {
             setSeatingRes(null)
             toast.success(`${res.guestName} seated at ${result.table} · table booked in POS`)
             posTables.reload()
-            if (res.status === 'pending') setStatus(res.id, 'confirmed')
+            if (res.status === 'pending') setStatus(res.id, 'confirmed').then(() => setStatus(res.id, 'seated'))
+            else if (res.status === 'confirmed') setStatus(res.id, 'seated')
           }}
         />
       ) : null}

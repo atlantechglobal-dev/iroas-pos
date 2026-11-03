@@ -1,13 +1,14 @@
 // Operator-only, idempotent creation of a dedicated URY integration user for
 // one IROAS restaurant (never Administrator, never shared between tenants):
-//   - User <email> (System User, roles URY Manager + Employee, no welcome email)
+//   - User <email> (System User, roles URY Manager + URY Cashier + Employee, no welcome email)
 //   - row in Branch <branch> → URY User   (URY resolves the user's branch from it)
 //   - row in POS Profile <profile> → Applicable for Users (default = 0)
 //   - API key/secret via frappe.core.doctype.user.user.generate_keys, written
 //     only to server/.env as URY_CRED_<REF>_API_KEY / _API_SECRET (never printed)
 // URY Manager is the narrowest stock URY role that can read Address and the
 // Branch Operating Schedule/Exception and write the Self Ordering Profile
-// (needed by self_ordering.generate_qr_token).
+// (needed by self_ordering.generate_qr_token). URY Cashier is needed to cancel
+// orders: cancel_order cancels the KOT, and only Cashier/Captain may.
 //
 //   node scripts/ury-integration-user.js --ref TENANT_62 --email iroas-integration-62@iroas.com \
 //        --branch "Demo Branch" --pos-profile "Demo Profile"            (dry run)
@@ -22,7 +23,7 @@ import { fileURLToPath } from 'node:url'
 import { getDoc, uryPost, UryError } from '../src/integrations/ury/uryClient.js'
 import { credentialEnvNames, isValidCredentialRef } from '../src/integrations/ury/uryCredentials.js'
 
-const ROLES = ['URY Manager', 'Employee']
+const ROLES = ['URY Manager', 'URY Cashier', 'Employee']
 const ENV_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env')
 
 const args = process.argv.slice(2)

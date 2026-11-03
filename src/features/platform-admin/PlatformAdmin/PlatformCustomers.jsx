@@ -4,6 +4,7 @@ import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
+import { OnboardingChip } from '@/shared/ui/setup-progress/SetupProgress'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdmin.css'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdminExtra.css'
 
@@ -146,6 +147,7 @@ function PlatformCustomers() {
                   <th>Email</th>
                   <th>Plan</th>
                   <th>Status</th>
+                  <th>Setup</th>
                 </tr>
               </thead>
               <tbody>
@@ -164,6 +166,9 @@ function PlatformCustomers() {
                       <span className={STATUS_CLASS[row.status] || 'trial-status'}>
                         {STATUS_LABEL[row.status] || row.status}
                       </span>
+                    </td>
+                    <td>
+                      <OnboardingChip done={row.onboardingDone} total={row.onboardingTotal} />
                     </td>
                   </tr>
                 ))}

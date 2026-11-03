@@ -19,6 +19,7 @@ import {
 } from './GuestCommerce.jsx'
 import UryCheckout from './UryCheckout.jsx'
 import { formatPosDate, formatPosPrice } from './posFormat.js'
+import { formatMoney } from '@/shared/utils/money'
 
 const FALLBACK_PHOTOS = [
   'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
@@ -118,7 +119,7 @@ function DishPhoto({ src, alt = '', className = '', placeholderLabel = '' }) {
 }
 
 function formatPrice(n) {
-  return `₹${n}`
+  return formatMoney(n)
 }
 
 function stars(rating) {

@@ -5,6 +5,8 @@ import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
+import { useAuth } from '@/shared/hooks/useAuth'
+import { isSuperAdmin } from '@/shared/constants/roles'
 import { platformAccountApproveProfilePath } from '@/shared/constants/routes'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdmin.css'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdminExtra.css'
@@ -30,6 +32,7 @@ function formatWhen(iso) {
 
 function AccountApprove() {
   const toast = useToast()
+  const canApprove = isSuperAdmin(useAuth().user)
   const navigate = useNavigate()
   const [tab, setTab] = useState('waiting')
   const [search, setSearch] = useState('')
@@ -241,7 +244,7 @@ function AccountApprove() {
                   <button type="button" className="pa-view-btn" onClick={() => openProfile(row.id)}>
                     {isWaiting ? 'Review' : 'View'}
                   </button>
-                  {isWaiting ? (
+                  {isWaiting && canApprove ? (
                     <button
                       type="button"
                       className="pa-approve-btn"

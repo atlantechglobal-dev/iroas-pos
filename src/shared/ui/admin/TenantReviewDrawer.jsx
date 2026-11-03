@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ProvisioningPanel } from '@/shared/ui/admin/ProvisioningPanel'
+import { SetupProgress } from '@/shared/ui/setup-progress/SetupProgress'
 import { createPortal } from 'react-dom'
 import { api } from '@/shared/lib/api'
+import { useAuth } from '@/shared/hooks/useAuth'
+import { isSuperAdmin } from '@/shared/constants/roles'
 import { QrCodePreview } from '@/shared/ui/QrCodePreview'
 import { restaurantHostname } from '@/shared/utils/restaurantUrl'
 import { guestSiteUrl, restaurantPublicSlug } from '@/shared/utils/guestLinks'
@@ -10,6 +14,7 @@ import '@/shared/ui/admin/TenantReviewDrawer.css'
 const TABS = [
   { id: 'profile', label: 'Profile' },
   { id: 'domain', label: 'Domain' },
+  { id: 'pos', label: 'POS setup' },
   { id: 'brand', label: 'Brand' },
   { id: 'preview', label: 'Preview' },
   { id: 'activity', label: 'Activity' },
@@ -77,6 +82,7 @@ export function TenantReviewDrawer({
 }) {
   const toast = useToast()
   const isPage = variant === 'page'
+  const mayApprove = isSuperAdmin(useAuth().user)
   const [tab, setTab] = useState('profile')
   const [loading, setLoading] = useState(true)
   const [tenant, setTenant] = useState(null)
@@ -88,6 +94,19 @@ export function TenantReviewDrawer({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteName, setDeleteName] = useState('')
   const [busy, setBusy] = useState('')
+  const [progress, setProgress] = useState(null)
+
+  useEffect(() => {
+    if (!tenantId) return undefined
+    let alive = true
+    api
+      .adminOnboarding(tenantId)
+      .then((res) => alive && setProgress(res.progress))
+      .catch(() => alive && setProgress(null))
+    return () => {
+      alive = false
+    }
+  }, [tenantId, tenant?.status])
 
   const load = async (id) => {
     const data = await api.adminTenant(id)
@@ -292,7 +311,7 @@ export function TenantReviewDrawer({
               ) : null}
             </header>
 
-            {tenant.status === 'pending_approval' && isAccountApproval ? (
+            {tenant.status === 'pending_approval' && isAccountApproval && mayApprove ? (
               <div className="tenant-review-approve-banner">
                 <div>
                   <strong>New signup awaiting approval</strong>
@@ -370,6 +389,7 @@ export function TenantReviewDrawer({
             </nav>
 
             <div className="tenant-review-body">
+              {tab === 'profile' && progress ? <SetupProgress progress={progress} /> : null}
               {tab === 'profile' && (
                 <div className="tenant-review-grid">
                   {(tenant.status === 'live' || tenant.status === 'rejected') && (
@@ -463,6 +483,8 @@ export function TenantReviewDrawer({
                   </div>
                 </div>
               )}
+
+              {tab === 'pos' && <ProvisioningPanel tenantId={tenantId} tenantStatus={tenant.status} />}
 
               {tab === 'brand' && (
                 <div className="tenant-review-brand">

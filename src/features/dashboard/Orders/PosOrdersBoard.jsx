@@ -266,6 +266,10 @@ function PosOrdersBoard({ posOrders, filterMode }) {
             setOpenId(null)
             posOrders.reload?.()
           }}
+          onCancelled={() => {
+            setOpenId(null)
+            posOrders.reload?.()
+          }}
         />
       ) : null}
     </>

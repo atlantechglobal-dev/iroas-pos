@@ -1,6 +1,7 @@
 import { db } from '../infra/db.js'
 import { queueEmail, createNotification } from './identityService.js'
 import { isSmtpConfigured, sendEmail } from './emailService.js'
+import { formatMoney } from '../shared/money.js'
 
 function parseSettings(restaurant) {
   if (!restaurant?.settings_json) return {}
@@ -51,7 +52,7 @@ export async function onOrderCreated(restaurant, order) {
       : `Cash · ${order.paymentStatus === 'paid' ? 'Paid' : 'Pay on collection'}`
 
   const itemLines = (order.items || [])
-    .map((it) => `${it.qty}× ${it.name} — ₹${Math.round(it.unitPrice * it.qty)}`)
+    .map((it) => `${it.qty}× ${it.name} — ${formatMoney(it.unitPrice * it.qty)}`)
     .join('\n')
 
   const guestBody = [
@@ -59,7 +60,7 @@ export async function onOrderCreated(restaurant, order) {
     `Order #${order.publicCode}`,
     `Type: ${modeLabel}`,
     `Payment: ${payLabel}`,
-    `Total: ₹${Math.round(order.total)}`,
+    `Total: ${formatMoney(order.total)}`,
     '',
     itemLines,
     order.notes ? `\nNotes: ${order.notes}` : '',
@@ -92,14 +93,14 @@ export async function onOrderCreated(restaurant, order) {
       `${order.guestName} · ${order.phone}`,
       modeLabel,
       payLabel,
-      `Total ₹${Math.round(order.total)}`,
+      `Total ${formatMoney(order.total)}`,
       itemLines,
     ].join('\n')
 
     createNotification({
       userId: restaurant.owner_id,
       title: `New order #${order.publicCode}`,
-      body: `${modeLabel} · ₹${Math.round(order.total)} · ${order.guestName}`,
+      body: `${modeLabel} · ${formatMoney(order.total)} · ${order.guestName}`,
       type: 'order',
       meta: { orderId: order.id, publicCode: order.publicCode },
     })
@@ -120,5 +121,32 @@ export async function onOrderCreated(restaurant, order) {
         body: ownerBody,
       })
     }
+  }
+}
+
+/** Staff alert for a guest order placed straight in the POS (self-ordering or table QR). One alert per invoice. */
+export function notifyPosGuestOrder(restaurant, { invoice, table, guestName, total, source }) {
+  try {
+    const settings = parseSettings(restaurant)
+    if (!invoice || settings.newOrderAlert === false) return
+    const already = db
+      .prepare(`SELECT 1 FROM notifications WHERE user_id = ? AND type = 'pos_order' AND meta_json LIKE ?`)
+      .get(restaurant.owner_id, `%"invoice":${JSON.stringify(invoice)}%`)
+    if (already) return
+
+    const where = table ? `Table ${table}` : source === 'pickup' ? 'Pickup' : 'Online'
+    const who = guestName ? ` · ${guestName}` : ''
+    const amount = total != null ? ` · ${formatMoney(total)}` : ''
+    const title = `New order ${invoice}`
+    const body = `${where}${who}${amount}`
+    createNotification({ userId: restaurant.owner_id, type: 'pos_order', title, body, meta: { invoice, table: table || null } })
+
+    if (ownerWantsEmail(settings)) {
+      const owner = db.prepare('SELECT email FROM users WHERE id = ?').get(restaurant.owner_id)
+      const to = restaurant.email || owner?.email
+      if (to) queueEmail({ to, subject: `${title} — ${restaurant.name || 'your restaurant'}`, body: `${body}\n\nOpen Orders in your dashboard to see the items.` })
+    }
+  } catch (err) {
+    console.error('[pos-order-alert] failed', err)
   }
 }

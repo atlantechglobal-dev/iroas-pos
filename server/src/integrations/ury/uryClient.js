@@ -13,6 +13,8 @@
 // credential (URY_USERNAME/URY_PASSWORD or URY_API_KEY/SECRET) and exist for
 // operator scripts only — tenant routes must never call them.
 
+import http from 'node:http'
+import https from 'node:https'
 import { getEnv } from '../../config/env.js'
 
 function requestTimeoutMs() {
@@ -50,10 +52,47 @@ export function getUryConfig() {
   })
 }
 
-async function rawFetch(url, init = {}) {
+const SITE_NAME_RE = /^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/i
+
+export function isValidSiteName(name) {
+  return typeof name === 'string' && SITE_NAME_RE.test(name)
+}
+
+// fetch() cannot set Host, and a multi-site bench picks the site from Host.
+function requestWithHost(url, init, siteName, signal) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url)
+    const lib = target.protocol === 'https:' ? https : http
+    const req = lib.request(
+      target,
+      { method: init.method || 'GET', headers: { ...(init.headers || {}), Host: siteName }, signal },
+      (res) => {
+        const chunks = []
+        res.on('data', (c) => chunks.push(c))
+        res.on('error', reject)
+        res.on('end', () => {
+          const headers = new Headers()
+          for (const [k, v] of Object.entries(res.headers)) {
+            if (Array.isArray(v)) v.forEach((x) => headers.append(k, x))
+            else if (v !== undefined) headers.set(k, v)
+          }
+          const status = res.statusCode || 0
+          const noBody = status === 204 || status === 205 || status === 304
+          resolve(new Response(noBody ? null : Buffer.concat(chunks), { status, headers }))
+        })
+      },
+    )
+    req.on('error', reject)
+    if (init.body) req.write(init.body)
+    req.end()
+  })
+}
+
+async function rawFetch(url, init = {}, siteName = '') {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs())
   try {
+    if (siteName) return await requestWithHost(url, init, siteName, controller.signal)
     return await fetch(url, { ...init, signal: controller.signal })
   } catch (err) {
     if (err.name === 'AbortError') throw new UryError('timeout', 'URY request timed out.')
@@ -110,10 +149,13 @@ async function toUryWriteError(res) {
 
 /**
  * A URY client bound to one credential, with its own session cookie.
- * `cfg`: { baseUrl, apiKey?, apiSecret?, username?, password? }.
+ * `cfg`: { baseUrl, siteName?, apiKey?, apiSecret?, username?, password? }.
  */
 export function createUryClient(rawCfg) {
   const cfg = withAuthMode({ ...rawCfg, baseUrl: String(rawCfg.baseUrl || '').replace(/\/+$/, '') })
+  const siteName = rawCfg.siteName ? String(rawCfg.siteName) : ''
+  if (siteName && !isValidSiteName(siteName)) throw new UryError('not_configured', 'URY site name is invalid.')
+  const send = (url, init) => rawFetch(url, init, siteName)
   let sessionCookie = null
 
   function assertConfigured() {
@@ -121,7 +163,7 @@ export function createUryClient(rawCfg) {
   }
 
   async function loginSession() {
-    const res = await rawFetch(`${cfg.baseUrl}/api/method/login`, {
+    const res = await send(`${cfg.baseUrl}/api/method/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
       body: new URLSearchParams({ usr: cfg.username, pwd: cfg.password }).toString(),
@@ -148,7 +190,7 @@ export function createUryClient(rawCfg) {
     const qs = new URLSearchParams(params).toString()
     const url = `${cfg.baseUrl}/api/method/${methodPath}${qs ? `?${qs}` : ''}`
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const res = await rawFetch(url, { headers: { Accept: 'application/json', ...(await authHeaders()) } })
+      const res = await send(url, { headers: { Accept: 'application/json', ...(await authHeaders()) } })
       if (res.ok) return res.json()
       if (cfg.authMode === 'session' && attempt === 0 && (res.status === 401 || res.status === 403)) {
         sessionCookie = null
@@ -194,7 +236,7 @@ export function createUryClient(rawCfg) {
     assertConfigured()
     const url = `${cfg.baseUrl}/api/method/${methodPath}`
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const res = await rawFetch(url, {
+      const res = await send(url, {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify(body),

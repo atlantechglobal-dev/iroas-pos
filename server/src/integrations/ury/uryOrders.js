@@ -14,6 +14,7 @@ const INVOICE_FIELDS = [
   'order_type',
   'restaurant',
   'restaurant_table',
+  'invoice_printed',
   'customer',
   'customer_name',
   'mobile_number',
@@ -125,6 +126,7 @@ function billFromDoc(doc, modes) {
     subtotal: num(doc.net_total) ?? num(doc.grand_total) ?? total,
     total,
     canPay: payable,
+    printed: Boolean(doc.invoice_printed),
     modes,
   }
 }
@@ -157,6 +159,8 @@ export async function payUryInvoice(tenant, invoiceId, input = {}) {
     throw new OrderingError('amount_mismatch', 'The amount entered must match the order total.')
   }
 
+  if (!doc.invoice_printed) await markPrinted(tenant, doc)
+
   const profile = (await tenant.client.get('ury.ury_pos.api.getPosProfile'))?.message || {}
   try {
     await tenant.client.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
@@ -177,15 +181,44 @@ export async function payUryInvoice(tenant, invoiceId, input = {}) {
   return { invoice: doc.name, paid: true }
 }
 
+/** Cancels an open (draft) order with iroas_ury_ext, since URY's cancel_order fails on an unpaid draft. */
+export async function cancelUryInvoice(tenant, invoiceId, input = {}) {
+  const reason = String(input.reason || '').trim().slice(0, 140)
+  if (reason.length < 3) throw new OrderingError('reason_required', 'Enter a reason for cancelling this order.')
+  const doc = await loadOwnInvoice(tenant, invoiceId)
+  if (doc.docstatus !== 0 || PAID_STATUSES.has(doc.status) || doc.status === 'Cancelled') {
+    throw new OrderingError('not_cancellable', 'Only an open order can be cancelled.', { status: 409 })
+  }
+  let body
+  try {
+    body = await tenant.client.post('iroas_ury_ext.api.orders.cancel_open_order', { invoice_id: doc.name, reason })
+  } catch (err) {
+    if (err instanceof UryError && err.code === 'validation') {
+      throw new OrderingError('cancel_rejected', err.message, { status: 422 })
+    }
+    throw err
+  }
+  const message = body?.message
+  if (message && typeof message === 'object' && message.status === 'Failure') {
+    throw new OrderingError('cancel_failed', 'The POS could not cancel this order.', { status: 502 })
+  }
+  return { invoice: doc.name, cancelled: true }
+}
+
 /** Marks the invoice printed in URY (`qz_print_update`), which is what the POS print button calls. */
 export async function printUryInvoice(tenant, invoiceId) {
   const doc = await loadOwnInvoice(tenant, invoiceId)
+  await markPrinted(tenant, doc)
+  return billFromDoc({ ...doc, invoice_printed: 1 }, [])
+}
+
+/** URY refuses payment on an unprinted bill, so payment prints it first. */
+async function markPrinted(tenant, doc) {
   const body = await tenant.client.post('ury.ury.api.ury_print.qz_print_update', { invoice: doc.name })
   const message = body?.message
   if (message && message.status === 'Failure') {
     throw new OrderingError('print_failed', 'The POS could not mark this bill as printed.', { status: 502 })
   }
-  return billFromDoc(doc, [])
 }
 
 export async function listUryOrders({ client, uryRestaurant }) {

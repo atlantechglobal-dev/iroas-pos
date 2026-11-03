@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '@/shared/context/authContext'
 import { ROUTES } from '@/shared/constants/routes'
-import { isAdmin } from '@/shared/constants/roles'
+import { isAdmin, isSuperAdmin } from '@/shared/constants/roles'
 import { businessCategoryFromRestaurant } from '@/shared/constants/businessCategory'
 import {
   canUseDashboard,
@@ -257,6 +257,7 @@ export function AuthProvider({ children }) {
       user,
       isAuthenticated: Boolean(user && getToken()),
       isAdmin: isAdmin(user),
+      isSuperAdmin: isSuperAdmin(user),
       restaurantStatus,
       awaitingAccountApproval,
       onboardingPaid,

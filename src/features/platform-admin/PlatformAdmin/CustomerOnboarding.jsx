@@ -5,6 +5,7 @@ import { TenantReviewDrawer } from '@/shared/ui/admin/TenantReviewDrawer'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
+import { OnboardingChip } from '@/shared/ui/setup-progress/SetupProgress'
 import { platformAccountApproveProfilePath } from '@/shared/constants/routes'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdmin.css'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdminExtra.css'
@@ -212,6 +213,7 @@ function CustomerOnboarding() {
                   <th>OWNER</th>
                   <th>PLAN</th>
                   <th>STATUS</th>
+                  <th>SETUP</th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
@@ -249,6 +251,9 @@ function CustomerOnboarding() {
                         <span className={`status ${STATUS_CLASS[row.status] || 'trial-status'}`}>
                           {STATUS_LABEL[row.status] || row.status}
                         </span>
+                      </td>
+                      <td>
+                        <OnboardingChip done={row.onboardingDone} total={row.onboardingTotal} />
                       </td>
                       <td>
                         <div

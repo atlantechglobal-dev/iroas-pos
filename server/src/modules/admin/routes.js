@@ -1,6 +1,7 @@
 import { Router } from 'express'
+import { getOnboardingProgress, loadOnboardingProgress } from '../../services/onboardingProgress.js'
 import { db } from '../../infra/db.js'
-import { requireAuth, requireAdmin } from '../../middleware/auth.js'
+import { requireAuth, requireStaff } from '../../middleware/auth.js'
 import {
   appendIdentityEvent,
   appendProductEvent,
@@ -24,6 +25,12 @@ import {
   TENANT_STATUSES,
 } from '../../services/tenantReview.js'
 import { sendApprovalEmails } from '../../services/onboardingMessaging.js'
+import {
+  cancelProvisioning,
+  getProvisioning,
+  listProvisioning,
+  requestProvisioning,
+} from '../../services/tenantProvisioning.js'
 import {
   getPublicEmailSettings,
   saveEmailSettings,
@@ -60,7 +67,28 @@ import {
 
 const router = Router()
 
-router.use(requireAuth, requireAdmin)
+// Specialists get this allowlist only; everything else here is Super Admin only.
+const SPECIALIST_ALLOWED = [
+  ['GET', /^\/stats$/],
+  ['GET', /^\/tenants$/],
+  ['GET', /^\/tenants\/\d+$/],
+  ['GET', /^\/identities$/],
+  ['GET', /^\/identities\/\d+$/],
+  ['POST', /^\/identities\/\d+\/notes$/],
+  ['GET', /^\/feed$/],
+  ['GET', /^\/provisioning$/],
+  ['GET', /^\/tenants\/\d+\/provisioning$/],
+  ['GET', /^\/tenants\/\d+\/onboarding$/],
+]
+
+function specialistGuard(req, res, next) {
+  if (req.user.role === 'admin') return next()
+  const allowed = SPECIALIST_ALLOWED.some(([method, re]) => req.method === method && re.test(req.path))
+  if (!allowed) return res.status(403).json({ error: 'Super Admin access required.' })
+  next()
+}
+
+router.use(requireAuth, requireStaff, specialistGuard)
 
 function auditFromReq(req, action, entityType, entityId, detail) {
   appendPlatformAudit({
@@ -165,8 +193,11 @@ router.get('/tenants', (req, res) => {
     const onboardingPaid = Boolean(settings?.onboardingPayment?.paid)
     const businessCategory = settings.businessCategory || settings.category || ''
     const { settings_json: _omit, ...rest } = r
+    const progress = getOnboardingProgress(r.id)
     return {
       ...rest,
+      onboardingDone: progress?.done ?? 0,
+      onboardingTotal: progress?.total ?? 0,
       awaitingAccountApproval,
       accountApprovedAt,
       onboardingPaid,
@@ -204,6 +235,12 @@ router.get('/tenants', (req, res) => {
   }
 
   res.json({ tenants: filtered, total: filtered.length })
+})
+
+router.get('/tenants/:id/onboarding', async (req, res) => {
+  const progress = await loadOnboardingProgress(Number(req.params.id))
+  if (!progress) return res.status(404).json({ error: 'Tenant not found.' })
+  res.json({ progress })
 })
 
 router.get('/tenants/:id', (req, res) => {
@@ -1016,6 +1053,44 @@ router.get('/health', (_req, res) => {
   res.json(getPlatformHealth())
 })
 
+function provisioningError(res, err) {
+  res.status(err.status || 400).json({ error: err.message || 'Provisioning request failed.' })
+}
+
+router.get('/provisioning', (_req, res) => {
+  res.json({ tenants: listProvisioning() })
+})
+
+router.get('/tenants/:id/provisioning', (req, res) => {
+  try {
+    res.json({ provisioning: getProvisioning(Number(req.params.id)) })
+  } catch (err) {
+    provisioningError(res, err)
+  }
+})
+
+router.post('/tenants/:id/provisioning', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const provisioning = requestProvisioning(id, req.body || {}, req.user.id)
+    auditFromReq(req, 'provisioning.request', 'restaurant', id, provisioning.request?.siteName)
+    res.status(201).json({ provisioning })
+  } catch (err) {
+    provisioningError(res, err)
+  }
+})
+
+router.delete('/tenants/:id/provisioning', (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const provisioning = cancelProvisioning(id)
+    auditFromReq(req, 'provisioning.cancel', 'restaurant', id, '')
+    res.json({ provisioning })
+  } catch (err) {
+    provisioningError(res, err)
+  }
+})
+
 router.get('/staff', (_req, res) => {
   res.json({ staff: listPlatformStaff() })
 })
@@ -1023,7 +1098,7 @@ router.get('/staff', (_req, res) => {
 router.post('/staff', (req, res) => {
   try {
     const user = createPlatformStaff(req.body || {})
-    auditFromReq(req, 'staff.create', 'user', user.id, user.email)
+    auditFromReq(req, 'staff.create', 'user', user.id, `${user.email} (${user.role})`)
     res.status(201).json({ ok: true, user, staff: listPlatformStaff() })
   } catch (err) {
     res.status(err.status || 400).json({ error: err.message || 'Unable to create staff user.' })

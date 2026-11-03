@@ -1,124 +1,116 @@
 # IROAS POS
 
-Restaurant onboarding + operations platform for IROAS. React (Vite) frontend with a Node/Express + SQLite backend.
+Restaurant onboarding and operations platform for IROAS (South Africa and
+neighbouring countries). One IROAS app serves the platform admin console, every
+restaurant's owner panel and every restaurant's branded guest website. Each
+restaurant's POS runs in its own URY (Frappe/ERPNext) site, managed from the
+IROAS owner panel, so restaurant owners never open URY directly.
+
+```
+IROAS app (this repo)  ──►  URY site per restaurant (own database)
+React + Express + SQLite     Frappe v16 + ERPNext + URY
+```
+
+See [docs/architecture/multi-tenant-ury.md](docs/architecture/multi-tenant-ury.md).
+
+## Who uses what
+
+| Who | Uses | Never needs |
+|---|---|---|
+| IROAS (client) admin | Platform admin console: approve tenants, plans, flags, audit | URY |
+| Restaurant owner | Owner panel: menu, tables, staff, orders, reservations, branding | URY desk |
+| Restaurant guests | Branded website: menu, QR ordering, booking, One Link, business card | none |
 
 ## Tech stack
 
 | Layer | Stack |
-|-------|-------|
+|---|---|
 | Frontend | React 19, Vite 8, React Router 7 |
 | Backend | Express 4, SQLite (`better-sqlite3`), JWT |
-| Auth | Bearer tokens in localStorage, role-based routes |
+| POS / operations | URY on Frappe/ERPNext v16 (see `ury/`) |
 
-## Features
-
-- Owner signup → onboarding wizard → go-live → operations dashboard
-- Platform admin console (tenants, stats)
-- Password reset flow (token returned in API for demo/testing)
-- Protected routes with admin-only access
-
-## Project structure
+## Repository layout
 
 ```
 iroas-pos/
-├── src/
-│   ├── app/                 # App shell, providers, routes
-│   ├── components/          # Shared UI (layout, feedback)
-│   ├── config/              # Environment config
-│   ├── constants/           # Routes, roles, messages
-│   ├── context/             # Auth provider
-│   ├── hooks/               # useAuth, useRestaurant, useDebounce
-│   ├── lib/                 # Back-compat re-exports (api, navGroups)
-│   ├── pages/               # Route pages (UI preserved per screen)
-│   ├── services/            # API client + auth storage
-│   └── utils/               # Validation, helpers
-├── public/images/
-├── server/                  # Express API + SQLite
+├── src/                      # Frontend (Vite + React)
+│   ├── app/                  #   shell, providers, route table
+│   ├── features/
+│   │   ├── auth/             #   login, signup, password recovery
+│   │   ├── onboarding/       #   setup wizard, launch, onboarding payment
+│   │   ├── dashboard/        #   restaurant owner panel
+│   │   ├── platform-admin/   #   IROAS admin console
+│   │   ├── guest/            #   public restaurant site, card, One Link
+│   │   └── system/           #   404 / 403
+│   └── shared/               #   api clients, ui, hooks, utils, constants
+├── public/                   # Static assets
+├── server/                   # Backend (Express + SQLite)
 │   ├── src/
-│   └── data/iroas.db
-├── .env.example             # Frontend env template
-└── DEPLOY.md
+│   │   ├── modules/          #   routes per domain (auth, tenants, admin, public, ...)
+│   │   ├── services/         #   business services (orders, reservations, messaging, ...)
+│   │   ├── integrations/ury/ #   URY client + per-feature modules
+│   │   ├── middleware/       #   auth, rate limit, security headers, errors
+│   │   └── infra/db.js       #   SQLite schema + migrations
+│   ├── scripts/              #   operator scripts (link a restaurant to its URY site, ...)
+│   └── test/                 #   node:test suites
+├── ury/                      # URY side: deployed versions, patches, provisioning
+│   ├── patches/              #   local patch to URY 3.0.0-beta.1
+│   └── provision/            #   provision_tenant.sh, seed_branch_profile.py
+└── docs/
+    ├── architecture/         #   multi-tenant model, app structure, deploy guide
+    └── ury/                  #   URY API discovery, reference, status, gap analysis
 ```
 
-## Installation
-
-### Backend
+## Run locally
 
 ```bash
-cd server
+# backend
+cd server && cp .env.example .env     # set JWT_SECRET and ADMIN_PASSWORD
+npm install && npm run seed && npm run dev      # http://localhost:4000
+
+# frontend (repo root)
 cp .env.example .env
-npm install
-npm run seed
-npm run dev    # http://localhost:4000
+npm install && npm run dev                      # http://localhost:5173
 ```
 
-### Frontend
-
-```bash
-cp .env.example .env
-npm install
-npm run dev    # http://localhost:5173
-```
-
-## Environment variables
-
-### Frontend (`.env`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VITE_API_BASE_URL` | `/api` | API base path |
-| `VITE_APP_DOMAIN` | `iroas.com` | Brand domain suffix |
-| `VITE_DEV_API_PROXY` | `http://localhost:4000` | Vite dev proxy target |
-
-### Backend (`server/.env`)
-
-See `server/.env.example` — **JWT_SECRET is required**.
+`npm run seed` creates the platform admin (`ADMIN_EMAIL` / `ADMIN_PASSWORD`; a
+random password is printed if none is set) and sample tenants.
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Production build → `dist/` |
-| `npm run preview` | Preview production build |
-| `npm run lint` | Run oxlint |
+| Command | Where | Description |
+|---|---|---|
+| `npm run dev` | root | Vite dev server |
+| `npm run build` | root | Production build to `dist/` |
+| `npm run lint` | root | oxlint |
+| `npm test` | `server/` | Backend tests (URY isolation, multi-site, demo journey) |
 
-## Authentication
+## Environment variables
 
-1. Login → JWT stored in localStorage (`iroas_token`, `iroas_user`)
-2. Session validated via `GET /api/auth/me` on app load
-3. `401` responses clear session and redirect to login
-4. Admin routes require `role === 'admin'` (frontend + backend)
+- Frontend (`.env`): `VITE_API_BASE_URL`, `VITE_APP_DOMAIN`, `VITE_DEV_API_PROXY`,
+  `VITE_CURRENCY_SYMBOL` (default `R`).
+- Backend (`server/.env`): see `server/.env.example`. `JWT_SECRET` is required.
+  Per-restaurant URY credentials are `URY_CRED_<REF>_API_KEY` / `_API_SECRET`.
 
-### Demo accounts
+Never commit `.env` files, API keys, SQLite files or Frappe `site_config.json`.
 
-**Platform Admin:** `admin@iroas.com` / `IroasAdmin@123`
-
-**Owners** (password `Demo@1234`):
-
-- `ananya@saffronandfig.in` — live
-- `rohit@baorepublic.in` — live
-- `priya@coastandco.in` — onboarding
-
-## Production build
+## Connecting a restaurant to its URY site
 
 ```bash
-npm run build
+cd server
+node scripts/ury-link-restaurant.js link <owner-email> \
+  --restaurant "<URY Restaurant>" --branch "<Branch>" --pos-profile "<POS Profile>" \
+  --credential-ref <REF> --base-url http://<bench-address> --site-name <frappe-site>
 ```
 
-With `NODE_ENV=production`, Express serves `dist/` alongside the API. See `DEPLOY.md`.
+Full onboarding steps: [ury/README.md](ury/README.md) and
+[docs/ury/URY_API_STATUS.md](docs/ury/URY_API_STATUS.md).
 
-## Troubleshooting
+## Production
 
-| Issue | Fix |
-|-------|-----|
-| `'vite' is not recognized` | Run `npm install` in project root |
-| API `ECONNREFUSED` on login | Start backend: `cd server && npm run dev` |
-| JWT error on server start | Set `JWT_SECRET` in `server/.env` |
+`NODE_ENV=production` makes Express serve `dist/` with the API. Deploy guide:
+[docs/architecture/deploy.md](docs/architecture/deploy.md).
 
-## Architecture notes
+## Documentation
 
-- **DashboardLayout** — shared sidebar/topbar for dashboard pages (migration in progress)
-- **services/api** — centralized fetch client with 401 handling
-- **Lazy-loaded routes** — code-splitting per page
-- **ToastProvider** — replaces browser `alert()` for user feedback (migration in progress)
+[docs/README.md](docs/README.md)

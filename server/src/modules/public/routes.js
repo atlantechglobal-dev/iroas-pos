@@ -1,20 +1,27 @@
+import { randomBytes } from 'node:crypto'
 import express, { Router } from 'express'
 import { db } from '../../infra/db.js'
 import {
+  ACTIVE_STATUS_SQL,
   assertBookable,
+  bookingRules,
   listSlots,
   maxCoversFromSettings,
   parseHoursJson,
+  parseTimeToMinutes,
+  zonedNow,
 } from '../../services/reservationAvailability.js'
-import { onReservationCreated } from '../../services/reservationMessaging.js'
+import { onReservationCreated, onReservationStatusChange } from '../../services/reservationMessaging.js'
 import { assignTableForParty } from '../../services/diningTables.js'
+import { upsertGuest } from '../../services/guestRecords.js'
+import { EnquiryError, submitEnquiry } from '../../services/enquiries.js'
 import {
   createGuestOrder,
   findTableByPublicCode,
   getOrderByPublicCode,
   listOrdersByPhone,
 } from '../../services/orders.js'
-import { onOrderCreated } from '../../services/orderMessaging.js'
+import { notifyPosGuestOrder, onOrderCreated } from '../../services/orderMessaging.js'
 import { listDiningTables } from '../../services/diningTables.js'
 import { verifyNotifySignature } from '../../services/addpayClient.js'
 import { getPaymentSettings } from '../../services/paymentSettings.js'
@@ -362,6 +369,43 @@ async function sendPublicSite(req, res) {
   })
 }
 
+const linkEventLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  message: 'Too many requests.',
+})
+
+/** One Link hub: a page view or a tap on one of its links. */
+router.post('/:slug/link-events', linkEventLimiter, (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+  const kind = req.body?.kind === 'click' ? 'click' : req.body?.kind === 'view' ? 'view' : null
+  const key = String(req.body?.key || '').slice(0, 60)
+  if (!kind || (kind === 'click' && !key)) return res.status(400).json({ error: 'Invalid event.' })
+  db.prepare('INSERT INTO link_events (restaurant_id, kind, dest_key) VALUES (?, ?, ?)').run(restaurant.id, kind, key)
+  res.status(204).end()
+})
+
+const enquiryLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 8,
+  message: 'Too many messages. Please try again in a few minutes.',
+})
+
+/** Contact form on the One Link page. */
+router.post('/:slug/enquiries', enquiryLimiter, (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+  try {
+    submitEnquiry(restaurant, req.body || {})
+    res.status(201).json({ ok: true })
+  } catch (err) {
+    if (err instanceof EnquiryError) return res.status(err.status).json({ error: err.message })
+    console.error('[enquiry] failed', err)
+    res.status(500).json({ error: 'Could not send your message. Please try again.' })
+  }
+})
+
 const uryOrderLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 30,
@@ -434,6 +478,7 @@ router.post('/:slug/ury-dine-orders', uryOrderLimiter, async (req, res) => {
     console.info(
       `[public-ury-dine] restaurant=${restaurantId} invoice=${placed.invoice || '?'} table=${placed.table} customer=${customer.id}`,
     )
+    notifyPosGuestOrder(ctx.restaurant, { invoice: placed.invoice, table: placed.table, guestName: customer.name })
     res.status(201).json({
       success: true,
       data: {
@@ -471,11 +516,23 @@ router.post('/:slug/ury-orders', uryOrderLimiter, async (req, res) => {
       `[public-ury-orders] restaurant=${restaurantId} submission=${data?.submissionId || '?'} status=${data?.status || result.body.code}` +
         `${table ? ` table=${table}` : ''}${data?.invoice ? ` invoice=${data.invoice}` : ''}`,
     )
+    notifyGuestOrderResult(ctx.restaurant, data, table)
     res.status(result.httpStatus).json(result.body)
   } catch (err) {
     sendGuestOrderError(res, err, restaurantId)
   }
 })
+
+function notifyGuestOrderResult(restaurant, data, table) {
+  if (data?.status !== 'placed' || !data.invoice) return
+  notifyPosGuestOrder(restaurant, {
+    invoice: data.invoice,
+    table: data.table || table,
+    guestName: data.customerName,
+    total: data.total,
+    source: 'pickup',
+  })
+}
 
 /** Resolves a scanned URY table QR code (signed by IROAS) to the table, re-checked in URY. */
 router.get('/:slug/ury-table/:code', uryOrderLimiter, async (req, res) => {
@@ -499,6 +556,7 @@ router.get('/:slug/ury-orders/:submissionId', async (req, res) => {
     if (!ctx) return
     restaurantId = ctx.restaurant.id
     const result = await getGuestOrder(ctx.tenant, req.params.submissionId)
+    notifyGuestOrderResult(ctx.restaurant, result.body?.data)
     res.status(result.httpStatus === 201 ? 200 : result.httpStatus).json(result.body)
   } catch (err) {
     sendGuestOrderError(res, err, restaurantId)
@@ -674,7 +732,7 @@ router.get('/:slug/availability', (req, res) => {
   const existing = db
     .prepare(
       `SELECT id, date, time, guests, status FROM reservations
-       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+       WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
     )
     .all(restaurant.id, date)
 
@@ -684,6 +742,7 @@ router.get('/:slug/availability', (req, res) => {
     guests,
     existingRows: existing,
     maxCovers: maxCoversFromSettings(settings),
+    ...bookingRules(restaurant, settings),
   })
 
   res.json({
@@ -725,7 +784,7 @@ router.post('/:slug/reservations', (req, res) => {
       const existing = db
         .prepare(
           `SELECT id, date, time, guests, status FROM reservations
-           WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+           WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
         )
         .all(restaurant.id, String(date))
 
@@ -736,6 +795,7 @@ router.post('/:slug/reservations', (req, res) => {
         guests: guestCount,
         existingRows: existing,
         maxCovers: maxCoversFromSettings(settings),
+        ...bookingRules(restaurant, settings),
       })
       if (!check.ok) {
         const err = new Error(check.error)
@@ -753,8 +813,8 @@ router.post('/:slug/reservations', (req, res) => {
       const result = db
         .prepare(
           `INSERT INTO reservations
-            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id, cancel_token)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
         )
         .run(
           restaurant.id,
@@ -766,6 +826,7 @@ router.post('/:slug/reservations', (req, res) => {
           String(time),
           String(notes || '').trim() || null,
           tableId || null,
+          randomBytes(16).toString('hex'),
         )
       insertedId = result.lastInsertRowid
     })
@@ -775,6 +836,7 @@ router.post('/:slug/reservations', (req, res) => {
   }
 
   const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(insertedId)
+  upsertGuest(restaurant.id, { name: row.guest_name, phone: row.phone, email: row.guest_email })
   onReservationCreated(restaurant, row, { source: 'public' })
 
   res.status(201).json({
@@ -790,8 +852,54 @@ router.post('/:slug/reservations', (req, res) => {
       status: row.status,
       tableId: row.table_id || null,
       createdAt: row.created_at,
+      cancelToken: row.cancel_token,
     },
   })
+})
+
+function guestBookingView(restaurant, row) {
+  const start = parseTimeToMinutes(row.time)
+  const zoned = zonedNow(restaurant.timezone)
+  const started =
+    row.date < zoned.date || (row.date === zoned.date && start != null && start <= zoned.minutes)
+  return {
+    restaurantName: restaurant.name,
+    guestName: row.guest_name,
+    guests: row.guests,
+    date: row.date,
+    time: row.time,
+    status: row.status,
+    canCancel: ['pending', 'confirmed'].includes(row.status) && !started,
+  }
+}
+
+function findGuestBooking(req) {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  const token = String(req.params.token || '')
+  if (!restaurant || !/^[0-9a-f]{32}$/.test(token)) return {}
+  const row = db
+    .prepare('SELECT * FROM reservations WHERE cancel_token = ? AND restaurant_id = ?')
+    .get(token, restaurant.id)
+  return { restaurant, row }
+}
+
+/** Guest looks at their booking through the link in the confirmation message. */
+router.get('/:slug/bookings/:token', (req, res) => {
+  const { restaurant, row } = findGuestBooking(req)
+  if (!row) return res.status(404).json({ error: 'Booking not found.' })
+  res.json({ booking: guestBookingView(restaurant, row) })
+})
+
+router.post('/:slug/bookings/:token/cancel', (req, res) => {
+  const { restaurant, row } = findGuestBooking(req)
+  if (!row) return res.status(404).json({ error: 'Booking not found.' })
+  if (!guestBookingView(restaurant, row).canCancel) {
+    return res.status(409).json({ error: 'This booking can no longer be cancelled online. Please call the restaurant.' })
+  }
+  db.prepare(`UPDATE reservations SET status = 'cancelled' WHERE id = ?`).run(row.id)
+  const updated = db.prepare('SELECT * FROM reservations WHERE id = ?').get(row.id)
+  onReservationStatusChange(restaurant, row, updated, { byGuest: true })
+  res.json({ booking: guestBookingView(restaurant, updated) })
 })
 
 /** Public list of active dining tables (for guest table picker) */

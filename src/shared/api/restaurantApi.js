@@ -32,8 +32,11 @@ export const restaurantApi = {
   listPosTables: () => apiRequest('/restaurant/pos-tables'),
   getPosTableOptions: () => apiRequest('/restaurant/pos-tables/options'),
   createPosTable: (payload) => apiRequest('/restaurant/pos-tables', { method: 'POST', body: payload }),
+  getDashboard: () => apiRequest('/restaurant/dashboard'),
   getPosMenu: () => apiRequest('/restaurant/pos-menu'),
   getPosMenuOptions: () => apiRequest('/restaurant/pos-menu/options'),
+  addPosItemStock: (code, qty) =>
+    apiRequest(`/restaurant/pos-menu/items/${encodeURIComponent(code)}/stock`, { method: 'POST', body: { qty } }),
   createPosMenuItem: (payload) => apiRequest('/restaurant/pos-menu/items', { method: 'POST', body: payload }),
   createPosCourse: (payload) => apiRequest('/restaurant/pos-menu/courses', { method: 'POST', body: payload }),
   createPosMenu: (payload) => apiRequest('/restaurant/pos-menu/menus', { method: 'POST', body: payload }),
@@ -51,6 +54,8 @@ export const restaurantApi = {
       method: 'POST',
       body: { payments },
     }),
+  cancelPosOrder: (invoiceId, reason) =>
+    apiRequest(`/restaurant/pos-orders/${encodeURIComponent(invoiceId)}/cancel`, { method: 'POST', body: { reason } }),
   printPosOrder: (invoiceId) =>
     apiRequest(`/restaurant/pos-orders/${encodeURIComponent(invoiceId)}/print`, { method: 'POST', body: {} }),
   advancePosKitchen: (invoiceId, body = { advance: true }) =>
@@ -59,6 +64,10 @@ export const restaurantApi = {
       body,
     }),
   listPosCustomers: () => apiRequest('/restaurant/pos-customers'),
+  listGuests: () => apiRequest('/restaurant/guests'),
+  getOnboardingProgress: () => apiRequest('/restaurant/onboarding-progress'),
+  getOneLinkStats: () => apiRequest('/restaurant/one-link/stats'),
+  listEnquiries: () => apiRequest('/restaurant/enquiries'),
   listPosStaff: () => apiRequest('/restaurant/pos-staff'),
   getPosOrderMenu: (table) =>
     apiRequest(`/restaurant/pos-order-menu?table=${encodeURIComponent(table)}`),

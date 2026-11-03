@@ -197,6 +197,7 @@ const fakeServer = http.createServer((req, res) => {
       fake.sessions.set(session, { invoice: null, table: table || null })
       return send(res, 200, { message: { session, source: table ? 'table' : 'pickup', restaurant: 'Demo Restaurant' } })
     }
+    if (method === 'iroas_ury_ext.api.menu.stock_menu_item') return send(res, 200, { message: { status: 'Success' } })
     if (method === 'frappe.client.insert') {
       const doc = body.doc || {}
       if (doc.doctype === 'Item') {
@@ -564,6 +565,10 @@ test('guest order is priced by URY, placed once, and replayed on duplicate submi
   assert.equal(st.json.data.status, 'placed')
   assert.equal(st.json.data.live.state, 'draft')
   assert.equal(st.json.data.live.orderType, 'Take Away')
+
+  const alerts = db.prepare(`SELECT title, body FROM notifications WHERE type = 'pos_order' AND title = ?`).all(`New order ${data.invoice}`)
+  assert.equal(alerts.length, 1, 'staff told once, not again on the replay or the status check')
+  assert.match(alerts[0].body, /Thandi Guest/)
 })
 
 test('concurrent submits with the same id create one URY order', async () => {

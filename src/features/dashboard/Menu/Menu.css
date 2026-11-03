@@ -422,7 +422,8 @@
   .pos-layout-toggle button.active { background: #f3f6fb; color: #2457c5; }
   .pos-status-filters { margin: 12px 0; }
   .pos-item-list { padding: 4px 20px 8px; }
-  .pos-item-head, .pos-item-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 140px auto 110px; align-items: center; gap: 16px; }
+  .pos-item-head, .pos-item-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 140px auto 110px auto; align-items: center; gap: 16px; }
+  .pos-stock-btn { white-space: nowrap; }
   .pos-item-head { padding: 12px 0; color: var(--muted); font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--border); }
   .pos-item-head span:nth-child(2) { grid-column: 2; }
   .pos-item-row { padding: 14px 0; border-bottom: 1px solid var(--border); }
@@ -487,10 +488,6 @@
     border-left: 1px solid var(--border);
     box-shadow: -16px 0 40px rgba(23, 23, 26, 0.16);
     animation: menu-drawer-in 0.18s ease-out;
-  }
-  @keyframes menu-drawer-in {
-    from { transform: translateX(24px); }
-    to { transform: translateX(0); }
   }
   .menu-drawer-head {
     display: flex;
@@ -593,4 +590,10 @@
     cursor: pointer;
   }
   .menu-drop input { display: none; }
+}
+
+/* Top-level on purpose: @keyframes cannot be nested inside .menu-page (CSS nesting). */
+@keyframes menu-drawer-in {
+  from { transform: translateX(24px); }
+  to { transform: translateX(0); }
 }

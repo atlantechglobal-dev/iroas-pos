@@ -47,11 +47,14 @@ function openReceipt(bill) {
   return true
 }
 
-function PosOrderSheet({ invoiceId, onClose, onPaid }) {
+function PosOrderSheet({ invoiceId, onClose, onPaid, onCancelled }) {
   const toast = useToast()
   const [bill, setBill] = useState(null)
   const [error, setError] = useState('')
   const [paying, setPaying] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [printPrompt, setPrintPrompt] = useState(false)
+  const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [amounts, setAmounts] = useState({})
 
@@ -60,6 +63,9 @@ function PosOrderSheet({ invoiceId, onClose, onPaid }) {
     setBill(null)
     setError('')
     setPaying(false)
+    setCancelling(false)
+    setPrintPrompt(false)
+    setReason('')
     api
       .getPosOrderBill(invoiceId)
       .then((res) => {
@@ -84,14 +90,44 @@ function PosOrderSheet({ invoiceId, onClose, onPaid }) {
   const balanced = bill ? Math.round(entered * 100) === Math.round(Number(bill.total) * 100) : false
 
   const print = async () => {
-    if (!bill) return
+    if (!bill) return false
     setBusy(true)
     try {
       await api.printPosOrder(bill.id)
+      setBill((current) => ({ ...current, printed: true }))
       if (!openReceipt(bill)) toast.info('Allow pop-ups to print this bill.')
       else toast.success(`${bill.id} marked printed.`)
+      return true
     } catch (err) {
       toast.error(err?.message || 'Could not print this bill.')
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startPayment = () => {
+    if (bill.printed) setPaying(true)
+    else setPrintPrompt(true)
+  }
+
+  const printThenPay = async () => {
+    if (await print()) {
+      setPrintPrompt(false)
+      setPaying(true)
+    }
+  }
+
+  const cancel = async (event) => {
+    event.preventDefault()
+    if (!bill || reason.trim().length < 3) return
+    setBusy(true)
+    try {
+      await api.cancelPosOrder(bill.id, reason.trim())
+      toast.success(`${bill.id} cancelled.`)
+      onCancelled?.()
+    } catch (err) {
+      toast.error(err?.message || 'Could not cancel this order.')
     } finally {
       setBusy(false)
     }
@@ -165,13 +201,62 @@ function PosOrderSheet({ invoiceId, onClose, onPaid }) {
                 </svg>
               </button>
               {bill.canPay ? (
-                <button type="button" className="order-pay-btn" disabled={busy} onClick={() => setPaying(true)}>
+                <button type="button" className="order-cancel-btn" disabled={busy} onClick={() => setCancelling(true)}>
+                  Cancel order
+                </button>
+              ) : null}
+              {bill.canPay ? (
+                <button type="button" className="order-pay-btn" disabled={busy} onClick={startPayment}>
                   Payment
                 </button>
               ) : null}
               <strong>{money(bill.total, bill.currency)}</strong>
             </footer>
           </>
+        ) : null}
+
+        {printPrompt && bill ? (
+          <div className="pay-modal-backdrop" role="presentation" onClick={() => !busy && setPrintPrompt(false)}>
+            <div className="cancel-modal" role="dialog" aria-label="Print the bill first" onClick={(event) => event.stopPropagation()}>
+              <h2>Print the bill first</h2>
+              <p>The POS takes payment only after the bill is printed. Printing locks the item quantities.</p>
+              <div className="cancel-actions">
+                <button type="button" disabled={busy} onClick={() => setPrintPrompt(false)}>
+                  Back
+                </button>
+                <button type="button" className="is-primary" disabled={busy} onClick={printThenPay}>
+                  {busy ? 'Printing…' : 'Print bill and continue'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {cancelling && bill ? (
+          <div className="pay-modal-backdrop" role="presentation" onClick={() => !busy && setCancelling(false)}>
+            <form className="cancel-modal" onClick={(event) => event.stopPropagation()} onSubmit={cancel}>
+              <h2>Cancel {bill.id}?</h2>
+              <p>The order is removed from the kitchen and the table is freed. This cannot be undone.</p>
+              <label>
+                Reason
+                <input
+                  autoFocus
+                  value={reason}
+                  maxLength={140}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="e.g. Guest left, wrong table"
+                />
+              </label>
+              <div className="cancel-actions">
+                <button type="button" disabled={busy} onClick={() => setCancelling(false)}>
+                  Keep order
+                </button>
+                <button type="submit" className="is-danger" disabled={busy || reason.trim().length < 3}>
+                  {busy ? 'Cancelling…' : 'Cancel order'}
+                </button>
+              </div>
+            </form>
+          </div>
         ) : null}
 
         {paying && bill ? (

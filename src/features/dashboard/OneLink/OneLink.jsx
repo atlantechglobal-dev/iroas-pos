@@ -19,6 +19,7 @@ import {
   withGuestDestinationHrefs,
 } from '@/shared/utils/guestLinks'
 import '@/features/dashboard/OneLink/OneLink.css'
+import '@/features/dashboard/OneLink/OneLinkEnquiries.css'
 
 function PhonePreview({
   displayRestaurant,
@@ -135,6 +136,17 @@ function OneLink() {
   const [dishPreviews, setDishPreviews] = useState([])
   const [dragKey, setDragKey] = useState(null)
   const [customModal, setCustomModal] = useState(null) // null | { key?, name, href, meta }
+  const [stats, setStats] = useState({ views: 0, clicks: 0, byKey: {} })
+
+  const [enquiries, setEnquiries] = useState([])
+
+  useEffect(() => {
+    api.getOneLinkStats().then(setStats).catch(() => {})
+    api
+      .getEnquiries()
+      .then((res) => setEnquiries(res.enquiries || []))
+      .catch(() => {})
+  }, [])
 
   const theme = ONE_LINK_THEMES[themeKey] || ONE_LINK_THEMES.lime
   const pageHeadline = headline || `${displayRestaurant}`
@@ -429,7 +441,7 @@ function OneLink() {
             <div className="growth-label">GROWTH</div>
             <h1>One Link</h1>
             <p>
-              One shareable website link for your restaurant — menu, ordering,
+              One shareable link for your restaurant — menu, ordering,
               bookings and socials.
               <br />
               Put it in your bio, on receipts and on table cards.
@@ -475,8 +487,8 @@ function OneLink() {
               </div>
 
               <div className="available">
-                QR and link open your restaurant website at <code>/s/{linkSlug}</code>. Toggle
-                destinations below to show Menu, Order, Book and more on that site.
+                The QR and link open your One Link page at <code>/l/{linkSlug}</code>. Toggle
+                the destinations below to choose which buttons it shows.
               </div>
 
               <div className="one-link-qr-row">
@@ -484,12 +496,12 @@ function OneLink() {
                 <div>
                   <strong>Scan preview</strong>
                   <p>
-                    One link only — guests land on your website. Live destinations control what
-                    they can open from there.
+                    Guests land on your One Link page. Live destinations are the buttons they see,
+                    with a link on to your full website.
                   </p>
                   <div className="one-link-qr-actions">
                     <button type="button" className="open-link-btn" onClick={() => persistAndOpen()}>
-                      Open website
+                      Open link
                     </button>
                   </div>
                 </div>
@@ -497,18 +509,39 @@ function OneLink() {
 
               <div className="stats">
                 <div className="stat-box">
-                  <span>Total views</span>
-                  <strong>18,204</strong>
+                  <span>Views (30d)</span>
+                  <strong>{stats.views.toLocaleString()}</strong>
                 </div>
                 <div className="stat-box">
                   <span>Link clicks (30d)</span>
-                  <strong>9,842</strong>
+                  <strong>{stats.clicks.toLocaleString()}</strong>
                 </div>
                 <div className="stat-box">
                   <span>Click-through</span>
-                  <strong>54%</strong>
+                  <strong>{stats.views ? `${Math.min(100, Math.round((stats.clicks / stats.views) * 100))}%` : '—'}</strong>
                 </div>
               </div>
+            </div>
+
+            <div className="card enquiries-card">
+              <h3>Recent enquiries</h3>
+              {enquiries.length === 0 ? (
+                <p className="enquiries-empty">Messages guests send from your One Link page appear here, and in your notifications.</p>
+              ) : (
+                <ul className="enquiries-list">
+                  {enquiries.map((q) => (
+                    <li key={q.id}>
+                      <div>
+                        <strong>{q.name}</strong>
+                        <small>
+                          {[q.phone, q.email].filter(Boolean).join(' · ')} · {q.createdAt}
+                        </small>
+                      </div>
+                      <p>{q.message}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="card destinations-card">
@@ -532,10 +565,7 @@ function OneLink() {
                     !['review', 'instagram', 'directions', 'call'].includes(destination.key)
                   const isLive = Boolean(destination.live)
                   const meta = destination.meta || destination.href || ''
-                  const clicks =
-                    typeof destination.clicks === 'number'
-                      ? destination.clicks.toLocaleString()
-                      : destination.clicks
+                  const clicks = (stats.byKey[destination.key] || 0).toLocaleString()
                   return (
                     <div
                       className={`destination${dragKey === destination.key ? ' dragging' : ''}${
@@ -722,13 +752,13 @@ function OneLink() {
               />
               <div className="modal-qr">
                 <QrCodePreview value={siteUrl} size={160} alt="Website QR" />
-                <p>Open your restaurant website in a new tab.</p>
+                <p>Open your One Link page in a new tab.</p>
                 <div className="modal-actions">
                   <button type="button" className="download-qr" onClick={handleDownloadQR}>
                     Download QR
                   </button>
                   <button type="button" className="publish-button" onClick={() => persistAndOpen()}>
-                    Open website
+                    Open link
                   </button>
                 </div>
               </div>

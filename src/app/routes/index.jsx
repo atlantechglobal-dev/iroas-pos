@@ -30,6 +30,7 @@ const OneLink = lazy(() => import('@/features/dashboard/OneLink/OneLink'))
 const GuestOneLink = lazy(() => import('@/features/guest/GuestOneLink/GuestOneLink'))
 const GuestBusinessCard = lazy(() => import('@/features/guest/GuestBusinessCard/GuestBusinessCard'))
 const GuestSite = lazy(() => import('@/features/guest/GuestSite/GuestSite'))
+const GuestBooking = lazy(() => import('@/features/guest/GuestBooking/GuestBooking'))
 const PlatformAdmin = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformAdmin'))
 const PlatformPlans = lazy(() => import('@/features/platform-admin/PlatformAdmin/Plans'))
 const PlatformCustomers = lazy(() => import('@/features/platform-admin/PlatformAdmin/PlatformCustomers'))
@@ -63,7 +64,6 @@ const Tables = lazy(() => import('@/features/dashboard/Tables/Tables'))
 const Staff = lazy(() => import('@/features/dashboard/Staff/Staff'))
 const Customers = lazy(() => import('@/features/dashboard/Customers/Customers'))
 const RolePermissions = lazy(() => import('@/features/dashboard/RolePermissions/RolePermissions'))
-const Analytics = lazy(() => import('@/features/dashboard/Analytics/Analytics'))
 const Payments = lazy(() => import('@/features/dashboard/Payments/Payments'))
 const Marketing = lazy(() => import('@/features/dashboard/Marketing/Marketing'))
 const Reviews = lazy(() => import('@/features/dashboard/Reviews/Reviews'))
@@ -113,6 +113,7 @@ function withProtection(
   Component,
   {
     adminOnly = false,
+    superAdminOnly = false,
     requireLive = false,
     onboardingOnly = false,
     allowPending = false,
@@ -122,6 +123,7 @@ function withProtection(
   return (
     <ProtectedRoute
       adminOnly={adminOnly}
+      superAdminOnly={superAdminOnly}
       requireLive={requireLive}
       onboardingOnly={onboardingOnly}
       allowPending={allowPending}
@@ -155,6 +157,7 @@ export function AppRoutes() {
         {/* Guest share pages — public, no auth redirect */}
         <Route path={ROUTES.GUEST_ONE_LINK} element={<GuestOneLink />} />
         <Route path={ROUTES.GUEST_BUSINESS_CARD} element={<GuestBusinessCard />} />
+        <Route path={ROUTES.GUEST_BOOKING} element={<GuestBooking />} />
         <Route path={ROUTES.GUEST_SITE_DISH} element={<GuestSite />} />
         <Route path={ROUTES.GUEST_SITE_TABLE} element={<GuestSite />} />
         <Route path={ROUTES.GUEST_SITE_PAGE} element={<GuestSite />} />
@@ -204,7 +207,7 @@ export function AppRoutes() {
         <Route path={ROUTES.STAFF} element={withProtection(Staff, LIVE_ONLY)} />
         <Route path={ROUTES.CUSTOMERS} element={withProtection(Customers, LIVE_ONLY)} />
         <Route path={ROUTES.ROLE_PERMISSIONS} element={withProtection(RolePermissions, LIVE_ONLY)} />
-        <Route path={ROUTES.ANALYTICS} element={withProtection(Analytics, LIVE_ONLY)} />
+        <Route path={ROUTES.ANALYTICS} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
         <Route path={ROUTES.PAYMENTS} element={withProtection(Payments, LIVE_ONLY)} />
         <Route path={ROUTES.MARKETING} element={withProtection(Marketing, LIVE_ONLY)} />
         <Route path={ROUTES.REVIEWS} element={withProtection(Reviews, LIVE_ONLY)} />
@@ -227,7 +230,7 @@ export function AppRoutes() {
         <Route path={ROUTES.SETTINGS_AUDIT} element={withProtection(SettingsAudit, LIVE_ONLY)} />
         <Route path={ROUTES.SETTINGS_PRIVACY} element={withProtection(SettingsPrivacy, LIVE_ONLY)} />
         <Route path={ROUTES.PLATFORM_ADMIN} element={withProtection(PlatformAdmin, { adminOnly: true })} />
-        <Route path={ROUTES.PLATFORM_PLANS} element={withProtection(PlatformPlans, { adminOnly: true })} />
+        <Route path={ROUTES.PLATFORM_PLANS} element={withProtection(PlatformPlans, { adminOnly: true, superAdminOnly: true })} />
         <Route
           path={ROUTES.PLATFORM_CUSTOMERS}
           element={withProtection(PlatformCustomers, { adminOnly: true })}
@@ -243,11 +246,11 @@ export function AppRoutes() {
         <Route path={ROUTES.PLATFORM_APPROVE_PROFILE} element={<RedirectLegacyApproveProfile />} />
         <Route
           path={ROUTES.PLATFORM_ACCOUNT_APPROVE}
-          element={withProtection(PlatformAccountApprove, { adminOnly: true })}
+          element={withProtection(PlatformAccountApprove, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_ACCOUNT_APPROVE_PROFILE}
-          element={withProtection(PlatformAccountApproveProfile, { adminOnly: true })}
+          element={withProtection(PlatformAccountApproveProfile, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_IDENTITIES}
@@ -261,35 +264,35 @@ export function AppRoutes() {
           path={ROUTES.PLATFORM_NOTIFICATIONS}
           element={withProtection(PlatformNotifications, { adminOnly: true })}
         />
-        <Route path={ROUTES.PLATFORM_AUDIT} element={withProtection(PlatformAudit, { adminOnly: true })} />
-        <Route path={ROUTES.PLATFORM_STAFF} element={withProtection(PlatformStaff, { adminOnly: true })} />
+        <Route path={ROUTES.PLATFORM_AUDIT} element={withProtection(PlatformAudit, { adminOnly: true, superAdminOnly: true })} />
+        <Route path={ROUTES.PLATFORM_STAFF} element={withProtection(PlatformStaff, { adminOnly: true, superAdminOnly: true })} />
         <Route
           path={ROUTES.PLATFORM_PROFESSIONAL}
-          element={withProtection(PlatformProfessional, { adminOnly: true })}
+          element={withProtection(PlatformProfessional, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS}
-          element={withProtection(PlatformSettings, { adminOnly: true })}
+          element={withProtection(PlatformSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_EMAIL}
-          element={withProtection(EmailSettings, { adminOnly: true })}
+          element={withProtection(EmailSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_PAYMENT}
-          element={withProtection(PaymentSettings, { adminOnly: true })}
+          element={withProtection(PaymentSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_GOOGLE}
-          element={withProtection(GoogleAuthSettings, { adminOnly: true })}
+          element={withProtection(GoogleAuthSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_CATEGORIES}
-          element={withProtection(BusinessCategoriesSettings, { adminOnly: true })}
+          element={withProtection(BusinessCategoriesSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_FLAGS}
-          element={withProtection(PlatformFeatureFlags, { adminOnly: true })}
+          element={withProtection(PlatformFeatureFlags, { adminOnly: true, superAdminOnly: true })}
         />
 
         <Route path={ROUTES.UNAUTHORIZED} element={<Unauthorized />} />

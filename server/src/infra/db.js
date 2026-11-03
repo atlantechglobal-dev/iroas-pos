@@ -24,7 +24,7 @@ db.exec(`
     phone TEXT,
     password_hash TEXT NOT NULL,
     google_id TEXT UNIQUE,
-    role TEXT NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'admin')),
+    role TEXT NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'admin', 'specialist')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -158,6 +158,41 @@ if (!userColumns.some((col) => col.name === 'google_id')) {
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL')
   } catch {
     // ignore if index already exists / SQLite variant
+  }
+}
+
+// SQLite cannot alter a CHECK constraint, so rebuild users to allow 'specialist'.
+{
+  const usersSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'`).get()?.sql || ''
+  if (usersSql && !usersSql.includes("'specialist'")) {
+    const known = ['id', 'name', 'email', 'phone', 'password_hash', 'google_id', 'role', 'created_at']
+    const shared = db
+      .prepare('PRAGMA table_info(users)')
+      .all()
+      .map((col) => col.name)
+      .filter((name) => known.includes(name))
+    db.pragma('foreign_keys = OFF')
+    try {
+      db.transaction(() => {
+        db.exec(`
+          CREATE TABLE users__role_mig (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            phone TEXT,
+            password_hash TEXT NOT NULL,
+            google_id TEXT UNIQUE,
+            role TEXT NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'admin', 'specialist')),
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `)
+        db.exec(`INSERT INTO users__role_mig (${shared.join(', ')}) SELECT ${shared.join(', ')} FROM users`)
+        db.exec('DROP TABLE users')
+        db.exec('ALTER TABLE users__role_mig RENAME TO users')
+      })()
+    } finally {
+      db.pragma('foreign_keys = ON')
+    }
   }
 }
 
@@ -406,6 +441,75 @@ if (!reservationColumns.some((col) => col.name === 'guest_email')) {
 if (!reservationColumns.some((col) => col.name === 'table_id')) {
   db.exec('ALTER TABLE reservations ADD COLUMN table_id INTEGER')
 }
+if (!reservationColumns.some((col) => col.name === 'cancel_token')) {
+  db.exec('ALTER TABLE reservations ADD COLUMN cancel_token TEXT')
+}
+
+// SQLite cannot alter a CHECK, so widen the status list by rebuilding the table once.
+if (!db.prepare(`SELECT sql FROM sqlite_master WHERE name = 'reservations'`).get().sql.includes('no_show')) {
+  db.pragma('foreign_keys = OFF')
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE reservations_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        guest_name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        guests INTEGER NOT NULL DEFAULT 2,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'seated', 'completed', 'no_show', 'cancelled')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        guest_email TEXT,
+        table_id INTEGER,
+        cancel_token TEXT
+      );
+      INSERT INTO reservations_new
+        (id, restaurant_id, guest_name, phone, guests, date, time, notes, status, created_at, guest_email, table_id, cancel_token)
+        SELECT id, restaurant_id, guest_name, phone, guests, date, time, notes, status, created_at, guest_email, table_id, cancel_token
+        FROM reservations;
+      DROP TABLE reservations;
+      ALTER TABLE reservations_new RENAME TO reservations;
+      CREATE INDEX IF NOT EXISTS idx_reservations_restaurant ON reservations(restaurant_id, date, time);
+    `)
+  })()
+  db.pragma('foreign_keys = ON')
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_reservations_cancel_token ON reservations(cancel_token)')
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS enquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_enquiries_restaurant ON enquiries(restaurant_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS link_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('view', 'click')),
+    dest_key TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_link_events_restaurant ON link_events(restaurant_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS guests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    phone_key TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    email TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (restaurant_id, phone_key)
+  );
+`)
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS message_jobs (
@@ -530,8 +634,6 @@ db.exec(`
     UNIQUE (restaurant_id, provider)
   );
 
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_external
-    ON restaurant_integrations(provider, external_restaurant);
 `)
 
 // Migration: per-tenant URY identity. credential_ref names server-side env
@@ -544,6 +646,8 @@ db.exec(`
     'ury_pos_profile',
     'ury_self_ordering_profile',
     'credential_ref',
+    'ury_base_url',
+    'ury_site_name',
     'verified_user',
     'verified_at',
   ]) {
@@ -560,8 +664,14 @@ db.exec(`
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_credential
       ON restaurant_integrations(provider, credential_ref) WHERE credential_ref IS NOT NULL;
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_integrations_verified_user
-      ON restaurant_integrations(provider, verified_user) WHERE verified_user IS NOT NULL;
+    -- unique per URY site, not globally (each customer has its own site)
+    DROP INDEX IF EXISTS idx_restaurant_integrations_verified_user;
+    DROP INDEX IF EXISTS idx_restaurant_integrations_external;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ri_site_verified_user
+      ON restaurant_integrations(provider, COALESCE(ury_base_url, ''), COALESCE(ury_site_name, ''), verified_user)
+      WHERE verified_user IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ri_site_external
+      ON restaurant_integrations(provider, COALESCE(ury_base_url, ''), COALESCE(ury_site_name, ''), external_restaurant);
   `)
 }
 

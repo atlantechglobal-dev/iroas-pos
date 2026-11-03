@@ -1,15 +1,20 @@
 export const ROLES = {
   OWNER: 'owner',
   ADMIN: 'admin',
-}
-
-/** Platform Super Admin (IROAS operator). Distinct from restaurant owner/admin. */
-export function isAdmin(user) {
-  return user?.role === ROLES.ADMIN
+  SPECIALIST: 'specialist',
 }
 
 export function isSuperAdmin(user) {
-  return isAdmin(user)
+  return user?.role === ROLES.ADMIN
+}
+
+export function isPlatformStaff(user) {
+  return user?.role === ROLES.ADMIN || user?.role === ROLES.SPECIALIST
+}
+
+// legacy name for isPlatformStaff
+export function isAdmin(user) {
+  return isPlatformStaff(user)
 }
 
 export function isOwner(user) {

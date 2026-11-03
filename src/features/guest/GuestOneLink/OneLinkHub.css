@@ -1,0 +1,43 @@
+.gol-icon { flex-shrink: 0; }
+
+.gol-quick { display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.gol-quick a { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border-radius: 999px; background: var(--ol-accent); color: #16210a; font-size: 13px; font-weight: 800; text-decoration: none; }
+.guest-one-link.theme-charcoal .gol-quick a { color: #f4f4f2; }
+
+.gol-social { display: flex; justify-content: center; gap: 10px; margin: 18px 0 4px; }
+.gol-social a { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--ol-btn-text); background: var(--ol-btn-bg); border: 1px solid color-mix(in srgb, var(--ol-accent) 28%, transparent); }
+
+.gol-tabs { margin-top: 20px; }
+.gol-tablist { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--ol-btn-bg); }
+.gol-tablist button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; border: 0; border-radius: 999px; background: transparent; color: var(--ol-muted); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gol-tablist button.is-active { background: var(--ol-screen); color: var(--ol-text); box-shadow: 0 1px 4px rgba(20, 20, 20, 0.12); }
+.gol-panel { padding: 16px 2px 4px; }
+
+.gol-form { display: grid; gap: 12px; }
+.gol-form label { display: grid; gap: 5px; font-size: 12px; font-weight: 700; color: var(--ol-muted); }
+.gol-form input, .gol-form textarea { width: 100%; box-sizing: border-box; padding: 11px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ol-accent) 30%, #d0d5dd); background: var(--ol-screen); color: var(--ol-text); font: inherit; font-size: 14px; }
+.gol-form textarea { resize: vertical; }
+.gol-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gol-form .gol-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.gol-error { margin: 0; color: #b91c1c; font-size: 13px; }
+.gol-hint { margin: 0; font-size: 12px; color: var(--ol-muted); text-align: center; }
+
+.gol-primary, .gol-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 800; text-decoration: none; cursor: pointer; border: 1px solid transparent; }
+.gol-primary { background: var(--ol-accent); color: #16210a; }
+.gol-ghost { background: transparent; color: var(--ol-text); border-color: color-mix(in srgb, var(--ol-accent) 40%, #d0d5dd); }
+.guest-one-link.theme-charcoal .gol-primary { color: #f4f4f2; }
+.gol-primary:disabled { opacity: 0.6; cursor: default; }
+
+.gol-sent { text-align: center; display: grid; gap: 8px; justify-items: center; }
+.gol-sent p { margin: 0; color: var(--ol-muted); font-size: 14px; }
+
+.gol-find { display: grid; gap: 12px; }
+.gol-address { margin: 0; font-size: 15px; font-weight: 600; text-align: center; }
+.gol-hours { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.gol-hours li { display: flex; justify-content: space-between; padding: 7px 10px; border-radius: 10px; font-size: 13px; color: var(--ol-muted); }
+.gol-hours li.is-today { background: var(--ol-btn-bg); color: var(--ol-text); font-weight: 800; }
+
+.gol-share { display: grid; gap: 12px; justify-items: center; }
+.gol-share-actions { display: grid; gap: 8px; width: 100%; }
+
+.gol-powered { margin: 18px 0 0; text-align: center; font-size: 11px; color: var(--ol-muted); }

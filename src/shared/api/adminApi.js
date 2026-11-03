@@ -13,6 +13,11 @@ export const adminApi = {
   tenantStatus: (id, status) =>
     apiRequest(`/admin/tenants/${id}/status`, { method: 'PATCH', body: { status } }),
   tenant: (id) => apiRequest(`/admin/tenants/${id}`),
+  provisioning: (id) => apiRequest(`/admin/tenants/${id}/provisioning`),
+  onboarding: (id) => apiRequest(`/admin/tenants/${id}/onboarding`),
+  requestProvisioning: (id, payload) =>
+    apiRequest(`/admin/tenants/${id}/provisioning`, { method: 'POST', body: payload }),
+  cancelProvisioning: (id) => apiRequest(`/admin/tenants/${id}/provisioning`, { method: 'DELETE' }),
   updateTenant: (id, payload) =>
     apiRequest(`/admin/tenants/${id}`, { method: 'PATCH', body: payload }),
   approveTenant: (id, checks) =>

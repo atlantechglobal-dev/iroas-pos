@@ -10,8 +10,16 @@
 // the demo profile) so URY POS shows the same session. A profile-level open
 // entry is enough for IROAS to accept orders.
 
+import { db } from '../../infra/db.js'
+import { zonedNow } from '../../services/reservationAvailability.js'
 import { UryError } from './uryClient.js'
 import { OrderingError } from './uryOrdering.js'
+
+/** URY accepts orders only on a shift opened today, in the restaurant's timezone. */
+export function isShiftOutdated(startedAt, timezone, now = new Date()) {
+  const day = /^\d{4}-\d{2}-\d{2}/.exec(String(startedAt || ''))
+  return Boolean(day) && day[0] < zonedNow(timezone, now).date
+}
 
 function asArray(value) {
   return Array.isArray(value) ? value : []
@@ -86,6 +94,10 @@ async function resolveCashier(client, posProfile) {
   return main?.user || users[0] || ''
 }
 
+function restaurantTimezone(restaurantId) {
+  return db.prepare('SELECT timezone FROM restaurants WHERE id = ?').get(restaurantId)?.timezone || ''
+}
+
 /** Current shift for this restaurant's POS profile. The cashier is the POS profile cashier. */
 export async function getUryShift(tenant) {
   const { client, posProfile, integrationUser } = tenant
@@ -113,6 +125,7 @@ export async function getUryShift(tenant) {
     currencySymbol: screen.currency_symbol || '',
     user: integrationUser,
     entry: mapEntry(mine, cashier),
+    outdated: Boolean(mine) && isShiftOutdated(mine.period_start_date, restaurantTimezone(tenant.restaurantId)),
     paymentModes: asArray(screen.payment_modes).map((mode) => ({
       mode: mode.mode_of_payment,
       openingAmount: money(mode.opening_amount),

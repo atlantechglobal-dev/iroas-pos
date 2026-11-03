@@ -384,7 +384,7 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password.' })
   }
 
-  if (user.role !== 'admin') {
+  if (user.role === 'owner') {
     const gate = restaurantAwaitingAccountApproval(user.id)
     if (gate.deleted) {
       return res.status(403).json({ error: 'This account has been closed. Contact IROAS support.' })
@@ -447,7 +447,7 @@ router.post('/google', async (req, res) => {
     return res.json({ needsSignup: true, idToken, name, email })
   }
 
-  if (user.role !== 'admin') {
+  if (user.role === 'owner') {
     const gate = restaurantAwaitingAccountApproval(user.id)
     if (gate.deleted) {
       return res.status(403).json({ error: 'This account has been closed. Contact IROAS support.' })

@@ -69,7 +69,7 @@ function PlatformStaff() {
       </div>
 
       <section className="tenants-card" style={{ marginBottom: 20, padding: 20 }}>
-        <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Invite admin</h2>
+        <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Invite platform staff</h2>
         <form
           onSubmit={create}
           className="pa-invite-form"
@@ -128,7 +128,7 @@ function PlatformStaff() {
             ) : null}
           </div>
           <button className="new-tenant" type="submit" disabled={saving} style={{ gridColumn: '1 / -1', width: 'fit-content' }}>
-            {saving ? 'Creating…' : 'Create admin'}
+            {saving ? 'Creating…' : 'Create account'}
           </button>
         </form>
       </section>
@@ -146,6 +146,7 @@ function PlatformStaff() {
               <tr>
                 <th>NAME</th>
                 <th>EMAIL</th>
+                <th>ROLE</th>
                 <th>PHONE</th>
                 <th>CREATED</th>
               </tr>
@@ -157,6 +158,7 @@ function PlatformStaff() {
                     <strong>{row.name}</strong>
                   </td>
                   <td>{row.email}</td>
+                  <td>{row.role === 'specialist' ? 'Onboarding Specialist' : 'Super Admin'}</td>
                   <td>{row.phone || '—'}</td>
                   <td>
                     {row.createdAt

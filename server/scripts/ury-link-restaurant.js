@@ -46,6 +46,7 @@ function usage() {
       '  node scripts/ury-link-restaurant.js link <owner-email | restaurant-id> --restaurant "<URY Restaurant>"',
       '       --branch "<Branch>" --pos-profile "<POS Profile>" --credential-ref <REF>',
       '       [--self-ordering-profile "<URY Self Ordering Profile>"] [--move-from <restaurant-id>]',
+      '       [--base-url <http://bench-address>] [--site-name <frappe-site>]   (customer\'s own URY site)',
       '  node scripts/ury-link-restaurant.js verify <owner-email | restaurant-id>',
       '  node scripts/ury-link-restaurant.js disable <owner-email | restaurant-id>',
       '  node scripts/ury-link-restaurant.js features <owner-email | restaurant-id> [--hours on|off] [--contact on|off]',
@@ -117,13 +118,18 @@ if (command === 'link') {
     ury_pos_profile: flags['pos-profile'],
     ury_self_ordering_profile: flags['self-ordering-profile'] || null,
     credential_ref: flags['credential-ref'],
+    ury_base_url: flags['base-url'] || null,
+    ury_site_name: flags['site-name'] || null,
   }
   if (!mapping.external_restaurant || !mapping.ury_branch || !mapping.ury_pos_profile || !mapping.credential_ref) usage()
   if (!isValidCredentialRef(mapping.credential_ref)) {
     console.log('--credential-ref must be uppercase letters, digits and underscores (e.g. TENANT_62).')
     process.exit(1)
   }
-  const client = getTenantClient(mapping.credential_ref)
+  const client = getTenantClient(mapping.credential_ref, {
+    baseUrl: mapping.ury_base_url,
+    siteName: mapping.ury_site_name,
+  })
   if (!client) {
     const names = credentialEnvNames(mapping.credential_ref)
     console.log(
@@ -135,8 +141,9 @@ if (command === 'link') {
   const moveFrom = flags['move-from'] ? Number(flags['move-from']) : null
   if (moveFrom !== null) {
     const holder = db
-      .prepare(`SELECT restaurant_id FROM restaurant_integrations WHERE provider = 'ury' AND external_restaurant = ?`)
-      .get(mapping.external_restaurant)
+      .prepare(`SELECT restaurant_id FROM restaurant_integrations WHERE provider = 'ury' AND external_restaurant = ?
+         AND COALESCE(ury_base_url, '') = ? AND COALESCE(ury_site_name, '') = ?`)
+      .get(mapping.external_restaurant, mapping.ury_base_url || '', mapping.ury_site_name || '')
     if (!holder || holder.restaurant_id !== moveFrom) {
       console.log(`--move-from ${moveFrom}: that IROAS restaurant does not hold the link to "${mapping.external_restaurant}". Nothing changed.`)
       process.exit(1)

@@ -9,9 +9,10 @@ import {
   rememberGuestOrder,
 } from '@/shared/utils/guestOrderHistory'
 import { clearGuestAccount, loadGuestAccount, saveGuestAccount } from '@/shared/utils/guestAccount'
+import { formatMoney } from '@/shared/utils/money'
 
 function formatPrice(n) {
-  return `₹${Math.round(Number(n) || 0)}`
+  return formatMoney(n)
 }
 
 function localDateIso(d) {

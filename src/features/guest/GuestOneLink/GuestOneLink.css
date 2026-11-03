@@ -60,7 +60,7 @@
   margin: 0 0 6px;
   font-size: 22px;
   font-weight: 800;
-  text-transform: capitalize;
+  text-transform: none;
 }
 
 .guest-sub {

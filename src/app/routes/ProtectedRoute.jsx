@@ -12,6 +12,7 @@ import {
 
 export function ProtectedRoute({
   adminOnly = false,
+  superAdminOnly = false,
   requireLive = false,
   onboardingOnly = false,
   allowPending = false,
@@ -21,6 +22,7 @@ export function ProtectedRoute({
   const {
     isAuthenticated,
     isAdmin,
+    isSuperAdmin,
     restaurantStatus,
     awaitingAccountApproval,
     onboardingPaid,
@@ -54,6 +56,10 @@ export function ProtectedRoute({
   }
 
   if (adminOnly && !isAdmin) {
+    return <Navigate to={ROUTES.UNAUTHORIZED} replace />
+  }
+
+  if (superAdminOnly && !isSuperAdmin) {
     return <Navigate to={ROUTES.UNAUTHORIZED} replace />
   }
 

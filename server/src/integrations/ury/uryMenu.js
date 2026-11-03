@@ -1,4 +1,4 @@
-// URY Menu READ for a mapped URY Restaurant. Verified chain (docs/URY_MENU_API_DISCOVERY.md):
+// URY Menu READ for a mapped URY Restaurant. Verified chain (docs/ury/URY_MENU_API_DISCOVERY.md):
 //   getdoc URY Restaurant <mapped>  -> active_menu, branch, room_wise_menu, order_type_wise_menu
 //   getdoc URY Menu <active_menu>   -> branch, enabled, price_list, items[] (URY Menu Item rows)
 //   getdoc Price List <price_list>  -> currency
@@ -10,6 +10,7 @@ import { IntegrationError } from './uryTenant.js'
 
 const CACHE_TTL_MS = 60_000
 const MAX_PRICE = 10_000_000
+const MAX_STOCK = 100_000
 const cache = new Map()
 
 /** URY stores either absolute image URLs or site paths such as /files/x.jpg. */
@@ -534,6 +535,34 @@ async function menuCatalog(client, menus) {
   return items.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+function stockAmount(value) {
+  if (value === undefined || value === null || value === '') return 0
+  const amount = Number(value)
+  if (!Number.isFinite(amount) || amount < 0 || amount > MAX_STOCK) {
+    throw new MenuEditError('invalid_stock', `Enter a quantity between 0 and ${MAX_STOCK.toLocaleString('en')}.`)
+  }
+  return Math.round(amount * 1000) / 1000
+}
+
+/** Makes an item sellable (production setup) and adds stock, through iroas_ury_ext. */
+async function receiveStock(tenant, code, amount) {
+  try {
+    await tenant.client.post('iroas_ury_ext.api.menu.stock_menu_item', { item_code: code, qty: amount })
+  } catch (err) {
+    if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
+    if (err instanceof UryError && err.status === 404) throw new MenuEditError('item_not_found', 'Menu item not found.', { status: 404 })
+    throw err
+  }
+}
+
+export async function addUryItemStock(tenant, code, qty) {
+  const item = cleanName(code, 140)
+  if (!item) throw new MenuEditError('item_required', 'Choose an item.')
+  await receiveStock(tenant, item, stockAmount(qty))
+  clearUryMenuCache()
+  return getUryMenu(tenant)
+}
+
 /** Creates an Item, then adds it to the chosen URY Menu. Same sequence as the URY menu screen. */
 export async function createUryMenuItem(tenant, input = {}) {
   const menuName = cleanName(input.menu, 140)
@@ -543,6 +572,7 @@ export async function createUryMenuItem(tenant, input = {}) {
   if (!menuName) throw new MenuEditError('menu_required', 'Choose a menu.')
   if (!itemName) throw new MenuEditError('name_required', 'Enter an item name.')
   if (!Number.isFinite(rate) || rate <= 0 || rate > MAX_PRICE) throw new MenuEditError('invalid_price', 'Enter a price greater than 0.')
+  const openingStock = stockAmount(input.openingStock)
 
   const menus = await branchMenus(tenant.client, tenant.branch)
   if (!menus.some((row) => row.name === menuName)) throw new MenuEditError('menu_not_found', 'Menu not found.', { status: 404 })
@@ -592,6 +622,16 @@ export async function createUryMenuItem(tenant, input = {}) {
   } catch (err) {
     if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
     throw err
+  }
+  clearUryMenuCache()
+  try {
+    await receiveStock(tenant, code, openingStock)
+  } catch {
+    throw new MenuEditError(
+      'item_setup_failed',
+      'The item was added but is not ready to sell yet. Use "Add stock" on the item to finish.',
+      { status: 502 },
+    )
   }
   clearUryMenuCache()
   return getUryMenu(tenant)

@@ -1,9 +1,12 @@
 import 'dotenv/config'
 import bcrypt from 'bcryptjs'
+import { randomBytes } from 'node:crypto'
 import { db } from './infra/db.js'
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@iroas.com'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'IroasAdmin@123'
+// No built-in default: an unset ADMIN_PASSWORD gets a random one, printed once below.
+const GENERATED_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ? '' : randomBytes(12).toString('base64url')
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || GENERATED_ADMIN_PASSWORD
 const ADMIN_NAME = process.env.ADMIN_NAME || 'IROAS Admin'
 
 function upsertUser({ name, email, phone, password, role }) {

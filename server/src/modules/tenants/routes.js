@@ -1,8 +1,15 @@
+import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { db } from '../../infra/db.js'
 import { requireAuth } from '../../middleware/auth.js'
 import {
+  ACTIVE_RESERVATION_STATUSES,
+  ACTIVE_STATUS_SQL,
+  RESERVATION_STATUSES,
   assertBookable,
+  checkStatusChange,
+  zonedNow,
+  bookingRules,
   listSlots,
   maxCoversFromSettings,
   normalizeOperatingHours,
@@ -12,6 +19,9 @@ import {
   onReservationCreated,
   onReservationStatusChange,
 } from '../../services/reservationMessaging.js'
+import { listGuests, upsertGuest } from '../../services/guestRecords.js'
+import { loadOnboardingProgress } from '../../services/onboardingProgress.js'
+import { listEnquiries } from '../../services/enquiries.js'
 import {
   assignTableForParty,
   assertTableAvailable,
@@ -43,10 +53,13 @@ import {
 import { UryError } from '../../integrations/ury/uryClient.js'
 import { IntegrationError, invalidateUryTenant, resolveUryTenant } from '../../integrations/ury/uryTenant.js'
 import { TableEditError, createUryTable, getUryTableOptions, listUryTables } from '../../integrations/ury/uryTables.js'
-import { MenuEditError, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
+import { MenuEditError, addUryItemStock, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
 import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
 import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
-import { getUryInvoiceBill, listUryCustomers, listUryOrders, payUryInvoice, printUryInvoice } from '../../integrations/ury/uryOrders.js'
+import { buildDashboardSummary } from '../../services/dashboardSummary.js'
+import { placeOnce } from '../../integrations/ury/staffOrderGuard.js'
+import { getPosProfileOverlay, syncProfileToPos } from '../../integrations/ury/uryProfileSync.js'
+import { cancelUryInvoice, getUryInvoiceBill, listUryCustomers, listUryOrders, payUryInvoice, printUryInvoice } from '../../integrations/ury/uryOrders.js'
 import { attachKitchenProgress, setKitchenStep } from '../../integrations/ury/uryKitchenFlow.js'
 import { listUryStaff } from '../../integrations/ury/uryStaff.js'
 import {
@@ -80,16 +93,17 @@ function assertNotAwaitingAccountApproval(restaurant, res) {
   return true
 }
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
   if (restaurant.status === 'deleted') {
     return res.status(403).json({ error: 'This account has been closed.' })
   }
-  res.json({ restaurant: { ...restaurant, settings: parseSettings(restaurant) } })
+  const posProfile = await getPosProfileOverlay(restaurant.id)
+  res.json({ restaurant: { ...restaurant, ...(posProfile || {}), settings: parseSettings(restaurant) } })
 })
 
-router.put('/profile', (req, res) => {
+router.put('/profile', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
   if (!assertNotAwaitingAccountApproval(restaurant, res)) return
@@ -131,7 +145,18 @@ router.put('/profile', (req, res) => {
     restaurant.id,
   )
 
-  res.json({ ok: true })
+  // Opening hours and contact live in the customer's POS when those features are on.
+  const posSync = await syncProfileToPos(restaurant.id, {
+    hours: hours ? normalizeOperatingHours(hours) : undefined,
+    timezone: timezone ?? restaurant.timezone,
+    phone: phone ?? restaurant.phone,
+    email: email ?? restaurant.email,
+    address: address ?? restaurant.address,
+    city: city ?? restaurant.city,
+    country: country ?? restaurant.country,
+  })
+
+  res.json({ ok: true, ...(posSync ? { posSync } : {}) })
 })
 
 router.put('/domain', (req, res) => {
@@ -562,6 +587,47 @@ router.get('/reservations', (req, res) => {
   res.json({ reservations: rows.map(mapReservation) })
 })
 
+router.get('/onboarding-progress', async (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  res.json({ progress: await loadOnboardingProgress(restaurant.id) })
+})
+
+router.get('/enquiries', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  res.json({ enquiries: listEnquiries(restaurant.id) })
+})
+
+router.get('/one-link/stats', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  const rows = db
+    .prepare(
+      `SELECT kind, dest_key AS key, COUNT(*) AS n FROM link_events
+       WHERE restaurant_id = ? AND created_at >= datetime('now', '-30 days')
+       GROUP BY kind, dest_key`,
+    )
+    .all(restaurant.id)
+  const byKey = {}
+  let views = 0
+  let clicks = 0
+  for (const r of rows) {
+    if (r.kind === 'view') views += r.n
+    else {
+      clicks += r.n
+      byKey[r.key] = r.n
+    }
+  }
+  res.json({ views, clicks, byKey })
+})
+
+router.get('/guests', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  res.json({ guests: listGuests(restaurant.id) })
+})
+
 router.get('/availability', (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
@@ -575,7 +641,7 @@ router.get('/availability', (req, res) => {
   const existing = db
     .prepare(
       `SELECT id, date, time, guests, status FROM reservations
-       WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+       WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
     )
     .all(restaurant.id, date)
 
@@ -589,6 +655,7 @@ router.get('/availability', (req, res) => {
     existingRows: existing,
     maxCovers: maxCoversFromSettings(settings),
     includePast,
+    ...bookingRules(restaurant, settings),
   })
 
   res.json({
@@ -626,7 +693,7 @@ router.post('/reservations', (req, res) => {
       const existing = db
         .prepare(
           `SELECT id, date, time, guests, status FROM reservations
-           WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+           WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
         )
         .all(restaurant.id, String(date))
 
@@ -637,6 +704,7 @@ router.post('/reservations', (req, res) => {
         guests: guestCount,
         existingRows: existing,
         maxCovers: maxCoversFromSettings(settings),
+        ...bookingRules(restaurant, settings),
       })
       if (!check.ok) {
         const err = new Error(check.error)
@@ -672,8 +740,8 @@ router.post('/reservations', (req, res) => {
       const result = db
         .prepare(
           `INSERT INTO reservations
-            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (restaurant_id, guest_name, phone, guest_email, guests, date, time, notes, status, table_id, cancel_token)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           restaurant.id,
@@ -686,6 +754,7 @@ router.post('/reservations', (req, res) => {
           String(notes || '').trim() || null,
           desiredStatus,
           assignedTable || null,
+          randomBytes(16).toString('hex'),
         )
       insertedId = result.lastInsertRowid
     })
@@ -695,6 +764,7 @@ router.post('/reservations', (req, res) => {
   }
 
   const row = db.prepare('SELECT * FROM reservations WHERE id = ?').get(insertedId)
+  upsertGuest(restaurant.id, { name: row.guest_name, phone: row.phone, email: row.guest_email })
   onReservationCreated(restaurant, row, { source: 'staff' })
   res.status(201).json({ reservation: mapReservation(row) })
 })
@@ -709,8 +779,16 @@ router.patch('/reservations/:id', (req, res) => {
   if (!row) return res.status(404).json({ error: 'Reservation not found.' })
 
   const { status, guestName, phone, email, guests, date, time, notes, tableId } = req.body || {}
-  const nextStatus =
-    status && ['pending', 'confirmed', 'cancelled'].includes(status) ? status : row.status
+  if (status && !RESERVATION_STATUSES.includes(status)) {
+    return res.status(400).json({ error: 'Unknown booking status.' })
+  }
+  const nextStatus = status || row.status
+  const statusProblem = checkStatusChange(row.status, nextStatus, {
+    date: row.date,
+    today: zonedNow(restaurant.timezone).date,
+  })
+  if (statusProblem) return res.status(409).json({ error: statusProblem })
+  const nextActive = ACTIVE_RESERVATION_STATUSES.includes(nextStatus)
   const nextGuests =
     guests != null ? Math.max(1, Math.min(20, Number(guests) || 2)) : row.guests
   const nextDate = date != null ? String(date) : row.date
@@ -723,12 +801,12 @@ router.patch('/reservations/:id', (req, res) => {
     notes !== undefined ? String(notes || '').trim() || null : row.notes
 
   const needsCapacityCheck =
-    nextStatus !== 'cancelled' &&
-    (nextStatus === 'confirmed' ||
-      nextDate !== row.date ||
+    nextActive &&
+    (nextDate !== row.date ||
       nextTime !== row.time ||
       nextGuests !== row.guests ||
-      (row.status === 'cancelled' && nextStatus !== 'cancelled'))
+      (row.status === 'pending' && nextStatus === 'confirmed') ||
+      row.status === 'cancelled')
 
   try {
     const run = db.transaction(() => {
@@ -738,7 +816,7 @@ router.patch('/reservations/:id', (req, res) => {
         const existing = db
           .prepare(
             `SELECT id, date, time, guests, status FROM reservations
-             WHERE restaurant_id = ? AND date = ? AND status IN ('pending', 'confirmed')`,
+             WHERE restaurant_id = ? AND date = ? AND status IN (${ACTIVE_STATUS_SQL})`,
           )
           .all(restaurant.id, nextDate)
 
@@ -750,6 +828,7 @@ router.patch('/reservations/:id', (req, res) => {
           existingRows: existing,
           maxCovers: maxCoversFromSettings(settings),
           excludeReservationId: row.id,
+          ...bookingRules(restaurant, settings),
         })
         if (!check.ok) {
           const err = new Error(check.error)
@@ -767,7 +846,7 @@ router.patch('/reservations/:id', (req, res) => {
 
       if (
         nextTableId == null &&
-        nextStatus !== 'cancelled' &&
+        nextActive &&
         (nextDate !== row.date || nextTime !== row.time || nextGuests !== row.guests)
       ) {
         nextTableId = assignTableForParty({
@@ -779,7 +858,7 @@ router.patch('/reservations/:id', (req, res) => {
         })
       }
 
-      if (nextTableId != null && nextStatus !== 'cancelled') {
+      if (nextTableId != null && nextActive) {
         const tableCheck = assertTableAvailable({
           restaurantId: restaurant.id,
           tableId: nextTableId,
@@ -942,6 +1021,28 @@ router.get('/pos-tables', async (req, res) => {
   }
 })
 
+router.get('/dashboard', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const [orders, tables, menu] = await Promise.all([
+      listUryOrders(tenant),
+      listUryTables(tenant),
+      getUryMenu(tenant).catch(() => null),
+    ])
+    const items = (menu?.categories || []).flatMap((category) => category.items || [])
+    const currency = menu?.currency || orders.find((order) => order.currency)?.currency || ''
+    res.json({ success: true, data: buildDashboardSummary({ orders, tables, items, currency, timezone: restaurant.timezone }) })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'dashboard',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'The dashboard is temporarily unavailable. Please try again.',
+    })
+  }
+})
+
 router.get('/pos-menu', async (req, res) => {
   const restaurant = getPosRestaurant(req, res)
   if (!restaurant) return
@@ -1023,6 +1124,24 @@ router.post('/pos-menu/menus', async (req, res) => {
       label: 'pos-menu:create-menu',
       restaurantId: restaurant.id,
       unavailableMessage: 'Could not add the menu. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-menu/items/:code/stock', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await addUryItemStock(tenant, req.params.code, req.body?.qty)
+    console.info(`[pos-menu:stock] restaurant=${restaurant.id} item=${req.params.code}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    sendPosError(res, err, {
+      label: 'pos-menu:stock',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not update stock. Nothing was changed.',
     })
   }
 })
@@ -1185,6 +1304,23 @@ router.post('/pos-orders/:invoiceId/pay', async (req, res) => {
   }
 })
 
+router.post('/pos-orders/:invoiceId/cancel', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await cancelUryInvoice(tenant, req.params.invoiceId, req.body || {})
+    console.info(`[pos-orders:cancel] restaurant=${restaurant.id} invoice=${data.invoice}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    sendPosError(res, err, {
+      label: 'pos-orders:cancel',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not cancel this order. Nothing was changed.',
+    })
+  }
+})
+
 router.post('/pos-orders/:invoiceId/print', async (req, res) => {
   const restaurant = getPosRestaurant(req, res)
   if (!restaurant) return
@@ -1222,10 +1358,12 @@ router.post('/pos-orders', async (req, res) => {
   if (!restaurant) return
   try {
     const tenant = await resolveUryTenant(restaurant.id)
-    const { table, customer, items, pax, comments } = req.body || {}
-    const data = await placeUryOrder(tenant, { table, customer, items, pax, comments })
-    console.info(`[pos-orders] restaurant=${restaurant.id} placed invoice=${data.invoice || '?'} table=${data.table}`)
-    res.status(201).json({ success: true, data })
+    const { table, customer, items, pax, comments, requestId } = req.body || {}
+    const data = await placeOnce(restaurant.id, requestId, () =>
+      placeUryOrder(tenant, { table, customer, items, pax, comments }),
+    )
+    console.info(`[pos-orders] restaurant=${restaurant.id} placed invoice=${data.invoice || '?'} table=${data.table}${data.replayed ? ' replayed' : ''}`)
+    res.status(data.replayed ? 200 : 201).json({ success: true, data })
   } catch (err) {
     sendPosError(res, err, {
       label: 'pos-orders:create',

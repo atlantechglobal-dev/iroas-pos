@@ -156,6 +156,17 @@
   .order-sheet-foot { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--border); }
   .order-pay-btn { flex: 1; height: 48px; border: 0; border-radius: 12px; background: #17171a; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
   .order-sheet-foot strong { min-width: 72px; text-align: right; }
+  .order-cancel-btn { height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: #d3453b; font: inherit; font-weight: 700; cursor: pointer; }
+  .cancel-modal { width: min(420px, 100%); display: grid; gap: 12px; padding: 22px; background: #fff; border-radius: 18px; }
+  .cancel-modal h2, .cancel-modal p { margin: 0; }
+  .cancel-modal p { color: var(--muted); }
+  .cancel-modal label { display: grid; gap: 6px; font-weight: 700; }
+  .cancel-modal input { height: 42px; border: 1px solid var(--border); border-radius: 10px; padding: 0 12px; font: inherit; }
+  .cancel-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .cancel-actions button { height: 42px; padding: 0 16px; border: 1px solid var(--border); border-radius: 10px; background: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+  .cancel-actions .is-danger { border-color: #d3453b; background: #d3453b; color: #fff; }
+  .cancel-actions .is-primary { border-color: #17171a; background: #17171a; color: #fff; }
+  .cancel-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
   .pay-modal-backdrop { position: fixed; inset: 0; z-index: 260; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(23, 23, 26, 0.45); }
   .pay-modal { width: min(760px, 100%); display: grid; grid-template-columns: 1.1fr 0.9fr; background: #fff; border-radius: 18px; overflow: hidden; }
   .pay-modal section { padding: 22px; }
