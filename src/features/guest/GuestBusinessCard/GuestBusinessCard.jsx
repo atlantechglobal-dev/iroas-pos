@@ -12,6 +12,7 @@ import {
 import {
   BusinessCardVisual,
 } from '@/shared/ui/businessCard/BusinessCardVisual'
+import { buildVCard, downloadVCard } from '@/shared/utils/contactLinks'
 import '@/features/guest/GuestBusinessCard/GuestBusinessCard.css'
 import '@/features/guest/GuestBusinessCard/BusinessIdProfile.css'
 import '@/features/dashboard/DigitalBusinessCard/DigitalBusinessCard.css'
@@ -420,23 +421,18 @@ function GuestBusinessCard() {
       toast.info(FILL_MESSAGE)
       return
     }
-    const vCard = [
-      'BEGIN:VCARD',
-      'VERSION:3.0',
-      `FN:${restaurant}`,
-      card.phone ? `TEL:${card.phone}` : '',
-      card.email ? `EMAIL:${card.email}` : '',
-      card.website ? `URL:${card.website}` : `URL:${websiteHref}`,
-      locationQuery ? `ADR:;;${locationQuery};;;;` : '',
-      'END:VCARD',
-    ]
-      .filter(Boolean)
-      .join('\n')
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(new Blob([vCard], { type: 'text/vcard' }))
-    link.download = `${slug}-contact.vcf`
-    link.click()
-    URL.revokeObjectURL(link.href)
+    downloadVCard(
+      buildVCard({
+        name: restaurant,
+        tagline: card.tagline,
+        phone: card.phone,
+        email: card.email,
+        website: card.website ? websiteHref : '',
+        pageUrl: publicUrl,
+        street: locationQuery,
+      }),
+      `${slug}-contact.vcf`,
+    )
   }
 
   const handleShare = async () => {

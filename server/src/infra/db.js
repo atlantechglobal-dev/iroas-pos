@@ -479,6 +479,17 @@ if (!db.prepare(`SELECT sql FROM sqlite_master WHERE name = 'reservations'`).get
 db.exec('CREATE INDEX IF NOT EXISTS idx_reservations_cancel_token ON reservations(cancel_token)')
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS enquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_enquiries_restaurant ON enquiries(restaurant_id, created_at);
+
   CREATE TABLE IF NOT EXISTS link_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,

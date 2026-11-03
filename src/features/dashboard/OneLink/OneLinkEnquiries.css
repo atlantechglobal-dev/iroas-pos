@@ -1,0 +1,7 @@
+.enquiries-card h3 { margin: 0 0 10px; font-size: 15px; }
+.enquiries-empty { margin: 0; font-size: 13px; color: #667085; }
+.enquiries-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.enquiries-list li { padding: 10px 12px; border-radius: 12px; background: #f9faf6; border: 1px solid #eceae4; }
+.enquiries-list strong { display: block; font-size: 14px; }
+.enquiries-list small { display: block; font-size: 12px; color: #667085; }
+.enquiries-list p { margin: 6px 0 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }

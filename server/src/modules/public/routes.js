@@ -14,6 +14,7 @@ import {
 import { onReservationCreated, onReservationStatusChange } from '../../services/reservationMessaging.js'
 import { assignTableForParty } from '../../services/diningTables.js'
 import { upsertGuest } from '../../services/guestRecords.js'
+import { EnquiryError, submitEnquiry } from '../../services/enquiries.js'
 import {
   createGuestOrder,
   findTableByPublicCode,
@@ -383,6 +384,26 @@ router.post('/:slug/link-events', linkEventLimiter, (req, res) => {
   if (!kind || (kind === 'click' && !key)) return res.status(400).json({ error: 'Invalid event.' })
   db.prepare('INSERT INTO link_events (restaurant_id, kind, dest_key) VALUES (?, ?, ?)').run(restaurant.id, kind, key)
   res.status(204).end()
+})
+
+const enquiryLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 8,
+  message: 'Too many messages. Please try again in a few minutes.',
+})
+
+/** Contact form on the One Link page. */
+router.post('/:slug/enquiries', enquiryLimiter, (req, res) => {
+  const restaurant = findRestaurantBySlug(req.params.slug, { liveOnly: true })
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' })
+  try {
+    submitEnquiry(restaurant, req.body || {})
+    res.status(201).json({ ok: true })
+  } catch (err) {
+    if (err instanceof EnquiryError) return res.status(err.status).json({ error: err.message })
+    console.error('[enquiry] failed', err)
+    res.status(500).json({ error: 'Could not send your message. Please try again.' })
+  }
 })
 
 const uryOrderLimiter = rateLimit({

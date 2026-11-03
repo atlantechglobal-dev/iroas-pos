@@ -21,6 +21,7 @@ import {
 } from '../../services/reservationMessaging.js'
 import { listGuests, upsertGuest } from '../../services/guestRecords.js'
 import { loadOnboardingProgress } from '../../services/onboardingProgress.js'
+import { listEnquiries } from '../../services/enquiries.js'
 import {
   assignTableForParty,
   assertTableAvailable,
@@ -590,6 +591,12 @@ router.get('/onboarding-progress', async (req, res) => {
   const restaurant = getOwnRestaurant(req.user.id)
   if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
   res.json({ progress: await loadOnboardingProgress(restaurant.id) })
+})
+
+router.get('/enquiries', (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  res.json({ enquiries: listEnquiries(restaurant.id) })
 })
 
 router.get('/one-link/stats', (req, res) => {

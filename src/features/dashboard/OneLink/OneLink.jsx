@@ -19,6 +19,7 @@ import {
   withGuestDestinationHrefs,
 } from '@/shared/utils/guestLinks'
 import '@/features/dashboard/OneLink/OneLink.css'
+import '@/features/dashboard/OneLink/OneLinkEnquiries.css'
 
 function PhonePreview({
   displayRestaurant,
@@ -137,8 +138,14 @@ function OneLink() {
   const [customModal, setCustomModal] = useState(null) // null | { key?, name, href, meta }
   const [stats, setStats] = useState({ views: 0, clicks: 0, byKey: {} })
 
+  const [enquiries, setEnquiries] = useState([])
+
   useEffect(() => {
     api.getOneLinkStats().then(setStats).catch(() => {})
+    api
+      .getEnquiries()
+      .then((res) => setEnquiries(res.enquiries || []))
+      .catch(() => {})
   }, [])
 
   const theme = ONE_LINK_THEMES[themeKey] || ONE_LINK_THEMES.lime
@@ -514,6 +521,27 @@ function OneLink() {
                   <strong>{stats.views ? `${Math.min(100, Math.round((stats.clicks / stats.views) * 100))}%` : '—'}</strong>
                 </div>
               </div>
+            </div>
+
+            <div className="card enquiries-card">
+              <h3>Recent enquiries</h3>
+              {enquiries.length === 0 ? (
+                <p className="enquiries-empty">Messages guests send from your One Link page appear here, and in your notifications.</p>
+              ) : (
+                <ul className="enquiries-list">
+                  {enquiries.map((q) => (
+                    <li key={q.id}>
+                      <div>
+                        <strong>{q.name}</strong>
+                        <small>
+                          {[q.phone, q.email].filter(Boolean).join(' · ')} · {q.createdAt}
+                        </small>
+                      </div>
+                      <p>{q.message}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="card destinations-card">
