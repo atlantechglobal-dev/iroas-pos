@@ -17,15 +17,10 @@ import '@/features/guest/GuestBusinessCard/GuestBusinessCard.css'
 import '@/features/guest/GuestBusinessCard/BusinessIdProfile.css'
 import '@/features/dashboard/DigitalBusinessCard/DigitalBusinessCard.css'
 
-const FILL_MESSAGE = 'Please fill in the image and details.'
+const FILL_MESSAGE = 'This is not available yet.'
 
 function EmptyPhoto({ variant = '' }) {
-  return (
-    <div className={`bid-photo-empty${variant ? ` ${variant}` : ''}`}>
-      <span>Fill image and details</span>
-      <small>Add photos and contact info in Business ID</small>
-    </div>
-  )
+  return <div className={`bid-photo-empty${variant ? ` ${variant}` : ''}`} aria-hidden="true" />
 }
 
 function IconUserPlus() {
