@@ -109,8 +109,13 @@ function PlatformNotifications() {
   }, [items, filter])
 
   const openItem = (item) => {
-    if (item.type === 'approval' && item.meta?.tenantId) {
-      navigate(`${ROUTES.PLATFORM_ACCOUNT_APPROVE}/${item.meta.tenantId}`)
+    const tenantId = item.meta?.tenantId || item.meta?.restaurantId
+    if (item.type === 'approval') {
+      navigate(tenantId ? `${ROUTES.PLATFORM_ACCOUNT_APPROVE}/${tenantId}` : ROUTES.PLATFORM_ACCOUNT_APPROVE)
+      return
+    }
+    if (item.type === 'identity') {
+      navigate(ROUTES.PLATFORM_IDENTITIES)
       return
     }
     if (item.type === 'audit') {

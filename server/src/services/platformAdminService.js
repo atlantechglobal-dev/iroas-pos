@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '../infra/db.js'
 import { isEmailConfigured } from './emailService.js'
 import { getPublicPaymentSettings } from './paymentSettings.js'
+import { isValidMobile } from '../shared/validation.js'
 
 export function appendPlatformAudit({
   actorId = null,
@@ -107,7 +108,12 @@ export function upsertPlan(payload) {
   }
   const name = String(payload.name || '').trim() || id
   const tagline = String(payload.tagline || '').trim()
-  const priceZar = Math.max(0, Number(payload.priceZar) || 0)
+  const priceZar = Number(payload.priceZar)
+  if (!Number.isFinite(priceZar) || priceZar <= 0) {
+    const err = new Error('Enter a price greater than zero.')
+    err.status = 400
+    throw err
+  }
   const billing = String(payload.billing || 'one-time launch').trim()
   const popular = payload.popular ? 1 : 0
   const features = Array.isArray(payload.features)
@@ -403,8 +409,14 @@ export function createPlatformStaff({ name, email, password, phone }) {
   const cleanName = String(name || '').trim()
   const cleanEmail = String(email || '').trim().toLowerCase()
   const cleanPassword = String(password || '')
+  const cleanPhone = String(phone || '').trim()
   if (!cleanName || !cleanEmail || cleanPassword.length < 8) {
     const err = new Error('Name, email, and password (min 8 chars) are required.')
+    err.status = 400
+    throw err
+  }
+  if (cleanPhone && !isValidMobile(cleanPhone)) {
+    const err = new Error('Enter a valid phone number (8–15 digits).')
     err.status = 400
     throw err
   }
@@ -419,7 +431,7 @@ export function createPlatformStaff({ name, email, password, phone }) {
     .prepare(
       `INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, 'admin')`,
     )
-    .run(cleanName, cleanEmail, phone ? String(phone).trim() : null, hash)
+    .run(cleanName, cleanEmail, cleanPhone || null, hash)
   return listPlatformStaff().find((u) => u.id === result.lastInsertRowid)
 }
 

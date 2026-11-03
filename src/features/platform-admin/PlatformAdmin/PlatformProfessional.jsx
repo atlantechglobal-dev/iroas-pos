@@ -332,7 +332,13 @@ function PlatformProfessional() {
                     checked={published}
                     onChange={(e) => setPublished(e.target.checked)}
                   />
-                  Publish on public link `/c/{publicSlug || 'iroas'}`
+                  <span>
+                    <strong>Publish public card</strong>
+                    <small>
+                      When checked, anyone with /c/{publicSlug || 'iroas'} can open this card.
+                      Uncheck to keep it private.
+                    </small>
+                  </span>
                 </label>
               </div>
             </div>

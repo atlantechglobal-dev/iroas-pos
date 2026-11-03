@@ -44,6 +44,7 @@ export async function apiRequest(path, { method = 'GET', body, auth = true, sign
       headers,
       body: body ? JSON.stringify(body) : undefined,
       signal,
+      cache: 'no-store',
     })
   } catch {
     throw new ApiError(MESSAGES.NETWORK_ERROR, { status: 0 })

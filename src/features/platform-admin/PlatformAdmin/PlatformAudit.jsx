@@ -5,11 +5,20 @@ import { api } from '@/shared/lib/api'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdmin.css'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdminExtra.css'
 
+function parseAuditTime(iso) {
+  const raw = String(iso || '').trim()
+  if (!raw) return null
+  const hasZone = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw)
+  const normalized = hasZone ? raw : `${raw.replace(' ', 'T')}Z`
+  const d = new Date(normalized)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 function formatWhen(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
+  const d = parseAuditTime(iso)
+  if (!d) return iso ? String(iso) : ''
   return d.toLocaleString(undefined, {
+    year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -35,7 +44,7 @@ function PlatformAudit() {
 
   return (
     <DashboardLayout
-      pageClassName="platform-admin-page"
+      pageClassName="platform-admin-page platform-audit-page"
       activeNav="platform-audit"
       variant="admin"
       adminSubtitle="Audit log"
@@ -55,8 +64,8 @@ function PlatformAudit() {
             <span>{loading ? 'Loading…' : `${entries.length} shown`}</span>
           </div>
         </div>
-        <div className="table-wrapper">
-          <table>
+        <div className="table-wrapper audit-table-wrap">
+          <table className="audit-table">
             <thead>
               <tr>
                 <th>WHEN</th>
@@ -68,18 +77,18 @@ function PlatformAudit() {
             <tbody>
               {entries.map((row) => (
                 <tr key={row.id}>
-                  <td>{formatWhen(row.createdAt)}</td>
-                  <td>
+                  <td data-label="When">{formatWhen(row.createdAt)}</td>
+                  <td data-label="Action">
                     <strong>{row.action}</strong>
                     <small>
                       {[row.entityType, row.entityId].filter(Boolean).join(' · ') || '—'}
                     </small>
                   </td>
-                  <td>
+                  <td data-label="Actor">
                     <strong>{row.actorName || '—'}</strong>
                     <small>{row.actorEmail}</small>
                   </td>
-                  <td>{row.detail || '—'}</td>
+                  <td data-label="Detail">{row.detail || '—'}</td>
                 </tr>
               ))}
               {!loading && entries.length === 0 ? (

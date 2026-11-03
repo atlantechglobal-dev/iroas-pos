@@ -620,12 +620,21 @@
   cursor: pointer;
   font-family: inherit;
   color: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.platform-admin-page .pa-pipeline-tab:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(30, 25, 15, 0.06);
+.platform-admin-page .pa-pipeline-tab:hover,
+.platform-admin-page .pa-pipeline-tab.tone-approve:hover,
+.platform-admin-page .pa-pipeline-tab.tone-approve.is-active:hover,
+.platform-admin-page .pa-pipeline-tab.tone-setup:hover,
+.platform-admin-page .pa-pipeline-tab.tone-setup.is-active:hover,
+.platform-admin-page .pa-pipeline-tab.tone-all:hover,
+.platform-admin-page .pa-pipeline-tab.tone-all.is-active:hover {
+  transform: none;
+  background: #f7fbf1;
+  border-color: color-mix(in srgb, var(--green) 55%, var(--border));
+  box-shadow: 0 8px 18px rgba(30, 25, 15, 0.06);
 }
 
 .platform-admin-page .pa-pipeline-tab-top {
@@ -1040,12 +1049,25 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.platform-admin-page.business-card-page .dbc-chip:hover {
+  background: #f7fbf1;
+  border-color: color-mix(in srgb, #8bc53f 55%, var(--border, #ece8df));
+  box-shadow: 0 8px 18px rgba(30, 25, 15, 0.06);
 }
 
 .platform-admin-page.business-card-page .dbc-chip.is-active {
   background: #eef6da;
   border-color: #cfe6a4;
   color: #2f5310;
+}
+
+.platform-admin-page.business-card-page .dbc-chip.is-active:hover {
+  background: #e4f0c8;
+  border-color: #b7d97a;
+  box-shadow: 0 8px 18px rgba(30, 25, 15, 0.06);
 }
 
 .platform-admin-page.business-card-page .dbc-grid {
@@ -1231,17 +1253,48 @@
 }
 
 .platform-admin-page.business-card-page .dbc-span,
-.platform-admin-page.business-card-page .dbc-check {
+.platform-admin-page.business-card-page .dbc-grid label.dbc-check {
   grid-column: 1 / -1;
 }
 
-.platform-admin-page.business-card-page .dbc-check {
+.platform-admin-page.business-card-page .dbc-grid label.dbc-check {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #ece8df);
+  border-radius: 14px;
+  background: #fff;
+  color: #17171a;
   font-size: 13px;
   font-weight: 650;
+  cursor: pointer;
+}
+
+.platform-admin-page.business-card-page .dbc-grid label.dbc-check input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: #8bc53f;
+  flex-shrink: 0;
+}
+
+.platform-admin-page.business-card-page .dbc-grid label.dbc-check strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
   color: #17171a;
+}
+
+.platform-admin-page.business-card-page .dbc-grid label.dbc-check small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b6b73;
+  line-height: 1.4;
 }
 
 @media (max-width: 900px) {
@@ -1674,6 +1727,14 @@
   padding: 16px 18px;
   display: grid;
   gap: 4px;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.platform-admin-page .pa-notif-stat:hover {
+  background: #f7fbf1;
+  border-color: color-mix(in srgb, var(--green) 55%, var(--border));
+  box-shadow: 0 8px 18px rgba(30, 25, 15, 0.06);
 }
 
 .platform-admin-page .pa-notif-stat strong {
@@ -1787,9 +1848,10 @@
   cursor: pointer;
 }
 
+.platform-admin-page .pa-notif-item:hover,
 .platform-admin-page .pa-notif-item.is-clickable:hover {
-  background: #f7f6f2;
-  border-color: var(--border);
+  background: #f7fbf1;
+  border-color: color-mix(in srgb, var(--green) 40%, var(--border));
 }
 
 .platform-admin-page .pa-notif-item:disabled {
@@ -1994,5 +2056,54 @@
 
   .platform-admin-page .pa-pipeline-search input {
     font-size: 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .platform-audit-page .tenants-card {
+    overflow: visible;
+  }
+
+  .platform-audit-page .audit-table-wrap {
+    overflow: visible;
+  }
+
+  .platform-audit-page .audit-table {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .platform-audit-page .audit-table thead {
+    display: none;
+  }
+
+  .platform-audit-page .audit-table tbody,
+  .platform-audit-page .audit-table tr,
+  .platform-audit-page .audit-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .platform-audit-page .audit-table tr {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .platform-audit-page .audit-table td {
+    padding: 6px 0 0;
+    text-align: left;
+  }
+
+  .platform-audit-page .audit-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
@@ -100,6 +100,16 @@ function EmailSettings() {
     smtpConfigured: false,
     devCatcher: false,
   })
+  const savedSnapshot = useRef('')
+
+  const emailSnapshot = (nextForm) =>
+    JSON.stringify({
+      apiToken: String(nextForm.apiToken || '').trim(),
+      fromEmail: String(nextForm.fromEmail || '').trim(),
+      fromName: String(nextForm.fromName || '').trim(),
+      features: nextForm.features,
+      templates: nextForm.templates,
+    })
 
   const applyMeta = (settings) => {
     setMeta({
@@ -158,6 +168,49 @@ function EmailSettings() {
     })
     setPlaceholders(Array.isArray(settings.placeholders) ? settings.placeholders : [])
     applyMeta(settings)
+    savedSnapshot.current = emailSnapshot({
+      apiToken: '',
+      fromEmail: settings.fromEmail || '',
+      fromName: settings.fromName || 'IROAS',
+      features: {
+        signupThankYouMail: settings.features?.signupThankYouMail !== false,
+        signupAdminNotifyMail: settings.features?.signupAdminNotifyMail !== false,
+        accountApprovedMail: settings.features?.accountApprovedMail !== false,
+        welcomeMail: settings.features?.welcomeMail !== false,
+        adminVerifyMail: settings.features?.adminVerifyMail !== false,
+        approvalDetailsMail: settings.features?.approvalDetailsMail !== false,
+      },
+      templates: {
+        signupThankYouMail: {
+          subject: settings.templates?.signupThankYouMail?.subject || '',
+          body: settings.templates?.signupThankYouMail?.body || '',
+        },
+        signupAdminNotifyMail: {
+          subject: settings.templates?.signupAdminNotifyMail?.subject || '',
+          body: settings.templates?.signupAdminNotifyMail?.body || '',
+        },
+        accountApprovedMail: {
+          subject: settings.templates?.accountApprovedMail?.subject || '',
+          body: settings.templates?.accountApprovedMail?.body || '',
+        },
+        welcomeMail: {
+          subject: settings.templates?.welcomeMail?.subject || '',
+          body: settings.templates?.welcomeMail?.body || '',
+        },
+        adminVerifyMail: {
+          subject: settings.templates?.adminVerifyMail?.subject || '',
+          body: settings.templates?.adminVerifyMail?.body || '',
+        },
+        adminApprovedMail: {
+          subject: settings.templates?.adminApprovedMail?.subject || '',
+          body: settings.templates?.adminApprovedMail?.body || '',
+        },
+        approvalDetailsMail: {
+          subject: settings.templates?.approvalDetailsMail?.subject || '',
+          body: settings.templates?.approvalDetailsMail?.body || '',
+        },
+      },
+    })
   }
 
   const load = async () => {
@@ -193,15 +246,20 @@ function EmailSettings() {
 
   const save = async (event) => {
     event.preventDefault()
+    const templates = { ...form.templates }
+    if (editingKey && draft.subject.trim() && draft.body.trim()) {
+      templates[editingKey] = {
+        subject: draft.subject.trim(),
+        body: draft.body.trim(),
+      }
+    }
+    const nextForm = { ...form, templates }
+    if (emailSnapshot(nextForm) === savedSnapshot.current) {
+      toast.info('No changes to save.')
+      return
+    }
     setSaving(true)
     try {
-      const templates = { ...form.templates }
-      if (editingKey && draft.subject.trim() && draft.body.trim()) {
-        templates[editingKey] = {
-          subject: draft.subject.trim(),
-          body: draft.body.trim(),
-        }
-      }
       const { settings } = await api.adminSaveEmailSettings({
         apiToken: form.apiToken,
         fromEmail: form.fromEmail,

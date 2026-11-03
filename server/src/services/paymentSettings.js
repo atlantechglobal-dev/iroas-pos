@@ -74,6 +74,12 @@ export function savePaymentSettings(payload = {}) {
   if (!next.appId || !next.merchantNo || !next.storeNo) {
     throw Object.assign(new Error('App ID, Merchant No, and Store No are required.'), { status: 400 })
   }
+  if (!/^\d{1,32}$/.test(next.merchantNo)) {
+    throw Object.assign(new Error('Merchant number must contain digits only.'), { status: 400 })
+  }
+  if (!/^\d{1,32}$/.test(next.storeNo)) {
+    throw Object.assign(new Error('Store number must contain digits only.'), { status: 400 })
+  }
 
   db.prepare(
     `INSERT INTO platform_settings (key, value_json, updated_at)

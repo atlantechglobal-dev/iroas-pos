@@ -20,13 +20,13 @@ function envDefaults() {
 
 export function getGoogleAuthSettings() {
   const row = db.prepare('SELECT value_json FROM platform_settings WHERE key = ?').get(GOOGLE_AUTH_KEY)
-  const stored = parseJson(row?.value_json, {})
+  const stored = parseJson(row?.value_json, null)
   const env = envDefaults()
+  const hasStored = stored && typeof stored === 'object' && Object.prototype.hasOwnProperty.call(stored, 'clientId')
 
   return {
-    clientId: String(stored.clientId || env.clientId || '').trim(),
-    enabled:
-      stored.enabled !== undefined ? Boolean(stored.enabled) : env.enabled,
+    clientId: hasStored ? String(stored.clientId || '').trim() : String(env.clientId || '').trim(),
+    enabled: hasStored && stored.enabled !== undefined ? Boolean(stored.enabled) : env.enabled,
   }
 }
 

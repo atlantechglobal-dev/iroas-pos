@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ROUTES } from '@/shared/constants/routes'
+import { ROUTES, platformAccountApproveProfilePath } from '@/shared/constants/routes'
 import { api } from '@/shared/lib/api'
 
 const ADMIN_QUICK_ACTIONS = [
@@ -95,6 +95,32 @@ const OWNER_QUICK_ACTIONS = [
   },
 ]
 
+function tenantMatches(row, query) {
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return false
+  return [row.name, row.owner_name, row.owner_email, row.plan].some((value) =>
+    String(value || '').toLowerCase().includes(q),
+  )
+}
+
+function tenantResultPath(row) {
+  if (row.status === 'pending_approval') return platformAccountApproveProfilePath(row.id)
+  if (row.status === 'onboarding') return ROUTES.PLATFORM_CUSTOMER_ONBOARDING
+  if (row.status === 'rejected') return `${ROUTES.PLATFORM_CUSTOMERS}?status=rejected`
+  if (row.status === 'live') return `${ROUTES.PLATFORM_CUSTOMERS}?status=live`
+  return ROUTES.PLATFORM_CUSTOMERS
+}
+
+function approvalPath(item, isAdmin) {
+  const meta = item?.meta && typeof item.meta === 'object' ? item.meta : {}
+  const tenantId = meta.tenantId || meta.restaurantId
+  const isApproval = item?.type === 'approval' || /approv/i.test(`${item?.title || ''} ${item?.body || ''}`)
+  if (!isApproval) return null
+  if (isAdmin && tenantId) return platformAccountApproveProfilePath(tenantId)
+  if (isAdmin) return ROUTES.PLATFORM_ACCOUNT_APPROVE
+  return null
+}
+
 function formatRelative(iso) {
   if (!iso) return ''
   const then = new Date(iso).getTime()
@@ -122,6 +148,10 @@ export function Topbar({
 }) {
   const [quickOpen, setQuickOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifLoading, setNotifLoading] = useState(false)
   const [notifError, setNotifError] = useState('')
@@ -130,6 +160,7 @@ export function Topbar({
   const wrapRef = useRef(null)
   const notifWrapRef = useRef(null)
   const searchRef = useRef(null)
+  const searchWrapRef = useRef(null)
   const location = useLocation()
   const quickActions = isAdmin ? ADMIN_QUICK_ACTIONS : OWNER_QUICK_ACTIONS
   const isApple =
@@ -166,38 +197,73 @@ export function Topbar({
     const onKey = (event) => {
       const key = String(event.key || '').toLowerCase()
       const mod = event.metaKey || event.ctrlKey
-      if (mod && key === 'k') {
+      if (mod && !event.altKey && (key === 'k' || event.code === 'KeyK')) {
         event.preventDefault()
         setQuickOpen(false)
         setNotifOpen(false)
         onProfileClose?.()
+        setSearchOpen(true)
         const input = searchRef.current
         if (!input) return
         input.focus()
         input.select?.()
         return
       }
-      if (key === 'escape' && document.activeElement === searchRef.current) {
-        searchRef.current.blur()
+      if (key === 'escape' && (document.activeElement === searchRef.current || searchOpen)) {
+        setSearchOpen(false)
+        searchRef.current?.blur()
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onProfileClose])
+  }, [onProfileClose, searchOpen])
 
   useEffect(() => {
-    if (!quickOpen && !notifOpen) return undefined
+    if (!isAdmin) return undefined
+    const term = query.trim()
+    if (term.length < 1) {
+      setSearchResults([])
+      setSearchLoading(false)
+      return undefined
+    }
+    let cancelled = false
+    setSearchLoading(true)
+    const timer = setTimeout(() => {
+      api
+        .adminTenants(term)
+        .then(({ tenants }) => {
+          if (cancelled) return
+          setSearchResults((tenants || []).filter((row) => tenantMatches(row, term)).slice(0, 8))
+        })
+        .catch(() => {
+          if (!cancelled) setSearchResults([])
+        })
+        .finally(() => {
+          if (!cancelled) setSearchLoading(false)
+        })
+    }, 200)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [isAdmin, query])
+
+  useEffect(() => {
+    if (!quickOpen && !notifOpen && !searchOpen) return undefined
     const onKey = (event) => {
       if (event.key === 'Escape') {
         setQuickOpen(false)
         setNotifOpen(false)
+        setSearchOpen(false)
       }
     }
     const onPointer = (event) => {
       const inQuick = wrapRef.current?.contains(event.target)
       const inNotif = notifWrapRef.current?.contains(event.target)
+      const inSearch = searchWrapRef.current?.contains(event.target)
       if (!inQuick) setQuickOpen(false)
       if (!inNotif) setNotifOpen(false)
+      if (!inSearch) setSearchOpen(false)
     }
     document.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onPointer)
@@ -205,7 +271,7 @@ export function Topbar({
       document.removeEventListener('keydown', onKey)
       document.removeEventListener('mousedown', onPointer)
     }
-  }, [quickOpen, notifOpen])
+  }, [quickOpen, notifOpen, searchOpen])
 
   useEffect(() => {
     if (profileOpen) {
@@ -228,6 +294,7 @@ export function Topbar({
   }
 
   const focusSearch = () => {
+    setSearchOpen(true)
     searchRef.current?.focus()
   }
 
@@ -261,7 +328,22 @@ export function Topbar({
       api.markNotificationsRead([item.id]).catch(() => {})
     }
     setNotifOpen(false)
+    const next = approvalPath(item, isAdmin)
+    if (next) {
+      onNavigate?.(next)
+      return
+    }
+    if (isAdmin && item.type === 'identity') {
+      onNavigate?.(ROUTES.PLATFORM_IDENTITIES)
+      return
+    }
     onNotifications?.()
+  }
+
+  const openSearchResult = (row) => {
+    setSearchOpen(false)
+    setQuery('')
+    onNavigate?.(tenantResultPath(row))
   }
 
   return (
@@ -279,27 +361,65 @@ export function Topbar({
           </svg>
         </button>
 
-        <div className="search-bar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-            <path d="M20 20L16.5 16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
+        <div className={`search-bar${searchOpen ? ' is-open' : ''}`} ref={searchWrapRef}>
+          <span className="search-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="6.25" stroke="currentColor" strokeWidth="2" />
+              <path d="M16 16.5L20 20.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
           <input
             ref={searchRef}
             type="search"
             placeholder={searchPlaceholder}
             aria-label="Search"
             aria-keyshortcuts={isApple ? 'Meta+K' : 'Control+K'}
+            aria-expanded={searchOpen}
+            aria-controls="topbar-search-results"
+            value={isAdmin ? query : undefined}
+            onChange={isAdmin ? (event) => {
+              setQuery(event.target.value)
+              setSearchOpen(true)
+            } : undefined}
+            onFocus={() => setSearchOpen(true)}
           />
           <button
             type="button"
-            className="kbd"
+            className="search-keys"
             onClick={focusSearch}
             title={`Focus search (${searchShortcutLabel})`}
             aria-label={`Focus search (${searchShortcutLabel})`}
           >
-            {searchShortcutLabel}
+            <kbd>{isApple ? '⌘' : 'Ctrl'}</kbd>
+            <kbd>K</kbd>
           </button>
+          {isAdmin && searchOpen ? (
+            <div id="topbar-search-results" className="search-results" role="listbox" aria-label="Search results">
+              {!query.trim() ? (
+                <p className="search-results-empty">Search tenants, owners, or plans</p>
+              ) : searchLoading ? (
+                <p className="search-results-empty">Searching…</p>
+              ) : searchResults.length === 0 ? (
+                <p className="search-results-empty">No matching records</p>
+              ) : (
+                searchResults.map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    role="option"
+                    className="search-result"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => openSearchResult(row)}
+                  >
+                    <strong>{row.name || 'Untitled'}</strong>
+                    <span>
+                      {[row.owner_name, row.plan].filter(Boolean).join(' · ') || 'Tenant'}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
 

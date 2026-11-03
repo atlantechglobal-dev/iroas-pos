@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
@@ -20,24 +21,37 @@ const STATUS_CLASS = {
   rejected: 'suspended-status',
 }
 
+const LIST_TITLE = {
+  live: 'Live tenants',
+  onboarding: 'In onboarding',
+  rejected: 'Rejected accounts',
+  pending_approval: 'Awaiting approval',
+}
+
 function PlatformCustomers() {
   const toast = useToast()
-  const [search, setSearch] = useState('')
+  const [params] = useSearchParams()
+  const status = params.get('status') || ''
+  const [search, setSearch] = useState(() => params.get('q') || '')
   const debounced = useDebounce(search, 250)
   const [tenants, setTenants] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setSearch(params.get('q') || '')
+  }, [params])
+
+  useEffect(() => {
     setLoading(true)
     api
-      .adminTenants(debounced)
+      .adminTenants(debounced, status)
       .then(({ tenants: rows }) => setTenants(rows || []))
       .catch((err) => {
         setTenants([])
         toast.error(err.message || 'Unable to load customers.')
       })
       .finally(() => setLoading(false))
-  }, [debounced, toast])
+  }, [debounced, status, toast])
 
   const stats = useMemo(() => {
     const owners = new Set(tenants.map((t) => t.owner_email || t.owner_name).filter(Boolean))
@@ -50,7 +64,7 @@ function PlatformCustomers() {
 
   return (
     <DashboardLayout
-      pageClassName="platform-admin-page"
+      pageClassName="platform-admin-page platform-customers-page"
       activeNav="platform-customers"
       variant="admin"
       adminSubtitle="All customers"
@@ -58,10 +72,13 @@ function PlatformCustomers() {
       <div className="page-header">
         <div>
           <div className="page-label">PLATFORM</div>
-          <h1>Customers</h1>
+          <h1>{LIST_TITLE[status] || 'Customers'}</h1>
           <p>
-            Restaurant owners and businesses across IROAS — contact details, plan, and account
-            status.
+            {status === 'live'
+              ? 'Published businesses that are live on IROAS.'
+              : status === 'rejected'
+                ? 'Accounts sent back to the owner.'
+                : 'Restaurant owners and businesses across IROAS — contact details, plan, and account status.'}
           </p>
         </div>
       </div>
@@ -90,20 +107,35 @@ function PlatformCustomers() {
             <h2>Customer directory</h2>
             <span>{loading ? 'Loading…' : `${tenants.length} shown`}</span>
           </div>
-          <div className="pa-toolbar" style={{ margin: 0 }}>
+          <label className="dir-search">
+            <span className="dir-search-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="6.25" stroke="currentColor" strokeWidth="2" />
+                <path d="M16 16.5L20 20.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </span>
             <input
               type="search"
               placeholder="Search name, email, city…"
+              aria-label="Search customer directory"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-          </div>
+          </label>
         </div>
 
         {loading ? (
           <p className="pa-empty">Loading customers…</p>
         ) : tenants.length === 0 ? (
-          <p className="pa-empty">No customers match this search.</p>
+          <p className="pa-empty">
+            {search.trim()
+              ? 'No customers match this search.'
+              : status === 'rejected'
+                ? 'No rejected accounts.'
+                : status === 'live'
+                  ? 'No live tenants.'
+                  : 'No customers in this list.'}
+          </p>
         ) : (
           <div className="table-wrap">
             <table>

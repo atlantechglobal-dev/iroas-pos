@@ -197,7 +197,7 @@ router.get('/tenants', (req, res) => {
 
   if (search) {
     filtered = filtered.filter((r) =>
-      `${r.name} ${r.city} ${r.owner_name} ${r.owner_email} ${r.businessCategory}`
+      `${r.name} ${r.city} ${r.owner_name} ${r.owner_email} ${r.plan} ${r.businessCategory}`
         .toLowerCase()
         .includes(search),
     )

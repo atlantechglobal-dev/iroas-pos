@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
@@ -19,6 +19,25 @@ function PaymentSettings() {
     gatewayPublicKey: '',
     useSandbox: true,
   })
+  const savedSnapshot = useRef('')
+  const [fieldErrors, setFieldErrors] = useState({ merchantNo: '', storeNo: '' })
+
+  const paymentSnapshot = (next) =>
+    JSON.stringify({
+      appId: String(next.appId || '').trim(),
+      merchantNo: String(next.merchantNo || '').trim(),
+      storeNo: String(next.storeNo || '').trim(),
+      privateKey: String(next.privateKey || '').trim(),
+      gatewayPublicKey: String(next.gatewayPublicKey || '').trim(),
+      useSandbox: next.useSandbox !== false,
+    })
+
+  const numericIdError = (label, value) => {
+    const trimmed = String(value || '').trim()
+    if (!trimmed) return `${label} is required.`
+    if (!/^\d{1,32}$/.test(trimmed)) return `${label} must contain digits only.`
+    return ''
+  }
   const [meta, setMeta] = useState({
     configured: false,
     privateKeySet: false,
@@ -43,14 +62,17 @@ function PaymentSettings() {
     setLoading(true)
     try {
       const { settings } = await api.adminPaymentSettings()
-      setForm({
+      const next = {
         appId: settings.appId || '',
         merchantNo: settings.merchantNo || '',
         storeNo: settings.storeNo || '',
         privateKey: '',
         gatewayPublicKey: '',
         useSandbox: settings.useSandbox !== false,
-      })
+      }
+      setForm(next)
+      savedSnapshot.current = paymentSnapshot(next)
+      setFieldErrors({ merchantNo: '', storeNo: '' })
       applyMeta(settings)
     } catch (err) {
       toast.error(err.message || 'Unable to load payment settings.')
@@ -65,6 +87,19 @@ function PaymentSettings() {
 
   const save = async (event) => {
     event.preventDefault()
+    if (paymentSnapshot(form) === savedSnapshot.current) {
+      setFieldErrors({ merchantNo: '', storeNo: '' })
+      toast.info('No changes to save.')
+      return
+    }
+    const merchantError = numericIdError('Merchant number', form.merchantNo)
+    const storeError = numericIdError('Store number', form.storeNo)
+    if (merchantError || storeError) {
+      setFieldErrors({ merchantNo: merchantError, storeNo: storeError })
+      toast.error(merchantError || storeError)
+      return
+    }
+    setFieldErrors({ merchantNo: '', storeNo: '' })
     setSaving(true)
     try {
       const { settings } = await api.adminSavePaymentSettings({
@@ -75,7 +110,16 @@ function PaymentSettings() {
         gatewayPublicKey: form.gatewayPublicKey,
         useSandbox: form.useSandbox,
       })
-      setForm((prev) => ({ ...prev, privateKey: '', gatewayPublicKey: '' }))
+      const next = {
+        appId: settings.appId || '',
+        merchantNo: settings.merchantNo || '',
+        storeNo: settings.storeNo || '',
+        privateKey: '',
+        gatewayPublicKey: '',
+        useSandbox: settings.useSandbox !== false,
+      }
+      setForm(next)
+      savedSnapshot.current = paymentSnapshot(next)
       applyMeta(settings)
       toast.success('Payment settings saved.')
     } catch (err) {
@@ -168,20 +212,42 @@ function PaymentSettings() {
                     <span>Merchant No</span>
                     <input
                       required
+                      inputMode="numeric"
+                      autoComplete="off"
                       placeholder="Merchant number"
+                      aria-invalid={fieldErrors.merchantNo ? 'true' : 'false'}
                       value={form.merchantNo}
-                      onChange={(e) => setForm((f) => ({ ...f, merchantNo: e.target.value }))}
+                      onChange={(e) => {
+                        setFieldErrors((prev) => ({ ...prev, merchantNo: '' }))
+                        setForm((f) => ({ ...f, merchantNo: e.target.value }))
+                      }}
                     />
+                    {fieldErrors.merchantNo ? (
+                      <em className="es-current" style={{ color: '#b42318' }}>
+                        {fieldErrors.merchantNo}
+                      </em>
+                    ) : null}
                   </label>
                 </div>
                 <label className="es-field">
                   <span>Store No</span>
                   <input
                     required
+                    inputMode="numeric"
+                    autoComplete="off"
                     placeholder="Store number"
+                    aria-invalid={fieldErrors.storeNo ? 'true' : 'false'}
                     value={form.storeNo}
-                    onChange={(e) => setForm((f) => ({ ...f, storeNo: e.target.value }))}
+                    onChange={(e) => {
+                      setFieldErrors((prev) => ({ ...prev, storeNo: '' }))
+                      setForm((f) => ({ ...f, storeNo: e.target.value }))
+                    }}
                   />
+                  {fieldErrors.storeNo ? (
+                    <em className="es-current" style={{ color: '#b42318' }}>
+                      {fieldErrors.storeNo}
+                    </em>
+                  ) : null}
                 </label>
 
                 <label className={`ps-env-toggle${form.useSandbox ? ' is-sandbox' : ' is-live'}`}>

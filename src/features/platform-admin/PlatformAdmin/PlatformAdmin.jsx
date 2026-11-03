@@ -165,18 +165,27 @@ function PlatformAdmin() {
   }, [displayStats, health])
 
   const statusGrid = useMemo(() => {
-    const cells = []
-    const sample = tenants.slice(0, 18)
-    for (let i = 0; i < 18; i += 1) {
-      const t = sample[i]
-      let kind = 'free'
-      if (t?.status === 'live') kind = 'occupied'
-      else if (t?.status === 'pending_approval') kind = 'reserved'
-      else if (t?.status === 'onboarding') kind = 'cleaning'
-      else if (t?.status === 'rejected') kind = 'free'
-      cells.push({ n: i + 1, kind, id: t?.id })
+    const buckets = {
+      live: tenants.filter((t) => t.status === 'live'),
+      awaiting: tenants.filter((t) => t.status === 'pending_approval'),
+      setup: tenants.filter((t) => t.status === 'onboarding'),
+      other: tenants.filter((t) => !['live', 'pending_approval', 'onboarding'].includes(t.status)),
     }
-    return cells
+    const order = ['live', 'awaiting', 'setup', 'other']
+    const picked = []
+    let added = true
+    while (picked.length < 18 && added) {
+      added = false
+      for (const kind of order) {
+        const tenant = buckets[kind].shift()
+        if (!tenant) continue
+        picked.push({ kind, id: tenant.id })
+        added = true
+        if (picked.length === 18) break
+      }
+    }
+    while (picked.length < 18) picked.push({ kind: 'empty', id: null })
+    return picked.map((cell, i) => ({ n: i + 1, ...cell }))
   }, [tenants])
 
   const statusCounts = useMemo(
@@ -224,7 +233,11 @@ function PlatformAdmin() {
       </div>
 
       <HorizontalDragScroll className="stat-cards">
-        <div className="stat-card">
+        <Link
+          className="stat-card is-clickable"
+          to={`${ROUTES.PLATFORM_CUSTOMERS}?status=live`}
+          aria-label="Live tenants"
+        >
           <div className="stat-top">
             <span className="stat-ico">▣</span>
             <span className="trend up">Live</span>
@@ -232,9 +245,13 @@ function PlatformAdmin() {
           <div className="stat-number">{loading ? '—' : displayStats.activeTenants}</div>
           <p className="stat-sub">Live tenants</p>
           <p className="stat-foot">Published & taking customers</p>
-        </div>
+        </Link>
 
-        <div className="stat-card">
+        <Link
+          className="stat-card is-clickable"
+          to={ROUTES.PLATFORM_CUSTOMER_ONBOARDING}
+          aria-label="In onboarding"
+        >
           <div className="stat-top">
             <span className="stat-ico">⌁</span>
             <span className="trend up">Setup</span>
@@ -242,12 +259,11 @@ function PlatformAdmin() {
           <div className="stat-number">{loading ? '—' : displayStats.onboardingTenants}</div>
           <p className="stat-sub">In onboarding</p>
           <p className="stat-foot">Still completing the wizard</p>
-        </div>
+        </Link>
 
         <button
           type="button"
-          className="stat-card"
-          style={{ cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
+          className="stat-card is-clickable"
           onClick={() => navigate(ROUTES.PLATFORM_ACCOUNT_APPROVE)}
         >
           <div className="stat-top">
@@ -261,7 +277,11 @@ function PlatformAdmin() {
           <p className="stat-foot">New Create Account requests</p>
         </button>
 
-        <div className="stat-card">
+        <Link
+          className="stat-card is-clickable"
+          to={`${ROUTES.PLATFORM_CUSTOMERS}?status=rejected`}
+          aria-label="Rejected"
+        >
           <div className="stat-top">
             <span className="stat-ico">⊘</span>
             <span className="trend down">{displayStats.rejectedTenants ? 'Sent back' : 'Clear'}</span>
@@ -269,11 +289,11 @@ function PlatformAdmin() {
           <div className="stat-number">{loading ? '—' : displayStats.rejectedTenants ?? 0}</div>
           <p className="stat-sub">Rejected</p>
           <p className="stat-foot">Need owner changes</p>
-        </div>
+        </Link>
       </HorizontalDragScroll>
 
       <div className="two-col-row">
-        <section className="card">
+        <section className="card is-hoverable">
           <div className="card-head">
             <div>
               <h2>Account approvals</h2>
@@ -328,7 +348,7 @@ function PlatformAdmin() {
           </ul>
         </section>
 
-        <section className="card">
+        <section className="card is-hoverable">
           <div className="card-head">
             <div>
               <h2>Platform activity</h2>
@@ -533,7 +553,7 @@ function PlatformAdmin() {
               <button
                 key={cell.n}
                 type="button"
-                className={`floor-cell floor-${cell.kind}`}
+                className={`floor-cell tile-${cell.kind}`}
                 title={cell.id ? `Tenant #${cell.id}` : 'Empty'}
                 onClick={() => cell.id && setReviewTenantId(cell.id)}
               >
@@ -543,16 +563,16 @@ function PlatformAdmin() {
           </div>
           <div className="floor-legend">
             <span>
-              <i className="dot floor-occupied" /> Live {statusCounts.live}
+              <i className="dot tile-live" /> Live {statusCounts.live}
             </span>
             <span>
-              <i className="dot floor-reserved" /> Awaiting {statusCounts.pending}
+              <i className="dot tile-awaiting" /> Awaiting {statusCounts.pending}
             </span>
             <span>
-              <i className="dot floor-cleaning" /> Setup {statusCounts.onboarding}
+              <i className="dot tile-setup" /> Setup {statusCounts.onboarding}
             </span>
             <span>
-              <i className="dot floor-free" /> Other {statusCounts.other}
+              <i className="dot tile-other" /> Other {statusCounts.other}
             </span>
           </div>
         </section>

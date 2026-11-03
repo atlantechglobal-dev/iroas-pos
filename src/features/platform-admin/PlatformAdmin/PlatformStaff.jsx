@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
+import { isValidMobile } from '@/shared/utils/validation'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdmin.css'
 import '@/features/platform-admin/PlatformAdmin/PlatformAdminExtra.css'
 
@@ -11,6 +12,7 @@ function PlatformStaff() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' })
+  const [phoneError, setPhoneError] = useState('')
 
   const load = () => {
     setLoading(true)
@@ -30,11 +32,19 @@ function PlatformStaff() {
 
   const create = async (e) => {
     e.preventDefault()
+    const phone = form.phone.trim()
+    if (phone && !isValidMobile(phone)) {
+      setPhoneError('Enter a valid phone number (8–15 digits). Letters are not allowed.')
+      toast.error('Enter a valid phone number (8–15 digits).')
+      return
+    }
+    setPhoneError('')
     setSaving(true)
     try {
       await api.adminCreateStaff(form)
       toast.success('Staff account created')
       setForm({ name: '', email: '', password: '', phone: '' })
+      setPhoneError('')
       load()
     } catch (err) {
       toast.error(err.message || 'Unable to create staff.')
@@ -89,12 +99,34 @@ function PlatformStaff() {
             onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
             style={{ height: 42, borderRadius: 12, border: '1px solid var(--border)', padding: '0 12px' }}
           />
-          <input
-            placeholder="Phone (optional)"
-            value={form.phone}
-            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            style={{ height: 42, borderRadius: 12, border: '1px solid var(--border)', padding: '0 12px' }}
-          />
+          <div>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="Phone (optional)"
+              aria-invalid={phoneError ? 'true' : 'false'}
+              aria-describedby={phoneError ? 'staff-phone-error' : undefined}
+              value={form.phone}
+              onChange={(e) => {
+                setPhoneError('')
+                setForm((f) => ({ ...f, phone: e.target.value }))
+              }}
+              style={{
+                width: '100%',
+                height: 42,
+                borderRadius: 12,
+                border: `1px solid ${phoneError ? '#d64545' : 'var(--border)'}`,
+                padding: '0 12px',
+                boxSizing: 'border-box',
+              }}
+            />
+            {phoneError ? (
+              <p id="staff-phone-error" style={{ margin: '6px 0 0', color: '#b42318', fontSize: 12 }}>
+                {phoneError}
+              </p>
+            ) : null}
+          </div>
           <button className="new-tenant" type="submit" disabled={saving} style={{ gridColumn: '1 / -1', width: 'fit-content' }}>
             {saving ? 'Creating…' : 'Create admin'}
           </button>

@@ -75,7 +75,7 @@ function Plans() {
   const payloadFromForm = () => ({
     name: String(form.name || '').trim(),
     tagline: String(form.tagline || '').trim(),
-    priceZar: Number(form.priceZar) || 0,
+    priceZar: Number(form.priceZar),
     billing: String(form.billing || 'one-time launch').trim(),
     popular: Boolean(form.popular),
     features: String(form.features || '')
@@ -93,8 +93,10 @@ function Plans() {
       toast.error('Plan name is required.')
       return
     }
-    if (!(Number(form.priceZar) >= 0)) {
-      toast.error('Enter a valid price in ZAR.')
+    const priceRaw = String(form.priceZar ?? '').trim()
+    const price = Number(priceRaw)
+    if (!/^\d+(\.\d{1,2})?$/.test(priceRaw) || !Number.isFinite(price) || price <= 0) {
+      toast.error('Enter a price greater than zero. Zero, letters, and negative amounts are not allowed.')
       return
     }
 
@@ -286,14 +288,12 @@ function Plans() {
                 <label className="pa-field">
                   <span>Price (ZAR)</span>
                   <input
-                    type="number"
-                    min="0"
-                    step="1"
+                    type="text"
+                    inputMode="decimal"
                     required
                     value={form.priceZar}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, priceZar: Number(e.target.value) }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, priceZar: e.target.value }))}
+                    placeholder="999"
                   />
                   <em>Charged at onboarding payment</em>
                 </label>

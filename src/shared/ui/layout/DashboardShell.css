@@ -281,20 +281,50 @@
   flex-shrink: 0;
 }
 
-.dashboard-shell .search-bar {
+.dashboard-shell .topbar .search-bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0 16px;
+  padding: 0 8px 0 16px;
   height: 44px;
   width: 100%;
   max-width: min(860px, 100%);
   flex: 1 1 auto;
   color: var(--muted);
   min-width: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dashboard-shell .search-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: #6f6f76;
+}
+
+.dashboard-shell .search-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.dashboard-shell .search-bar:focus-within,
+.dashboard-shell .search-bar.is-open {
+  border-color: #8bc53f;
+  box-shadow: 0 0 0 3px rgba(139, 197, 63, 0.22);
+  background: #fff;
+}
+
+.dashboard-shell .search-bar:focus-within .search-icon,
+.dashboard-shell .search-bar.is-open .search-icon {
+  color: #3f6212;
 }
 
 .dashboard-shell .search-bar input {
@@ -306,25 +336,102 @@
   color: var(--ink);
   font-family: inherit;
   min-width: 0;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  appearance: none;
+}
+
+.dashboard-shell .search-bar input[type='search']::-webkit-search-decoration,
+.dashboard-shell .search-bar input[type='search']::-webkit-search-cancel-button,
+.dashboard-shell .search-bar input[type='search']::-webkit-search-results-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
 }
 
 .dashboard-shell .search-bar input::placeholder {
   color: var(--muted-2);
 }
 
+.dashboard-shell .search-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dashboard-shell .search-keys kbd,
 .dashboard-shell .kbd {
   font-size: 11px;
-  color: var(--muted-2);
-  background: var(--bg);
+  color: #6f6f76;
+  background: #f4f3ef;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 3px 7px;
+  padding: 3px 6px;
+  min-width: 18px;
   flex-shrink: 0;
-  font: inherit;
-  font-size: 11px;
+  font-family: inherit;
   font-weight: 700;
-  cursor: pointer;
   line-height: 1.2;
+  text-align: center;
+}
+
+.dashboard-shell .search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(30, 25, 15, 0.12);
+  padding: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.dashboard-shell .search-results-empty {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dashboard-shell .search-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.dashboard-shell .search-result:hover,
+.dashboard-shell .search-result:focus-visible {
+  background: #f6f4ef;
+  outline: none;
+}
+
+.dashboard-shell .search-result strong {
+  font-size: 13.5px;
+}
+
+.dashboard-shell .search-result span {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .dashboard-shell .kbd:hover,
@@ -481,6 +588,7 @@
   cursor: pointer;
 }
 
+.dashboard-shell .icon-btn:hover,
 .dashboard-shell .icon-btn.is-open {
   border-color: color-mix(in srgb, var(--green) 45%, var(--border));
   background: var(--green-soft);
@@ -709,6 +817,14 @@
   border-radius: 999px;
   padding: 6px 14px 6px 6px;
   min-height: 52px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.dashboard-shell .user-chip:hover,
+.dashboard-shell .user-chip[aria-expanded='true'] {
+  background: #f6f8f1;
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border));
 }
 
 .dashboard-shell .avatar-dark {
@@ -993,7 +1109,8 @@
     padding-bottom: max(32px, env(safe-area-inset-bottom, 0px));
   }
 
-  .dashboard-shell .search-bar .kbd {
+  .dashboard-shell .search-bar .kbd,
+  .dashboard-shell .search-bar .search-keys {
     display: none;
   }
 

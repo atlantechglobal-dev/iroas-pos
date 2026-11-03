@@ -19,24 +19,29 @@ function FeatureFlags() {
       .finally(() => setLoading(false))
   }, [toast])
 
-  const toggle = (key) => {
-    setFlags((prev) =>
-      prev.map((f) => (f.key === key ? { ...f, enabled: !f.enabled } : f)),
-    )
-  }
-
-  const save = async () => {
+  const persist = async (next, previous) => {
     setSaving(true)
     try {
-      const { flags: rows } = await api.adminSaveFeatureFlags(flags)
-      setFlags(rows || flags)
+      const { flags: rows } = await api.adminSaveFeatureFlags(next)
+      setFlags(rows || next)
       toast.success('Feature flags saved')
     } catch (err) {
+      if (previous) setFlags(previous)
       toast.error(err.message || 'Unable to save flags.')
     } finally {
       setSaving(false)
     }
   }
+
+  const toggle = (key) => {
+    if (saving) return
+    const previous = flags
+    const next = flags.map((f) => (f.key === key ? { ...f, enabled: !f.enabled } : f))
+    setFlags(next)
+    persist(next, previous)
+  }
+
+  const save = () => persist(flags)
 
   return (
     <DashboardLayout
