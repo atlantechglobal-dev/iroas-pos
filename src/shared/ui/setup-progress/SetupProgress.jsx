@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import './SetupProgress.css'
 
 /** Setup checklist: owners get a link per step, admins (no `links`) just read the state. */
-export function SetupProgress({ progress, links = false, title = 'Setup progress' }) {
+export function SetupProgress({ progress, links = false, hideDone = false, title = 'Setup progress' }) {
+  const [showDone, setShowDone] = useState(false)
   if (!progress) return null
+  const visible = hideDone && !showDone ? progress.steps.filter((s) => !s.done) : progress.steps
   const percent = Math.round((progress.done / progress.total) * 100)
   return (
     <section className="onboarding-progress" aria-label={title}>
@@ -19,7 +22,7 @@ export function SetupProgress({ progress, links = false, title = 'Setup progress
         </div>
       </header>
       <ol>
-        {progress.steps.map((step) => (
+        {visible.map((step) => (
           <li key={step.key} className={`${step.done ? 'is-done' : ''}${step.key === progress.nextStep ? ' is-next' : ''}`}>
             <span className="onboarding-progress-mark" aria-hidden="true">
               {step.done ? '✓' : ''}
@@ -36,6 +39,11 @@ export function SetupProgress({ progress, links = false, title = 'Setup progress
           </li>
         ))}
       </ol>
+      {hideDone && progress.done > 0 ? (
+        <button type="button" className="onboarding-progress-toggle" onClick={() => setShowDone((v) => !v)}>
+          {showDone ? 'Hide completed steps' : `Show completed steps (${progress.done})`}
+        </button>
+      ) : null}
     </section>
   )
 }

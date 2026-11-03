@@ -157,7 +157,7 @@ function Dashboard() {
         </div>
       ) : null}
 
-      {setup && !setup.complete ? <SetupProgress progress={setup} links title="Finish setting up" /> : null}
+      {setup && !setup.complete ? <SetupProgress progress={setup} links hideDone title="Finish setting up" /> : null}
 
       <div className="page-head">
         <div>

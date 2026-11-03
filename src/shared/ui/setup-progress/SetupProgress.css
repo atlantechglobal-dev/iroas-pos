@@ -16,3 +16,4 @@
 .onboarding-progress-go { font-size: 12px; font-weight: 700; color: #3f6212; text-decoration: none; padding: 6px 12px; border-radius: 999px; background: #e9f3d6; }
 .onboarding-chip { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fef3c7; color: #92400e; }
 .onboarding-chip.is-complete { background: #e9f3d6; color: #3f6212; }
+.onboarding-progress-toggle { margin-top: 8px; padding: 4px 6px; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: #3f6212; cursor: pointer; }
