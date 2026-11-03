@@ -20,6 +20,7 @@ import {
   onReservationStatusChange,
 } from '../../services/reservationMessaging.js'
 import { listGuests, upsertGuest } from '../../services/guestRecords.js'
+import { loadOnboardingProgress } from '../../services/onboardingProgress.js'
 import {
   assignTableForParty,
   assertTableAvailable,
@@ -583,6 +584,12 @@ router.get('/reservations', (req, res) => {
     .all(restaurant.id)
 
   res.json({ reservations: rows.map(mapReservation) })
+})
+
+router.get('/onboarding-progress', async (req, res) => {
+  const restaurant = getOwnRestaurant(req.user.id)
+  if (!restaurant) return res.status(404).json({ error: 'No restaurant found.' })
+  res.json({ progress: await loadOnboardingProgress(restaurant.id) })
 })
 
 router.get('/one-link/stats', (req, res) => {

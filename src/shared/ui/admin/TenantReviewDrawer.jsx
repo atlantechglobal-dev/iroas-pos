@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ProvisioningPanel } from '@/shared/ui/admin/ProvisioningPanel'
+import { SetupProgress } from '@/shared/ui/setup-progress/SetupProgress'
 import { createPortal } from 'react-dom'
 import { api } from '@/shared/lib/api'
 import { useAuth } from '@/shared/hooks/useAuth'
@@ -93,6 +94,19 @@ export function TenantReviewDrawer({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteName, setDeleteName] = useState('')
   const [busy, setBusy] = useState('')
+  const [progress, setProgress] = useState(null)
+
+  useEffect(() => {
+    if (!tenantId) return undefined
+    let alive = true
+    api
+      .adminOnboarding(tenantId)
+      .then((res) => alive && setProgress(res.progress))
+      .catch(() => alive && setProgress(null))
+    return () => {
+      alive = false
+    }
+  }, [tenantId, tenant?.status])
 
   const load = async (id) => {
     const data = await api.adminTenant(id)
@@ -375,6 +389,7 @@ export function TenantReviewDrawer({
             </nav>
 
             <div className="tenant-review-body">
+              {tab === 'profile' && progress ? <SetupProgress progress={progress} /> : null}
               {tab === 'profile' && (
                 <div className="tenant-review-grid">
                   {(tenant.status === 'live' || tenant.status === 'rejected') && (

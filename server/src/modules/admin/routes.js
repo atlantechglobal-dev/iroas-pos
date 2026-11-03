@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { getOnboardingProgress, loadOnboardingProgress } from '../../services/onboardingProgress.js'
 import { db } from '../../infra/db.js'
 import { requireAuth, requireStaff } from '../../middleware/auth.js'
 import {
@@ -77,6 +78,7 @@ const SPECIALIST_ALLOWED = [
   ['GET', /^\/feed$/],
   ['GET', /^\/provisioning$/],
   ['GET', /^\/tenants\/\d+\/provisioning$/],
+  ['GET', /^\/tenants\/\d+\/onboarding$/],
 ]
 
 function specialistGuard(req, res, next) {
@@ -191,8 +193,11 @@ router.get('/tenants', (req, res) => {
     const onboardingPaid = Boolean(settings?.onboardingPayment?.paid)
     const businessCategory = settings.businessCategory || settings.category || ''
     const { settings_json: _omit, ...rest } = r
+    const progress = getOnboardingProgress(r.id)
     return {
       ...rest,
+      onboardingDone: progress?.done ?? 0,
+      onboardingTotal: progress?.total ?? 0,
       awaitingAccountApproval,
       accountApprovedAt,
       onboardingPaid,
@@ -230,6 +235,12 @@ router.get('/tenants', (req, res) => {
   }
 
   res.json({ tenants: filtered, total: filtered.length })
+})
+
+router.get('/tenants/:id/onboarding', async (req, res) => {
+  const progress = await loadOnboardingProgress(Number(req.params.id))
+  if (!progress) return res.status(404).json({ error: 'Tenant not found.' })
+  res.json({ progress })
 })
 
 router.get('/tenants/:id', (req, res) => {

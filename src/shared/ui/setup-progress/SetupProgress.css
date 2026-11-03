@@ -1,0 +1,18 @@
+.onboarding-progress { background: #fff; border: 1px solid #eceae4; border-radius: 16px; padding: 16px 18px; margin-bottom: 16px; }
+.onboarding-progress header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.onboarding-progress header strong { display: block; font-size: 15px; }
+.onboarding-progress header span { font-size: 12px; color: #667085; }
+.onboarding-progress-bar { flex: 1; min-width: 140px; max-width: 280px; height: 8px; border-radius: 999px; background: #f2f4f7; overflow: hidden; }
+.onboarding-progress-bar span { display: block; height: 100%; background: #6fa62a; border-radius: 999px; }
+.onboarding-progress ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.onboarding-progress li { display: flex; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 10px; }
+.onboarding-progress li.is-next { background: #f4f8ec; }
+.onboarding-progress-mark { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 2px solid #d0d5dd; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; }
+.onboarding-progress li.is-done .onboarding-progress-mark { background: #6fa62a; border-color: #6fa62a; }
+.onboarding-progress li div { flex: 1; min-width: 0; }
+.onboarding-progress li strong { display: block; font-size: 13px; }
+.onboarding-progress li small { display: block; font-size: 12px; color: #667085; }
+.onboarding-progress li.is-done strong { color: #667085; font-weight: 600; }
+.onboarding-progress-go { font-size: 12px; font-weight: 700; color: #3f6212; text-decoration: none; padding: 6px 12px; border-radius: 999px; background: #e9f3d6; }
+.onboarding-chip { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fef3c7; color: #92400e; }
+.onboarding-chip.is-complete { background: #e9f3d6; color: #3f6212; }

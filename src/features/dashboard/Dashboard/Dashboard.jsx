@@ -7,6 +7,7 @@ import { HorizontalDragScroll } from '@/shared/ui/HorizontalDragScroll'
 import { usePosResource } from '@/shared/hooks/usePosResource'
 import { ROUTES } from '@/shared/constants/routes'
 import { api } from '@/shared/lib/api'
+import { SetupProgress } from '@/shared/ui/setup-progress/SetupProgress'
 import { todayIso } from '@/shared/utils/localDate'
 import '@/features/dashboard/Dashboard/Dashboard.css'
 
@@ -65,6 +66,14 @@ function Dashboard() {
   const [tonightReservations, setTonightReservations] = useState([])
   const [activeReservationCount, setActiveReservationCount] = useState(null)
   const [arrivingSoonCount, setArrivingSoonCount] = useState(0)
+  const [setup, setSetup] = useState(null)
+
+  useEffect(() => {
+    api
+      .getOnboardingProgress()
+      .then((res) => setSetup(res.progress))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -147,6 +156,8 @@ function Dashboard() {
           </button>
         </div>
       ) : null}
+
+      {setup && !setup.complete ? <SetupProgress progress={setup} links title="Finish setting up" /> : null}
 
       <div className="page-head">
         <div>
