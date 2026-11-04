@@ -432,7 +432,7 @@ export function createPlatformStaff({ name, email, password, phone, role }) {
     .prepare(
       `INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(cleanName, cleanEmail, cleanPhone || null, hash)
+    .run(cleanName, cleanEmail, cleanPhone || null, hash, cleanRole)
   return listPlatformStaff().find((u) => u.id === result.lastInsertRowid)
 }
 
