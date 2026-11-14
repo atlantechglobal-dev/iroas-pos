@@ -289,16 +289,25 @@ export async function updateUryMenuItem(tenant, rowId, changes = {}) {
     if (!Number.isFinite(price) || price <= 0 || price > MAX_PRICE) throw new MenuEditError('invalid_price', 'Enter a price greater than 0.')
     values.rate = Math.round(price * 100) / 100
   }
+  const itemValues = {}
   if (changes.name !== undefined) {
     const name = cleanName(changes.name, 140)
     if (!name) throw new MenuEditError('name_required', 'Enter an item name.')
+    // Written on both: the menu row (what getdoc-based reads show) and the
+    // Item master (what the POS register's getRestaurantMenu reads and
+    // overrides the row with — see alignMenuRows). Out of sync otherwise.
     values.item_name = name
+    itemValues.item_name = name
   }
   if (changes.course !== undefined) {
     values.course = cleanName(changes.course, 140)
   }
-  const hasDescription = changes.description !== undefined
-  if (!Object.keys(values).length && !hasDescription) throw new MenuEditError('nothing_to_update', 'Nothing to update.')
+  if (changes.description !== undefined) {
+    itemValues.description = cleanName(changes.description, 2000)
+  }
+  if (!Object.keys(values).length && !Object.keys(itemValues).length) {
+    throw new MenuEditError('nothing_to_update', 'Nothing to update.')
+  }
 
   const rowIdText = String(rowId || '')
   const { row } = await findMenuRow(tenant, rowIdText)
@@ -311,13 +320,9 @@ export async function updateUryMenuItem(tenant, rowId, changes = {}) {
       throw err
     }
   }
-  if (hasDescription && row.item) {
+  if (Object.keys(itemValues).length && row.item) {
     try {
-      await tenant.client.post('frappe.client.set_value', {
-        doctype: 'Item',
-        name: row.item,
-        fieldname: { description: cleanName(changes.description, 2000) },
-      })
+      await tenant.client.post('frappe.client.set_value', { doctype: 'Item', name: row.item, fieldname: itemValues })
     } catch (err) {
       if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
       throw err
