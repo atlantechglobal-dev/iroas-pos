@@ -625,7 +625,7 @@ export function TenantReviewDrawer({
                   </button>
                 )}
               </div>
-              {tenant.status === 'pending_approval' && isAccountApproval ? (
+              {tenant.status === 'pending_approval' && isAccountApproval && mayApprove ? (
                 <div className="tenant-review-footer-right">
                   <button type="button" onClick={() => setRejectOpen(true)}>
                     Reject
