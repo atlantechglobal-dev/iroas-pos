@@ -130,6 +130,8 @@ function RestaurantProfile() {
   const [email, setEmail] = useState('hello@saffronandfig.in')
   const [website, setWebsite] = useState('saffronandfig.in')
   const [hours, setHours] = useState(defaultHours)
+  const [exceptions, setExceptions] = useState([])
+  const [newExceptionDate, setNewExceptionDate] = useState('')
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [lastOrderCutoff, setLastOrderCutoff] = useState('22:45')
   const [pauseOrders, setPauseOrders] = useState(false)
@@ -212,6 +214,14 @@ function RestaurantProfile() {
             setHours(parsedHours)
           } catch {
             // keep defaults
+          }
+        }
+        if (restaurant.operating_exceptions) {
+          try {
+            const parsed = JSON.parse(restaurant.operating_exceptions)
+            if (Array.isArray(parsed)) setExceptions(parsed)
+          } catch {
+            // keep empty
           }
         }
 
@@ -373,6 +383,7 @@ function RestaurantProfile() {
         timezone,
         address,
         hours,
+        exceptions,
       })
       // Hours and contact are also written to your POS; tell the owner if that part failed.
       const posFailures = Object.values(profileRes?.posSync || {})
@@ -810,6 +821,61 @@ function RestaurantProfile() {
                     <small className="hint">
                       How many guests can be seated across overlapping reservation windows (default 40).
                     </small>
+                  </div>
+
+                  <div className="field" style={{ marginBottom: '16px' }}>
+                    <label>HOLIDAYS & ONE-OFF CLOSURES</label>
+                    <small className="hint">
+                      Override the weekly hours above for a single date — close the restaurant
+                      entirely, or set different hours just for that day.
+                    </small>
+                    <div className="exception-list">
+                      {exceptions.length === 0 ? (
+                        <p className="hint" style={{ margin: '8px 0' }}>No dates added yet.</p>
+                      ) : (
+                        exceptions.map((row) => (
+                          <div className="exception-row" key={row.date}>
+                            <strong>{row.date}</strong>
+                            <span>
+                              {row.closed
+                                ? `Closed${row.reason ? ` · ${row.reason}` : ''}`
+                                : `${row.open || '—'}–${row.close || '—'}`}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-icon-remove"
+                              aria-label={`Remove ${row.date}`}
+                              onClick={() => setExceptions((prev) => prev.filter((e) => e.date !== row.date))}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="exception-add-row">
+                      <input
+                        type="date"
+                        value={newExceptionDate}
+                        onChange={(e) => setNewExceptionDate(e.target.value)}
+                        aria-label="Date to close or override"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        disabled={!newExceptionDate}
+                        onClick={() => {
+                          if (!newExceptionDate) return
+                          setExceptions((prev) => [
+                            ...prev.filter((e) => e.date !== newExceptionDate),
+                            { date: newExceptionDate, closed: true, reason: '' },
+                          ])
+                          setNewExceptionDate('')
+                        }}
+                      >
+                        + Add closed day
+                      </button>
+                    </div>
                   </div>
 
                   <div className="field" style={{ marginBottom: '16px' }}>

@@ -4,6 +4,7 @@ import { db } from '../../infra/db.js'
 import {
   ACTIVE_STATUS_SQL,
   assertBookable,
+  parseExceptionsJson,
   bookingRules,
   listSlots,
   maxCoversFromSettings,
@@ -729,6 +730,7 @@ router.get('/:slug/availability', (req, res) => {
 
   const settings = parseSettings(restaurant)
   const hours = parseHoursJson(restaurant.operating_hours)
+  const exceptions = parseExceptionsJson(restaurant.operating_exceptions)
   const existing = db
     .prepare(
       `SELECT id, date, time, guests, status FROM reservations
@@ -742,6 +744,7 @@ router.get('/:slug/availability', (req, res) => {
     guests,
     existingRows: existing,
     maxCovers: maxCoversFromSettings(settings),
+    exceptions,
     ...bookingRules(restaurant, settings),
   })
 
@@ -777,6 +780,7 @@ router.post('/:slug/reservations', (req, res) => {
   const guestEmail = String(email || '').trim() || null
   const settings = parseSettings(restaurant)
   const hours = parseHoursJson(restaurant.operating_hours)
+  const exceptions = parseExceptionsJson(restaurant.operating_exceptions)
 
   let insertedId = null
   try {
@@ -795,6 +799,7 @@ router.post('/:slug/reservations', (req, res) => {
         guests: guestCount,
         existingRows: existing,
         maxCovers: maxCoversFromSettings(settings),
+        exceptions,
         ...bookingRules(restaurant, settings),
       })
       if (!check.ok) {

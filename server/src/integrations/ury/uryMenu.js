@@ -52,12 +52,14 @@ export function mapUryMenuToIroasMenu(menuDoc, itemInfo = new Map(), stockByCode
       id: row.name,
       code: row.item || '',
       name: row.item_name || row.item || '',
+      course: courseName,
       price: typeof row.rate === 'number' ? row.rate : null,
       available: enabled && inStock,
       onMenu: enabled,
       stockQty,
       special: row.special_dish === 1,
       image: info.image || null,
+      description: info.description || '',
     })
   }
   return categories
@@ -74,17 +76,22 @@ async function readCurrency(client, priceList) {
   }
 }
 
-/** Item image + disabled flag per item code. Missing permission leaves items without images. */
+/** Item image, description and disabled flag per item code. Missing permission leaves items without them. */
 async function readItemInfo(client, rows) {
   const codes = [...new Set(rows.map((r) => r.item).filter(Boolean))]
   if (!codes.length) return new Map()
   try {
     const items = await client.getList('Item', {
-      fields: ['name', 'image', 'disabled'],
+      fields: ['name', 'image', 'disabled', 'description'],
       filters: [['name', 'in', codes]],
       limit: codes.length,
     })
-    return new Map(items.map((it) => [it.name, { image: absoluteImageUrl(it.image), disabled: it.disabled }]))
+    return new Map(
+      items.map((it) => [
+        it.name,
+        { image: absoluteImageUrl(it.image), disabled: it.disabled, description: it.description || '' },
+      ]),
+    )
   } catch (err) {
     if (err instanceof UryError && err.code === 'forbidden') return new Map()
     throw err
@@ -233,9 +240,43 @@ export class MenuEditError extends Error {
 }
 
 /**
- * Updates availability and/or price of one row of the tenant's active URY menu.
- * The row must belong to the mapped restaurant's active menu; nothing else is writable.
- *   POST frappe.client.set_value { doctype: "URY Menu Item", name: <row>, fieldname: { disabled?, rate? } }
+ * Finds the menu row (and its parent URY Menu doc) for a given row id, searching
+ * the active menu first, then every other menu on the branch. Shared by
+ * updateUryMenuItem and removeUryMenuItem so both look a row up the same way.
+ */
+async function findMenuRow(tenant, rowIdText) {
+  const { menu } = await loadActiveMenuDoc(tenant)
+  let doc = menu
+  let row = menu?.items?.find((entry) => entry.name === rowIdText && entry.parent === menu.name)
+  if (!row) {
+    const menus = await branchMenus(tenant.client, tenant.branch)
+    for (const listed of menus) {
+      if (listed.name === menu?.name) continue
+      let listedDoc
+      try {
+        listedDoc = (await tenant.client.getDoc('URY Menu', listed.name)).docs[0]
+      } catch (err) {
+        if (err instanceof UryError && (err.code === 'not_found' || err.code === 'forbidden')) continue
+        throw err
+      }
+      const found = (listedDoc.items || []).find((entry) => entry.name === rowIdText && entry.parent === listed.name)
+      if (found) {
+        row = found
+        doc = listedDoc
+        break
+      }
+    }
+  }
+  if (!row) throw new MenuEditError('item_not_found', 'Menu item not found.', { status: 404 })
+  return { doc, row }
+}
+
+/**
+ * Updates one row of the tenant's active URY menu: availability, price, name,
+ * or course (all on the URY Menu Item row), plus the underlying Item's
+ * description (a separate doctype, so a separate write when changed).
+ *   POST frappe.client.set_value { doctype: "URY Menu Item", name: <row>, fieldname: {...} }
+ *   POST frappe.client.set_value { doctype: "Item", name: <item code>, fieldname: { description } }
  */
 export async function updateUryMenuItem(tenant, rowId, changes = {}) {
   const values = {}
@@ -248,30 +289,76 @@ export async function updateUryMenuItem(tenant, rowId, changes = {}) {
     if (!Number.isFinite(price) || price <= 0 || price > MAX_PRICE) throw new MenuEditError('invalid_price', 'Enter a price greater than 0.')
     values.rate = Math.round(price * 100) / 100
   }
-  if (!Object.keys(values).length) throw new MenuEditError('nothing_to_update', 'Nothing to update.')
+  if (changes.name !== undefined) {
+    const name = cleanName(changes.name, 140)
+    if (!name) throw new MenuEditError('name_required', 'Enter an item name.')
+    values.item_name = name
+  }
+  if (changes.course !== undefined) {
+    values.course = cleanName(changes.course, 140)
+  }
+  const hasDescription = changes.description !== undefined
+  if (!Object.keys(values).length && !hasDescription) throw new MenuEditError('nothing_to_update', 'Nothing to update.')
 
   const rowIdText = String(rowId || '')
-  const { menu } = await loadActiveMenuDoc(tenant)
-  let row = menu?.items?.find((entry) => entry.name === rowIdText && entry.parent === menu.name)
-  if (!row) {
-    const menus = await branchMenus(tenant.client, tenant.branch)
-    for (const listed of menus) {
-      if (listed.name === menu?.name) continue
-      let doc
-      try {
-        doc = (await tenant.client.getDoc('URY Menu', listed.name)).docs[0]
-      } catch (err) {
-        if (err instanceof UryError && (err.code === 'not_found' || err.code === 'forbidden')) continue
-        throw err
-      }
-      row = (doc.items || []).find((entry) => entry.name === rowIdText && entry.parent === listed.name)
-      if (row) break
+  const { row } = await findMenuRow(tenant, rowIdText)
+
+  if (Object.keys(values).length) {
+    try {
+      await tenant.client.post('frappe.client.set_value', { doctype: row.doctype || 'URY Menu Item', name: row.name, fieldname: values })
+    } catch (err) {
+      if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
+      throw err
     }
   }
-  if (!row) throw new MenuEditError('item_not_found', 'Menu item not found.', { status: 404 })
+  if (hasDescription && row.item) {
+    try {
+      await tenant.client.post('frappe.client.set_value', {
+        doctype: 'Item',
+        name: row.item,
+        fieldname: { description: cleanName(changes.description, 2000) },
+      })
+    } catch (err) {
+      if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
+      throw err
+    }
+  }
+  clearUryMenuCache()
+  return getUryMenu(tenant)
+}
 
+/**
+ * Removes one row from its menu. Only the URY Menu Item child row is
+ * removed — the underlying Item (and any order history referencing it)
+ * is untouched, same as how the URY desk menu screen deletes a row.
+ */
+export async function removeUryMenuItem(tenant, rowId) {
+  const rowIdText = String(rowId || '')
+  const { doc } = await findMenuRow(tenant, rowIdText)
+  const nextDoc = { ...doc, items: (doc.items || []).filter((entry) => entry.name !== rowIdText), doctype: 'URY Menu' }
   try {
-    await tenant.client.post('frappe.client.set_value', { doctype: row.doctype || 'URY Menu Item', name: row.name, fieldname: values })
+    await tenant.client.post('frappe.client.save', { doc: nextDoc })
+  } catch (err) {
+    if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
+    throw err
+  }
+  clearUryMenuCache()
+  return getUryMenu(tenant)
+}
+
+/** Switches the restaurant's active menu to an existing URY Menu on this branch. */
+export async function setActiveUryMenu(tenant, menuName) {
+  const name = cleanName(menuName, 140)
+  if (!name) throw new MenuEditError('menu_required', 'Choose a menu.')
+  const menus = await branchMenus(tenant.client, tenant.branch)
+  if (!menus.some((row) => row.name === name)) throw new MenuEditError('menu_not_found', 'Menu not found.', { status: 404 })
+  try {
+    await tenant.client.post('frappe.client.set_value', {
+      doctype: 'URY Restaurant',
+      name: tenant.uryRestaurant,
+      fieldname: 'active_menu',
+      value: name,
+    })
   } catch (err) {
     if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
     throw err
@@ -324,6 +411,7 @@ async function readMenuCatalog(client, branch, knownDocs = new Map()) {
   for (const item of items) {
     const info = itemInfo.get(item.code) || {}
     if (!item.image && info.image) item.image = info.image
+    item.description = info.description || ''
     if (info.disabled === 1) {
       item.onMenu = false
       item.available = false
@@ -568,6 +656,7 @@ export async function createUryMenuItem(tenant, input = {}) {
   const menuName = cleanName(input.menu, 140)
   const itemName = cleanName(input.name, 140)
   const course = cleanName(input.course, 140)
+  const description = cleanName(input.description, 2000)
   const rate = Number(input.rate)
   if (!menuName) throw new MenuEditError('menu_required', 'Choose a menu.')
   if (!itemName) throw new MenuEditError('name_required', 'Enter an item name.')
@@ -593,6 +682,7 @@ export async function createUryMenuItem(tenant, input = {}) {
         is_stock_item: 1,
         standard_rate: Math.round(rate * 100) / 100,
         ...(imageUrl ? { image: imageUrl } : {}),
+        ...(description ? { description } : {}),
       },
     })
   } catch (err) {

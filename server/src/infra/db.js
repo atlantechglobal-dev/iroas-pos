@@ -150,6 +150,9 @@ if (!restaurantColumns.some((col) => col.name === 'domain_suffix')) {
 if (!restaurantColumns.some((col) => col.name === 'submitted_at')) {
   db.exec('ALTER TABLE restaurants ADD COLUMN submitted_at TEXT')
 }
+if (!restaurantColumns.some((col) => col.name === 'operating_exceptions')) {
+  db.exec('ALTER TABLE restaurants ADD COLUMN operating_exceptions TEXT')
+}
 
 const userColumns = db.prepare('PRAGMA table_info(users)').all()
 if (!userColumns.some((col) => col.name === 'google_id')) {

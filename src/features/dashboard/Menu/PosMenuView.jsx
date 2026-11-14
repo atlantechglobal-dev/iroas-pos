@@ -20,13 +20,17 @@ function formatFetchedAt(iso) {
 
 const FILTERS = ['All', 'Available', 'Unavailable', 'Special']
 
-function PosItemRow({ item, currency, onSaved }) {
+function PosItemRow({ item, currency, courses, onSaved }) {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
   const [price, setPrice] = useState('')
+  const [name, setName] = useState('')
+  const [course, setCourse] = useState('')
+  const [description, setDescription] = useState('')
   const [stocking, setStocking] = useState(false)
   const [stockQty, setStockQty] = useState('')
+  const [removing, setRemoving] = useState(false)
 
   const addStock = async (event) => {
     event.preventDefault()
@@ -63,14 +67,36 @@ function PosItemRow({ item, currency, onSaved }) {
     }
   }
 
-  const submitPrice = (event) => {
+  const submitDetails = (event) => {
     event.preventDefault()
     const value = Number(price)
     if (!(value > 0)) {
       toast.error('Enter a price greater than 0.')
       return
     }
-    save({ price: value }, `${item.name} price updated in your POS.`)
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      toast.error('Enter an item name.')
+      return
+    }
+    save(
+      { price: value, name: trimmedName, course, description: description.trim() },
+      `${trimmedName} updated in your POS.`,
+    )
+  }
+
+  const removeItem = async () => {
+    setBusy(true)
+    try {
+      const res = await api.deletePosMenuItem(item.id)
+      onSaved(res?.data || null)
+      toast.success(`${item.name} removed from your POS menu.`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not remove the item. Nothing was changed.')
+    } finally {
+      setBusy(false)
+      setRemoving(false)
+    }
   }
 
   return (
@@ -120,7 +146,23 @@ function PosItemRow({ item, currency, onSaved }) {
           </button>
         </form>
       ) : editing ? (
-        <form className="pos-price-form" onSubmit={submitPrice}>
+        <form className="pos-price-form pos-details-form" onSubmit={submitDetails}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            aria-label={`Name for ${item.name}`}
+            placeholder="Item name"
+            autoFocus
+          />
+          <select value={course} onChange={(e) => setCourse(e.target.value)} aria-label={`Course for ${item.name}`}>
+            <option value="">No course</option>
+            {courses.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
           <input
             type="number"
             min="0.01"
@@ -128,32 +170,58 @@ function PosItemRow({ item, currency, onSaved }) {
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             aria-label={`New price for ${item.name}`}
-            autoFocus
           />
-          <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
-            Save
-          </button>
-          <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => setEditing(false)}>
-            Cancel
-          </button>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            aria-label={`Description for ${item.name}`}
+            placeholder="Description (optional)"
+            rows={2}
+          />
+          <div className="pos-details-form-actions">
+            <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
+              Save
+            </button>
+            <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
         </form>
       ) : (
         <button
           type="button"
           className="pos-item-price pos-price-edit"
-          title="Change price in your POS"
+          title="Edit item details"
           disabled={busy}
           onClick={() => {
             setPrice(typeof item.price === 'number' ? String(item.price) : '')
+            setName(item.name || '')
+            setCourse(item.course || '')
+            setDescription(item.description || '')
             setEditing(true)
           }}
         >
           {formatPosPrice(item.price, currency)}
         </button>
       )}
-      {!stocking && !editing ? (
+      {!stocking && !editing && !removing ? (
         <button type="button" className="btn btn-outline btn-sm pos-stock-btn" disabled={busy} onClick={() => setStocking(true)}>
           + Stock
+        </button>
+      ) : null}
+      {removing ? (
+        <div className="pos-remove-confirm">
+          <span>Remove?</span>
+          <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={removeItem}>
+            Yes
+          </button>
+          <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => setRemoving(false)}>
+            Cancel
+          </button>
+        </div>
+      ) : !stocking && !editing ? (
+        <button type="button" className="btn btn-outline btn-sm pos-remove-btn" disabled={busy} onClick={() => setRemoving(true)}>
+          Remove
         </button>
       ) : null}
     </div>
@@ -161,12 +229,27 @@ function PosItemRow({ item, currency, onSaved }) {
 }
 
 function PosMenuView({ posMenu }) {
+  const toast = useToast()
   const { status, data, reload, replaceData } = posMenu
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
   const [menuName, setMenuName] = useState('')
   const [courseName, setCourseName] = useState('')
   const [layout, setLayout] = useState('list')
+  const [activating, setActivating] = useState(false)
+
+  const activateMenu = async () => {
+    setActivating(true)
+    try {
+      const res = await api.setActivePosMenu(menuName)
+      replaceData(res?.data || null)
+      toast.success(`${menuName} is now the active menu in your POS.`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not switch the active menu.')
+    } finally {
+      setActivating(false)
+    }
+  }
 
   const categories = useMemo(() => data?.categories || [], [data])
   const catalogItems = useMemo(() => {
@@ -278,6 +361,11 @@ function PosMenuView({ posMenu }) {
               ))}
             </select>
           </label>
+          {menuName && menuName !== data?.menu?.name ? (
+            <button type="button" className="btn btn-outline btn-sm" disabled={activating} onClick={activateMenu}>
+              {activating ? 'Switching…' : `Make "${menuName}" active`}
+            </button>
+          ) : null}
           <label className="pos-select">
             <select aria-label="Course" value={courseName} onChange={(event) => setCourseName(event.target.value)}>
               <option value="">All Courses</option>
@@ -360,6 +448,7 @@ function PosMenuView({ posMenu }) {
                 key={`${item.menu}-${item.id}`}
                 item={item}
                 currency={data.currency}
+                courses={courses}
                 onSaved={(next) => (next ? replaceData(next) : reload())}
               />
             ))

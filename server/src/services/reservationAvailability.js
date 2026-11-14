@@ -46,6 +46,45 @@ export function parseHoursJson(raw) {
   }
 }
 
+/** One-off closure/custom-hours dates, stored separately from the weekly hours. */
+export function parseExceptionsJson(raw) {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function exceptionForDate(exceptions, dateStr) {
+  if (!Array.isArray(exceptions) || !dateStr) return null
+  return exceptions.find((row) => String(row?.date || '') === String(dateStr)) || null
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Keeps only well-formed, de-duplicated exception rows (one per date, newest write wins). */
+export function normalizeExceptions(list) {
+  if (!Array.isArray(list)) return []
+  const byDate = new Map()
+  for (const row of list) {
+    const date = String(row?.date || '').trim()
+    if (!DATE_RE.test(date)) continue
+    const closed = Boolean(row?.closed)
+    const entry = { date, closed, reason: String(row?.reason || '').trim().slice(0, 200) }
+    if (!closed) {
+      const open = normalizeDayHours({ open: row?.open, close: row?.close })
+      entry.open = open.open || ''
+      entry.close = open.close || ''
+      if (!entry.open || !entry.close) continue
+    }
+    byDate.set(date, entry)
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
 export function maxCoversFromSettings(settings) {
   const n = Number(settings?.reservationMaxCovers)
   if (Number.isFinite(n) && n > 0) return Math.floor(n)
@@ -245,13 +284,24 @@ export function listSlots({
   timezone = '',
   advanceDays = DEFAULT_ADVANCE_DAYS,
   now = new Date(),
+  exceptions = [],
 }) {
   const party = Math.max(1, Math.min(20, Number(guests) || 2))
   const dateProblem = checkBookingDate(date, { timezone, advanceDays, now })
   if (dateProblem && !(includePast && dateProblem.error === 'That date has already passed.')) {
     return { slots: [], closed: true, reason: dateProblem.error }
   }
-  const day = dayRowForDate(hours, date)
+
+  const exception = exceptionForDate(exceptions, date)
+  let day
+  if (exception) {
+    if (exception.closed) {
+      return { slots: [], closed: true, reason: exception.reason || 'Closed for a holiday.' }
+    }
+    day = { open: exception.open, close: exception.close }
+  } else {
+    day = dayRowForDate(hours, date)
+  }
 
   if (!day) {
     return { slots: [], closed: true, reason: 'No opening hours set for this day.' }
@@ -330,6 +380,7 @@ export function assertBookable({
   timezone = '',
   advanceDays = DEFAULT_ADVANCE_DAYS,
   now = new Date(),
+  exceptions = [],
 }) {
   if (!date || !time) {
     return { ok: false, status: 400, error: 'Date and time are required.' }
@@ -364,6 +415,7 @@ export function assertBookable({
     timezone,
     advanceDays,
     now,
+    exceptions,
   })
 
   if (closed) {

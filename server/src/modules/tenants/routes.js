@@ -7,6 +7,8 @@ import {
   ACTIVE_STATUS_SQL,
   RESERVATION_STATUSES,
   assertBookable,
+  normalizeExceptions,
+  parseExceptionsJson,
   checkStatusChange,
   zonedNow,
   bookingRules,
@@ -53,7 +55,7 @@ import {
 import { UryError } from '../../integrations/ury/uryClient.js'
 import { IntegrationError, invalidateUryTenant, resolveUryTenant } from '../../integrations/ury/uryTenant.js'
 import { TableEditError, createUryTable, getUryTableOptions, listUryTables } from '../../integrations/ury/uryTables.js'
-import { MenuEditError, addUryItemStock, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
+import { MenuEditError, addUryItemStock, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, removeUryMenuItem, setActiveUryMenu, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
 import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
 import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
 import { buildDashboardSummary } from '../../services/dashboardSummary.js'
@@ -120,13 +122,14 @@ router.put('/profile', async (req, res) => {
     timezone,
     address,
     hours,
+    exceptions,
   } = req.body || {}
 
   db.prepare(
     `UPDATE restaurants
      SET name = ?, cuisine = ?, description = ?, phone = ?, website = ?, email = ?,
          city = ?, country = ?, timezone = ?, address = ?,
-         operating_hours = ?, updated_at = datetime('now')
+         operating_hours = ?, operating_exceptions = ?, updated_at = datetime('now')
      WHERE id = ?`,
   ).run(
     restaurantName ?? restaurant.name,
@@ -142,6 +145,9 @@ router.put('/profile', async (req, res) => {
     hours
       ? JSON.stringify(normalizeOperatingHours(hours))
       : restaurant.operating_hours,
+    exceptions
+      ? JSON.stringify(normalizeExceptions(exceptions))
+      : restaurant.operating_exceptions,
     restaurant.id,
   )
 
@@ -638,6 +644,7 @@ router.get('/availability', (req, res) => {
 
   const settings = parseSettings(restaurant)
   const hours = parseHoursJson(restaurant.operating_hours)
+  const exceptions = parseExceptionsJson(restaurant.operating_exceptions)
   const existing = db
     .prepare(
       `SELECT id, date, time, guests, status FROM reservations
@@ -655,6 +662,7 @@ router.get('/availability', (req, res) => {
     existingRows: existing,
     maxCovers: maxCoversFromSettings(settings),
     includePast,
+    exceptions,
     ...bookingRules(restaurant, settings),
   })
 
@@ -683,6 +691,7 @@ router.post('/reservations', (req, res) => {
   const guestEmail = String(email || '').trim() || null
   const settings = parseSettings(restaurant)
   const hours = parseHoursJson(restaurant.operating_hours)
+  const exceptions = parseExceptionsJson(restaurant.operating_exceptions)
   const desiredStatus = ['pending', 'confirmed', 'cancelled'].includes(status)
     ? status
     : 'confirmed'
@@ -704,6 +713,7 @@ router.post('/reservations', (req, res) => {
         guests: guestCount,
         existingRows: existing,
         maxCovers: maxCoversFromSettings(settings),
+        exceptions,
         ...bookingRules(restaurant, settings),
       })
       if (!check.ok) {
@@ -813,6 +823,7 @@ router.patch('/reservations/:id', (req, res) => {
       if (needsCapacityCheck) {
         const settings = parseSettings(restaurant)
         const hours = parseHoursJson(restaurant.operating_hours)
+  const exceptions = parseExceptionsJson(restaurant.operating_exceptions)
         const existing = db
           .prepare(
             `SELECT id, date, time, guests, status FROM reservations
@@ -828,6 +839,7 @@ router.patch('/reservations/:id', (req, res) => {
           existingRows: existing,
           maxCovers: maxCoversFromSettings(settings),
           excludeReservationId: row.id,
+          exceptions,
           ...bookingRules(restaurant, settings),
         })
         if (!check.ok) {
@@ -1151,8 +1163,8 @@ router.patch('/pos-menu/items/:id', async (req, res) => {
   if (!restaurant) return
   try {
     const tenant = await resolveUryTenant(restaurant.id)
-    const { available, price } = req.body || {}
-    const data = await updateUryMenuItem(tenant, req.params.id, { available, price })
+    const { available, price, name, course, description } = req.body || {}
+    const data = await updateUryMenuItem(tenant, req.params.id, { available, price, name, course, description })
     console.info(`[pos-menu:update] restaurant=${restaurant.id} row=${req.params.id}`)
     res.json({ success: true, data })
   } catch (err) {
@@ -1163,6 +1175,46 @@ router.patch('/pos-menu/items/:id', async (req, res) => {
       label: 'pos-menu:update',
       restaurantId: restaurant.id,
       unavailableMessage: 'Could not reach the POS. The menu was not changed. Please try again.',
+    })
+  }
+})
+
+router.delete('/pos-menu/items/:id', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await removeUryMenuItem(tenant, req.params.id)
+    console.info(`[pos-menu:delete] restaurant=${restaurant.id} row=${req.params.id}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) {
+      return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    }
+    sendPosError(res, err, {
+      label: 'pos-menu:delete',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not reach the POS. The item was not removed. Please try again.',
+    })
+  }
+})
+
+router.post('/pos-menu/active', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const data = await setActiveUryMenu(tenant, req.body?.menu)
+    console.info(`[pos-menu:activate] restaurant=${restaurant.id} menu=${req.body?.menu || ''}`)
+    res.json({ success: true, data })
+  } catch (err) {
+    if (err instanceof MenuEditError) {
+      return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    }
+    sendPosError(res, err, {
+      label: 'pos-menu:activate',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not reach the POS. The active menu was not changed. Please try again.',
     })
   }
 })

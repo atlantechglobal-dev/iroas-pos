@@ -452,6 +452,13 @@
   .pos-price-form { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
   .pos-price-form input { width: 90px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
   .pos-item-row:has(.pos-price-form) { grid-template-columns: minmax(0, 1.4fr) 140px auto auto; }
+  .pos-item-row:has(.pos-remove-btn) { grid-template-columns: minmax(0, 1.4fr) 140px auto 110px auto auto; }
+  .pos-details-form { grid-column: 1 / -1; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px; margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: #fafaf8; }
+  .pos-details-form input, .pos-details-form select, .pos-details-form textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+  .pos-details-form textarea { resize: vertical; }
+  .pos-details-form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .pos-remove-confirm { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .pos-remove-btn { white-space: nowrap; }
 
   @media (max-width: 1200px) {
     .category-grid { grid-template-columns: repeat(2, 1fr); }
@@ -465,7 +472,7 @@
     .page-head { flex-direction: column; align-items: stretch; }
     .head-actions .btn { flex: 1; justify-content: center; }
     .toolbar { flex-direction: column; align-items: stretch; }
-    .pos-item-row, .pos-item-head, .pos-item-row:has(.pos-price-form) { grid-template-columns: 1fr auto; }
+    .pos-item-row, .pos-item-head, .pos-item-row:has(.pos-price-form), .pos-item-row:has(.pos-remove-btn) { grid-template-columns: 1fr auto; }
     .pos-item-head span:nth-child(2), .pos-course-pill { grid-column: 1 / -1; justify-self: start; }
     .pos-item-grid { grid-template-columns: 1fr; }
     .pos-item-price, .pos-price-form { grid-column: 1 / -1; text-align: left; justify-content: flex-start; }
