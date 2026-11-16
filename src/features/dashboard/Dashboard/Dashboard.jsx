@@ -175,7 +175,7 @@ function Dashboard() {
       ) : null}
 
       <HorizontalDragScroll className="stat-cards">
-        <div className="stat-card">
+        <button type="button" className="stat-card" onClick={() => navigate(ROUTES.ORDERS)}>
           <div className="stat-top">
             <span className="stat-ico">R</span>
             {trend == null ? <span className="trend up">Live</span> : <span className={`trend ${trend >= 0 ? 'up' : 'down'}`}>{trend >= 0 ? '↗ +' : '↘ '}{trend}%</span>}
@@ -183,9 +183,9 @@ function Dashboard() {
           <div className="stat-number">{data ? formatMoney(data.today.revenue, currency) : '—'}</div>
           <p className="stat-sub">Revenue today</p>
           <p className="stat-foot">{data ? `vs. yesterday ${formatMoney(data.yesterday.revenue, currency)}` : ' '}</p>
-        </div>
+        </button>
 
-        <div className="stat-card">
+        <button type="button" className="stat-card" onClick={() => navigate(ROUTES.ORDERS)}>
           <div className="stat-top">
             <span className="stat-ico">🧾</span>
             <span className="trend up">Live</span>
@@ -195,9 +195,9 @@ function Dashboard() {
           <p className="stat-foot">
             {data ? `${data.today.paidOrders} paid · ${data.today.openOrders} open (${formatMoney(data.today.openValue, currency)})` : ' '}
           </p>
-        </div>
+        </button>
 
-        <div className="stat-card">
+        <button type="button" className="stat-card" onClick={() => navigate(ROUTES.RESERVATIONS)}>
           <div className="stat-top">
             <span className="stat-ico">👥</span>
             <span className="trend up">Live</span>
@@ -205,9 +205,9 @@ function Dashboard() {
           <div className="stat-number">{activeReservationCount == null ? '—' : activeReservationCount}</div>
           <p className="stat-sub">Active reservations</p>
           <p className="stat-foot">{arrivingSoonCount} arriving in next hour</p>
-        </div>
+        </button>
 
-        <div className="stat-card">
+        <button type="button" className="stat-card" onClick={() => navigate(ROUTES.TABLES)}>
           <div className="stat-top">
             <span className="stat-ico">⏱</span>
             <span className="trend up">{data?.tables.total ? `${Math.round((data.tables.occupied / data.tables.total) * 100)}%` : 'Live'}</span>
@@ -215,9 +215,9 @@ function Dashboard() {
           <div className="stat-number">{data ? `${data.tables.occupied} / ${data.tables.total}` : '—'}</div>
           <p className="stat-sub">Tables occupied</p>
           <p className="stat-foot">{data ? `${data.tables.seats} seats` : ' '}</p>
-        </div>
+        </button>
 
-        <div className="stat-card">
+        <button type="button" className="stat-card" onClick={() => navigate(ROUTES.ORDERS)}>
           <div className="stat-top">
             <span className="stat-ico">💳</span>
             <span className="trend up">Live</span>
@@ -225,7 +225,7 @@ function Dashboard() {
           <div className="stat-number">{data ? formatMoney(data.today.avgOrder, currency) : '—'}</div>
           <p className="stat-sub">Avg. order value</p>
           <p className="stat-foot">Paid orders today</p>
-        </div>
+        </button>
       </HorizontalDragScroll>
 
       <div className="chart-row">

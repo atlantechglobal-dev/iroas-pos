@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { api } from '@/shared/lib/api'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import PosOrderSheet from '@/features/dashboard/Orders/PosOrderSheet'
+import { HorizontalDragScroll } from '@/shared/ui/HorizontalDragScroll'
 
 /** Payment lane — mirrors URY POS Orders tabs. */
 const PAYMENT_COLUMNS = [
@@ -182,7 +183,7 @@ function PosOrdersBoard({ posOrders, filterMode }) {
         <p className="pos-orders-note">No orders have been placed in your POS yet. New POS orders appear here automatically.</p>
       ) : null}
 
-      <div className="board">
+      <HorizontalDragScroll className="board">
         {columns.map((col) => (
           <div className="board-col" key={col.key}>
             <div className="col-head">
@@ -257,7 +258,7 @@ function PosOrdersBoard({ posOrders, filterMode }) {
             </div>
           </div>
         ))}
-      </div>
+      </HorizontalDragScroll>
       {openId ? (
         <PosOrderSheet
           invoiceId={openId}

@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
-import { HorizontalDragScroll } from '@/shared/ui/HorizontalDragScroll'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { TenantReviewDrawer } from '@/shared/ui/admin/TenantReviewDrawer'
@@ -232,7 +231,7 @@ function PlatformAdmin() {
         </div>
       </div>
 
-      <HorizontalDragScroll className="stat-cards">
+      <div className="stat-cards">
         <Link
           className="stat-card is-clickable"
           to={`${ROUTES.PLATFORM_CUSTOMERS}?status=live`}
@@ -290,7 +289,7 @@ function PlatformAdmin() {
           <p className="stat-sub">Rejected</p>
           <p className="stat-foot">Need owner changes</p>
         </Link>
-      </HorizontalDragScroll>
+      </div>
 
       <div className="two-col-row">
         <section className="card is-hoverable">

@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
-import { ROUTES } from '@/shared/constants/routes'
 import '@/features/dashboard/Settings/EmailSettings.css'
 import '@/features/dashboard/Settings/PaymentSettings.css'
 
@@ -138,9 +136,6 @@ function PaymentSettings() {
       <div className="es-page">
       <div className="es-page-head">
         <div className="es-page-head-main">
-          <Link className="es-back" to={ROUTES.PLATFORM_SETTINGS}>
-            ← Platform settings
-          </Link>
           <p className="eyebrow">Platform</p>
           <h1>Payment settings</h1>
           <p className="page-desc">

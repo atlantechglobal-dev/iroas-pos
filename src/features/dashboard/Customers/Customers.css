@@ -22,9 +22,10 @@
   }
 
   .stat-cards {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
     gap: 12px;
+    width: 100%;
     margin-bottom: 16px;
   }
 
@@ -33,6 +34,21 @@
     border: 1px solid #eceae4;
     border-radius: 14px;
     padding: 14px 16px;
+    flex: 1 1 0;
+    min-width: 180px;
+    box-sizing: border-box;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .stat-card:hover,
+  .stat-card.is-on {
+    background: #f7fbf1;
+    border-color: color-mix(in srgb, #8bc53f 55%, #eceae4);
+    box-shadow: 0 8px 18px rgba(30, 25, 15, 0.06);
   }
 
   .stat-card span {

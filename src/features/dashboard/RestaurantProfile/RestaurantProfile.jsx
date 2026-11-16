@@ -428,8 +428,6 @@ function RestaurantProfile() {
     }
   }
 
-  const handleSave = () => saveProfile({ markTab: activeTab, goNext: false })
-
   const handleSaveAndContinue = () => saveProfile({ markTab: activeTab, goNext: true })
 
   const tabActions = (
@@ -460,9 +458,6 @@ function RestaurantProfile() {
                 </p>
               </div>
 
-              <button className="btn-save" type="button" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
             </div>
 
             {/* SETUP PROGRESS */}

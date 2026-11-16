@@ -133,7 +133,9 @@
 .business-card-page .dbc-preview {
   min-width: 0;
   position: sticky;
-  top: 16px;
+  top: calc(var(--topbar-height, 96px) + 12px);
+  align-self: start;
+  z-index: 2;
 }
 
 .business-card-page .preview-label {
@@ -271,11 +273,24 @@
   cursor: pointer;
   font-family: inherit;
   color: inherit;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.business-card-page .layout-opt:hover {
+  background: #f7fbf1;
+  border-color: color-mix(in srgb, var(--lime) 55%, var(--line));
+  box-shadow: 0 8px 18px rgba(30, 25, 15, 0.06);
 }
 
 .business-card-page .layout-opt.selected {
   border-color: var(--lime);
   box-shadow: 0 0 0 1px var(--lime) inset;
+}
+
+.business-card-page .layout-opt.selected:hover {
+  background: #f7fbf1;
+  border-color: var(--lime);
+  box-shadow: 0 0 0 1px var(--lime) inset, 0 8px 18px rgba(30, 25, 15, 0.06);
 }
 
 .business-card-page .layout-thumb {

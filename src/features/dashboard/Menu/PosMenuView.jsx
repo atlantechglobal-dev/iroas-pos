@@ -25,29 +25,6 @@ function PosItemRow({ item, currency, onSaved }) {
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
   const [price, setPrice] = useState('')
-  const [stocking, setStocking] = useState(false)
-  const [stockQty, setStockQty] = useState('')
-
-  const addStock = async (event) => {
-    event.preventDefault()
-    const value = Number(stockQty)
-    if (!(value > 0)) {
-      toast.error('Enter how many to add.')
-      return
-    }
-    setBusy(true)
-    try {
-      const res = await api.addPosItemStock(item.code, value)
-      onSaved(res?.data || null)
-      toast.success(`${value} added to ${item.name}.`)
-      setStocking(false)
-      setStockQty('')
-    } catch (err) {
-      toast.error(err?.message || 'Could not add stock.')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const save = async (changes, message) => {
     setBusy(true)
@@ -101,25 +78,7 @@ function PosItemRow({ item, currency, onSaved }) {
             ? 'Not available today'
             : 'Unavailable'}
       </button>
-      {stocking ? (
-        <form className="pos-price-form" onSubmit={addStock}>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            value={stockQty}
-            onChange={(e) => setStockQty(e.target.value)}
-            aria-label={`Stock to add for ${item.name}`}
-            autoFocus
-          />
-          <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
-            Add
-          </button>
-          <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => setStocking(false)}>
-            Cancel
-          </button>
-        </form>
-      ) : editing ? (
+      {editing ? (
         <form className="pos-price-form" onSubmit={submitPrice}>
           <input
             type="number"
@@ -151,10 +110,33 @@ function PosItemRow({ item, currency, onSaved }) {
           {formatPosPrice(item.price, currency)}
         </button>
       )}
-      {!stocking && !editing ? (
-        <button type="button" className="btn btn-outline btn-sm pos-stock-btn" disabled={busy} onClick={() => setStocking(true)}>
-          + Stock
-        </button>
+      {!editing ? (
+        <div className="pos-item-actions">
+          <button
+            type="button"
+            className="btn btn-outline btn-sm pos-delete-btn"
+            disabled={busy}
+            onClick={async () => {
+              if (!window.confirm(`Delete ${item.name} from the menu?`)) return
+              setBusy(true)
+              try {
+                const res = await api.deletePosMenuItem(item.id)
+                onSaved(res?.data || null)
+                toast.success(
+                  res?.outcome === 'disabled'
+                    ? `${item.name} was removed from the menu. It is already on an invoice, so the POS disabled it instead of deleting it.`
+                    : `${item.name} was deleted.`,
+                )
+              } catch (err) {
+                toast.error(err?.message || 'Could not delete the menu item.')
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            Delete
+          </button>
+        </div>
       ) : null}
     </div>
   )

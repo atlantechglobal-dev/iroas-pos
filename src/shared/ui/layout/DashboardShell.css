@@ -60,6 +60,7 @@
   position: sticky;
   top: 16px;
   align-self: flex-start;
+  z-index: 30;
 }
 
 .dashboard-shell .sidebar-header {
@@ -155,9 +156,12 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: #d9d5c9 transparent;
+  padding-right: 2px;
 }
 
 .dashboard-shell .nav::-webkit-scrollbar {
@@ -219,12 +223,39 @@
 .dashboard-shell .nav-item.active::before {
   content: "";
   position: absolute;
-  left: -8px;
-  top: 6px;
-  bottom: 6px;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
   width: 3px;
   border-radius: 3px;
   background: var(--green);
+}
+
+.dashboard-shell .sidebar .restaurant-switch,
+.dashboard-shell .sidebar .nav-item,
+.dashboard-shell .sidebar .sidebar-close {
+  cursor: pointer;
+}
+
+.dashboard-shell .sidebar .nav-item img,
+.dashboard-shell .sidebar .nav-item span {
+  pointer-events: none;
+}
+
+.dashboard-shell .sidebar .nav-item.active {
+  background: #eaf5db;
+  color: #2f5310;
+  font-weight: 700;
+}
+
+.dashboard-shell .sidebar .nav-item.active::before {
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+}
+
+.dashboard-shell .sidebar .nav-item:hover:not(.active) {
+  background: #f6f4ef;
 }
 
 .dashboard-shell .badge {
@@ -244,10 +275,21 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
-.dashboard-shell .topbar {
+.dashboard-shell .app-navbar {
+  /* Keep the bar on the shell colors when a page redefines --green or --bg. */
+  --bg: #f7f6f2;
+  --panel: #ffffff;
+  --border: #ece8df;
+  --ink: #17171a;
+  --muted: #8b8b8f;
+  --muted-2: #b3b1a8;
+  --green: #8bc53f;
+  --green-dark: #6fa62a;
+  --green-soft: #eaf5db;
+  --green-text: #4c8a1a;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -260,7 +302,7 @@
   background: var(--bg);
 }
 
-.dashboard-shell .topbar-left {
+.dashboard-shell .app-navbar-start {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -281,7 +323,7 @@
   flex-shrink: 0;
 }
 
-.dashboard-shell .topbar .search-bar {
+.dashboard-shell .app-navbar .app-navbar-search {
   position: relative;
   display: flex;
   align-items: center;
@@ -315,19 +357,19 @@
   height: 18px;
 }
 
-.dashboard-shell .search-bar:focus-within,
-.dashboard-shell .search-bar.is-open {
+.dashboard-shell .app-navbar-search:focus-within,
+.dashboard-shell .app-navbar-search.is-open {
   border-color: #8bc53f;
   box-shadow: 0 0 0 3px rgba(139, 197, 63, 0.22);
   background: #fff;
 }
 
-.dashboard-shell .search-bar:focus-within .search-icon,
-.dashboard-shell .search-bar.is-open .search-icon {
+.dashboard-shell .app-navbar-search:focus-within .search-icon,
+.dashboard-shell .app-navbar-search.is-open .search-icon {
   color: #3f6212;
 }
 
-.dashboard-shell .search-bar input {
+.dashboard-shell .app-navbar-search input {
   border: none;
   outline: none;
   background: transparent;
@@ -342,15 +384,15 @@
   appearance: none;
 }
 
-.dashboard-shell .search-bar input[type='search']::-webkit-search-decoration,
-.dashboard-shell .search-bar input[type='search']::-webkit-search-cancel-button,
-.dashboard-shell .search-bar input[type='search']::-webkit-search-results-button {
+.dashboard-shell .app-navbar-search input[type='search']::-webkit-search-decoration,
+.dashboard-shell .app-navbar-search input[type='search']::-webkit-search-cancel-button,
+.dashboard-shell .app-navbar-search input[type='search']::-webkit-search-results-button {
   -webkit-appearance: none;
   appearance: none;
   display: none;
 }
 
-.dashboard-shell .search-bar input::placeholder {
+.dashboard-shell .app-navbar-search input::placeholder {
   color: var(--muted-2);
 }
 
@@ -441,7 +483,7 @@
   outline: none;
 }
 
-.dashboard-shell .topbar-actions {
+.dashboard-shell .app-navbar-actions {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -574,7 +616,7 @@
   max-width: 100%;
 }
 
-.dashboard-shell .icon-btn {
+.dashboard-shell .app-navbar-icon {
   position: relative;
   width: 44px;
   height: 44px;
@@ -588,13 +630,13 @@
   cursor: pointer;
 }
 
-.dashboard-shell .icon-btn:hover,
-.dashboard-shell .icon-btn.is-open {
+.dashboard-shell .app-navbar-icon:hover,
+.dashboard-shell .app-navbar-icon.is-open {
   border-color: color-mix(in srgb, var(--green) 45%, var(--border));
   background: var(--green-soft);
 }
 
-.dashboard-shell .icon-btn .dot {
+.dashboard-shell .app-navbar-icon .dot {
   position: absolute;
   top: 9px;
   right: 10px;
@@ -804,11 +846,11 @@
   background: #fcfef8;
 }
 
-.dashboard-shell .user-chip-wrapper {
+.dashboard-shell .app-navbar-user-wrap {
   position: relative;
 }
 
-.dashboard-shell .user-chip {
+.dashboard-shell .app-navbar-user {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -821,8 +863,8 @@
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.dashboard-shell .user-chip:hover,
-.dashboard-shell .user-chip[aria-expanded='true'] {
+.dashboard-shell .app-navbar-user:hover,
+.dashboard-shell .app-navbar-user[aria-expanded='true'] {
   background: #f6f8f1;
   border-color: color-mix(in srgb, var(--green) 45%, var(--border));
 }
@@ -869,7 +911,7 @@
   background: rgba(23, 23, 26, 0.45);
 }
 
-.dashboard-shell .profile-menu {
+.dashboard-shell .app-navbar-menu {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -885,7 +927,7 @@
   z-index: 210;
 }
 
-.dashboard-shell .profile-menu button {
+.dashboard-shell .app-navbar-menu button {
   text-align: left;
   background: none;
   border: none;
@@ -896,15 +938,15 @@
   color: var(--ink);
 }
 
-.dashboard-shell .profile-menu button:hover {
+.dashboard-shell .app-navbar-menu button:hover {
   background: var(--bg);
 }
 
-.dashboard-shell .profile-menu button.danger {
+.dashboard-shell .app-navbar-menu button.danger {
   color: var(--red);
 }
 
-.dashboard-shell .profile-menu button.danger:hover {
+.dashboard-shell .app-navbar-menu button.danger:hover {
   background: var(--red-soft);
 }
 
@@ -913,7 +955,7 @@
   flex: 1;
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .dashboard-shell .approval-gate {
@@ -963,6 +1005,36 @@
 }
 
 /* Shared shell buttons (used in topbar) */
+.dashboard-shell .app-navbar-quick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--green);
+  color: #16210a;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(139, 197, 63, 0.3);
+  cursor: pointer;
+}
+
+.dashboard-shell .app-navbar-quick:hover {
+  background: var(--green-dark);
+}
+
+.dashboard-shell .app-navbar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  background: rgba(23, 23, 26, 0.45);
+}
+
 .dashboard-shell .btn {
   display: inline-flex;
   align-items: center;
@@ -1013,12 +1085,12 @@
     --sidebar-width: 272px;
   }
 
-  .dashboard-shell .topbar {
+  .dashboard-shell .app-navbar {
     padding: 18px 20px 18px 10px;
   }
 
   .dashboard-shell .content {
-    padding: 0 20px 40px 10px;
+    padding: 0 24px 40px;
   }
 }
 
@@ -1029,12 +1101,12 @@
     --sidebar-width: 252px;
   }
 
-  .dashboard-shell .topbar {
+  .dashboard-shell .app-navbar {
     padding: 16px 20px 16px 8px;
   }
 
   .dashboard-shell .content {
-    padding: 0 20px 40px 8px;
+    padding: 0 20px 40px;
   }
 
   .dashboard-shell .quick-action-label {
@@ -1096,7 +1168,7 @@
     width: 100%;
   }
 
-  .dashboard-shell .topbar {
+  .dashboard-shell .app-navbar {
     padding: 12px 16px;
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -1109,8 +1181,8 @@
     padding-bottom: max(32px, env(safe-area-inset-bottom, 0px));
   }
 
-  .dashboard-shell .search-bar .kbd,
-  .dashboard-shell .search-bar .search-keys {
+  .dashboard-shell .app-navbar-search .kbd,
+  .dashboard-shell .app-navbar-search .search-keys {
     display: none;
   }
 
@@ -1118,7 +1190,7 @@
     display: none;
   }
 
-  .dashboard-shell .user-chip {
+  .dashboard-shell .app-navbar-user {
     padding-right: 8px;
   }
 
@@ -1153,31 +1225,31 @@
 }
 
 @media (max-width: 768px) {
-  .dashboard-shell .topbar {
+  .dashboard-shell .app-navbar {
     gap: 8px;
     flex-wrap: nowrap;
     flex-direction: row;
     align-items: center;
   }
 
-  .dashboard-shell .topbar-left {
+  .dashboard-shell .app-navbar-start {
     flex: 1 1 auto;
     min-width: 0;
     width: auto;
   }
 
-  .dashboard-shell .search-bar {
+  .dashboard-shell .app-navbar-search {
     flex: 1 1 0;
     min-width: 0;
     max-width: none;
     padding: 0 12px;
   }
 
-  .dashboard-shell .search-bar input {
+  .dashboard-shell .app-navbar-search input {
     font-size: 16px; /* avoids iOS zoom */
   }
 
-  .dashboard-shell .topbar-actions {
+  .dashboard-shell .app-navbar-actions {
     flex: 0 0 auto;
     width: auto;
     gap: 6px;
@@ -1188,14 +1260,14 @@
     display: none !important;
   }
 
-  .dashboard-shell .user-chip {
+  .dashboard-shell .app-navbar-user {
     padding: 4px;
     min-height: 40px;
     gap: 0;
   }
 
-  .dashboard-shell .user-chip .chev,
-  .dashboard-shell .user-chip svg:last-child {
+  .dashboard-shell .app-navbar-user .chev,
+  .dashboard-shell .app-navbar-user svg:last-child {
     display: none;
   }
 
@@ -1204,8 +1276,8 @@
     height: 32px;
   }
 
-  .dashboard-shell .icon-btn,
-  .dashboard-shell .topbar-actions .btn-primary {
+  .dashboard-shell .app-navbar-icon,
+  .dashboard-shell .app-navbar-quick {
     width: 40px;
     height: 40px;
     min-width: 40px;
@@ -1221,11 +1293,11 @@
 }
 
 @media (max-width: 640px) {
-  .dashboard-shell .topbar-actions .btn-primary {
+  .dashboard-shell .app-navbar-quick {
     padding: 0;
   }
 
-  .dashboard-shell .search-bar {
+  .dashboard-shell .app-navbar-search {
     max-width: none;
   }
 
@@ -1233,7 +1305,7 @@
     grid-template-columns: 1fr;
   }
 
-  .dashboard-shell .profile-menu {
+  .dashboard-shell .app-navbar-menu {
     right: 0;
     left: auto;
     min-width: min(200px, calc(100vw - 32px));
@@ -1246,7 +1318,7 @@
     padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
-  .dashboard-shell .topbar {
+  .dashboard-shell .app-navbar {
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
@@ -1256,4 +1328,86 @@
   .dashboard-shell .menu-overlay[data-sidebar-backdrop] {
     display: none;
   }
+}
+
+/* Restaurant pages share one top bar. Page CSS must not resize the search or the bar. */
+.dashboard-shell:not(.platform-admin-page) > .app > .main > .app-navbar,
+.dashboard-shell:not(.platform-admin-page) > .app > .main > .content {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+
+.dashboard-shell:not(.platform-admin-page) > .app > .main > .app-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 20px !important;
+  padding-bottom: 20px !important;
+  flex-wrap: nowrap;
+}
+
+.dashboard-shell:not(.platform-admin-page) > .app > .main > .app-navbar .app-navbar-search {
+  width: auto;
+  max-width: none;
+  flex: 1 1 auto;
+  height: 44px;
+  min-width: 0;
+  padding: 0 8px 0 16px;
+}
+
+.dashboard-shell:not(.platform-admin-page) > .app > .main > .app-navbar .app-navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin-left: 16px;
+}
+
+.dashboard-shell .app-navbar-quick {
+  transform: none;
+}
+
+.dashboard-shell .app-navbar-quick:hover {
+  transform: none;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-shell:not(.platform-admin-page) > .app > .main > .app-navbar,
+  .dashboard-shell:not(.platform-admin-page) > .app > .main > .content {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-shell:not(.platform-admin-page) > .app > .main > .app-navbar,
+  .dashboard-shell:not(.platform-admin-page) > .app > .main > .content {
+    padding-left: max(16px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(16px, env(safe-area-inset-right, 0px)) !important;
+  }
+}
+
+/* Same title-to-content gap on every restaurant page. */
+.dashboard-shell:not(.platform-admin-page) .page-head {
+  align-items: flex-start;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.dashboard-shell:not(.platform-admin-page) .page-head h1 {
+  font-size: 32px;
+  line-height: 1.15;
+  margin: 0 0 8px;
+}
+
+.dashboard-shell:not(.platform-admin-page) .page-head .page-desc,
+.dashboard-shell:not(.platform-admin-page) .page-head > div > p:not(.eyebrow):not(.dbc-identity-hint) {
+  font-size: 14.5px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.dashboard-shell.business-card-page .dbc-page > .page-head {
+  margin-bottom: 0;
 }

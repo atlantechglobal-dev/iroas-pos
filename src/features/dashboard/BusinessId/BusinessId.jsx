@@ -490,7 +490,7 @@ function BusinessId() {
                     <div className="bid-gallery-empty-slots">
                       {[0, 1, 2].map((i) => (
                         <div key={i} className="bid-gallery-slot">
-                          <em>Fill image and details</em>
+                          <em>Add photo</em>
                         </div>
                       ))}
                     </div>

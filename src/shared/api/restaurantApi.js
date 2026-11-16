@@ -42,6 +42,8 @@ export const restaurantApi = {
   createPosMenu: (payload) => apiRequest('/restaurant/pos-menu/menus', { method: 'POST', body: payload }),
   updatePosMenuItem: (id, payload) =>
     apiRequest(`/restaurant/pos-menu/items/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
+  deletePosMenuItem: (id) =>
+    apiRequest(`/restaurant/pos-menu/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   listPosTableQr: () => apiRequest('/restaurant/pos-tables/qr'),
   getPosShift: () => apiRequest('/restaurant/pos-shift'),
   openPosShift: (payload = {}) => apiRequest('/restaurant/pos-shift/open', { method: 'POST', body: payload }),

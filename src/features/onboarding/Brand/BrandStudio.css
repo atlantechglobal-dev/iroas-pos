@@ -637,12 +637,3 @@
   }
 }
 
-/* Active Branding nav accent matches this page's identity orange */
-.dashboard-shell.branding-studio-page .nav-item.active {
-  color: #9a3412;
-  background: #fff7ed;
-}
-
-.dashboard-shell.branding-studio-page .nav-item.active::before {
-  background: #f97316;
-}

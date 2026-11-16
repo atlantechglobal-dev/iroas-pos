@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
-import { useDebounce } from '@/shared/hooks/useDebounce'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
 import { useAuth } from '@/shared/hooks/useAuth'
@@ -35,8 +34,6 @@ function AccountApprove() {
   const canApprove = isSuperAdmin(useAuth().user)
   const navigate = useNavigate()
   const [tab, setTab] = useState('waiting')
-  const [search, setSearch] = useState('')
-  const debounced = useDebounce(search, 250)
   const [tenants, setTenants] = useState([])
   const [counts, setCounts] = useState({ waiting: 0, approved: 0 })
   const [loading, setLoading] = useState(true)
@@ -60,7 +57,7 @@ function AccountApprove() {
   const loadList = () => {
     setLoading(true)
     api
-      .adminTenants(debounced, tab, 'account')
+      .adminTenants('', tab, 'account')
       .then(({ tenants: rows }) => setTenants(rows || []))
       .catch((err) => {
         setTenants([])
@@ -75,7 +72,7 @@ function AccountApprove() {
 
   useEffect(() => {
     loadList()
-  }, [debounced, tab])
+  }, [tab])
 
   const openProfile = (id) => {
     navigate(platformAccountApproveProfilePath(id))
@@ -155,16 +152,6 @@ function AccountApprove() {
             </button>
           )
         })}
-      </div>
-
-      <div className="pa-pipeline-search">
-        <input
-          type="search"
-          placeholder={isWaiting ? 'Search new signups…' : 'Search approved accounts…'}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search account approve list"
-        />
       </div>
 
       <section className="pa-approve-panel aa-panel">

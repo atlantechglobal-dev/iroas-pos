@@ -44,6 +44,7 @@ export const api = {
   createPosCourse: restaurantApi.createPosCourse,
   createPosMenu: restaurantApi.createPosMenu,
   updatePosMenuItem: restaurantApi.updatePosMenuItem,
+  deletePosMenuItem: restaurantApi.deletePosMenuItem,
   getPosTableQr: restaurantApi.listPosTableQr,
   getPosShift: restaurantApi.getPosShift,
   openPosShift: restaurantApi.openPosShift,

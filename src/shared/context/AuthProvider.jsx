@@ -10,6 +10,7 @@ import {
 } from '@/shared/constants/restaurantStatus'
 import { authApi, setUnauthorizedHandler } from '@/shared/api/index'
 import { restaurantApi } from '@/shared/api/restaurantApi'
+import { clearRestaurantLabelCache } from '@/shared/hooks/useRestaurant'
 import {
   clearSession,
   getStoredUser,
