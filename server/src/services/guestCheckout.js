@@ -36,9 +36,11 @@ export async function createGuestOrderCheckout(restaurant, order) {
   const reference = `ORD-${restaurant.id}-${order.id}-${Date.now().toString(36).toUpperCase()}`
   const appBase = appPublicUrl()
   const apiBase = apiPublicUrl()
-  // Mirrors `guestSitePath(slug, 'tracking')` from src/shared/utils/guestLinks.js
-  // (frontend-only module, not importable from the server).
-  const trackingPath = `/s/${restaurant.slug}/tracking?code=${encodeURIComponent(order.publicCode)}`
+  // The restaurant row's slug lives in `subdomain`, not `slug` — mirrors
+  // `publicSlug()` in modules/public/routes.js and `guestSitePath()` from
+  // src/shared/utils/guestLinks.js (frontend-only module, not importable here).
+  const slug = restaurant.subdomain || String(restaurant.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  const trackingPath = `/s/${slug}/tracking?code=${encodeURIComponent(order.publicCode)}`
 
   const checkout = await addpayRequest(
     '/api/entry',
