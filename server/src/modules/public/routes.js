@@ -19,14 +19,17 @@ import { EnquiryError, submitEnquiry } from '../../services/enquiries.js'
 import {
   createGuestOrder,
   findTableByPublicCode,
+  getOrderById,
   getOrderByPublicCode,
   listOrdersByPhone,
+  markOrderPaid,
 } from '../../services/orders.js'
 import { notifyPosGuestOrder, onOrderCreated } from '../../services/orderMessaging.js'
 import { listDiningTables } from '../../services/diningTables.js'
 import { verifyNotifySignature } from '../../services/addpayClient.js'
 import { getPaymentSettings } from '../../services/paymentSettings.js'
 import { finalizeOnboardingPayment, parseRestaurantSettings } from '../../services/onboardingPayment.js'
+import { createGuestOrderCheckout } from '../../services/guestCheckout.js'
 import { getPublishedAdminCardBySlug } from '../../services/platformAdminService.js'
 import { rateLimit } from '../../middleware/rateLimit.js'
 import { UryError } from '../../integrations/ury/uryClient.js'
@@ -954,7 +957,19 @@ router.post('/:slug/orders', async (req, res) => {
     console.warn('Order messaging failed:', err?.message || err)
   }
 
-  res.status(201).json({ order: result.order })
+  let payUrl = null
+  if (result.order.paymentMethod === 'upi') {
+    try {
+      const checkout = await createGuestOrderCheckout(restaurant, result.order)
+      payUrl = checkout.payUrl
+    } catch (err) {
+      // Don't fail the order over a payment-link hiccup — guest can still
+      // pay at the table; staff marks it paid like any cash order.
+      console.warn('[addpay] guest checkout link failed:', err.message || err)
+    }
+  }
+
+  res.status(201).json({ order: { ...result.order, payUrl } })
 })
 
 /** Guest tracks an order by public code (optional phone check) */
@@ -1004,6 +1019,23 @@ router.post(
 
     const orderRef = String(payload.merchant_order_no || '').trim()
     const transStatus = Number(payload.trans_status)
+
+    const guestOrderMatch = /^ORD-(\d+)-(\d+)-/.exec(orderRef)
+    if (guestOrderMatch) {
+      const restaurant = db.prepare('SELECT * FROM restaurants WHERE id = ?').get(Number(guestOrderMatch[1]))
+      const order = restaurant ? getOrderById(restaurant.id, Number(guestOrderMatch[2])) : null
+      if (!order) return respondSuccess()
+      if (order.paymentStatus === 'paid') return respondSuccess() // already processed — idempotent
+      if (transStatus !== 2) return respondSuccess() // not a completed payment yet
+
+      const marked = markOrderPaid(restaurant.id, order.id, { paymentMethod: 'upi' })
+      if (!marked.ok) {
+        console.error('[addpay webhook] markOrderPaid failed:', marked.error)
+        return res.status(500).type('text/plain').send('error')
+      }
+      return respondSuccess()
+    }
+
     const match = /^ONB-(\d+)-/.exec(orderRef)
     if (!match) return respondSuccess()
 

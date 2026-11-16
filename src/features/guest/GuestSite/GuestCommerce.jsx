@@ -54,25 +54,14 @@ const CHECKOUT_STEPS = [
 ]
 
 const TAKEAWAY_PAYMENT_OPTIONS = [
-  { id: 'upi', label: 'UPI', badge: 'Pay via QR' },
+  { id: 'upi', label: 'Pay now', badge: 'Card / QR' },
   { id: 'cash', label: 'Cash', badge: 'Pay at counter' },
 ]
 
 const TABLE_PAYMENT_OPTIONS = [
-  { id: 'bill', label: 'Pay bill now', badge: 'UPI / Cash' },
+  { id: 'bill', label: 'Pay bill now', badge: 'Card / Cash' },
   { id: 'pay_later', label: 'Pay later', badge: 'Settle at table' },
 ]
-
-function upiPayUri(upiId, payeeName, amount) {
-  if (!upiId) return ''
-  const params = new URLSearchParams({
-    pa: upiId,
-    pn: payeeName || 'Restaurant',
-    am: String(Math.round(Number(amount) || 0)),
-    cu: 'INR',
-  })
-  return `upi://pay?${params.toString()}`
-}
 
 function trackStepsForStatus(status) {
   const flow = ['new', 'accepted', 'preparing', 'ready', 'completed']
@@ -442,10 +431,6 @@ export function GuestCheckoutPage({
   const deliveryFee = serviceMode === 'delivery' ? 49 : 0
   const gst = Math.round(subtotal * 0.05)
   const total = subtotal + deliveryFee + gst
-  const restaurantUpi = payments.upiId || ''
-  const payeeName = payments.upiDisplayName || restaurantContact.name || 'Restaurant'
-  const upiUri = upiPayUri(restaurantUpi, payeeName, total)
-
   if (!cart.length) {
     return (
       <section className="gs-checkout-page">
@@ -537,6 +522,7 @@ export function GuestCheckoutPage({
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
         paymentTiming: order.paymentTiming,
+        payUrl: order.payUrl || null,
         tableName: order.tableName,
         phone: order.phone,
         createdAt: order.createdAt,
@@ -708,18 +694,10 @@ export function GuestCheckoutPage({
                         ))}
                       </div>
                       {(checkout.billPay || 'upi') === 'upi' ? (
-                        restaurantUpi ? (
-                          <>
-                            <p className="gs-upi-id">
-                              UPI ID: <code>{restaurantUpi}</code>
-                            </p>
-                            <div className="gs-upi-qr">
-                              <QrCodePreview value={upiUri} size={180} alt="Restaurant UPI QR" />
-                            </div>
-                          </>
-                        ) : (
-                          <p className="gs-muted">UPI ID not set — choose Cash or Pay later.</p>
-                        )
+                        <p className="gs-muted">
+                          You'll get a secure payment link and QR code to scan right after you place
+                          this order.
+                        </p>
                       ) : (
                         <p className="gs-muted">Pay cash to staff when the bill is brought to your table.</p>
                       )}
@@ -748,22 +726,10 @@ export function GuestCheckoutPage({
                   </div>
                   {checkout.payment === 'upi' ? (
                     <div className="gs-upi-merchant">
-                      {restaurantUpi ? (
-                        <>
-                          <p className="gs-muted">
-                            Pay <strong>{formatPrice(total)}</strong> to <strong>{payeeName}</strong>, then
-                            place your order.
-                          </p>
-                          <p className="gs-upi-id">
-                            UPI ID: <code>{restaurantUpi}</code>
-                          </p>
-                          <div className="gs-upi-qr">
-                            <QrCodePreview value={upiUri} size={180} alt="Restaurant UPI QR" />
-                          </div>
-                        </>
-                      ) : (
-                        <p className="gs-muted">UPI ID not published yet — choose Cash.</p>
-                      )}
+                      <p className="gs-muted">
+                        You'll get a secure payment link and QR code to scan right after you place this
+                        order.
+                      </p>
                     </div>
                   ) : (
                     <p className="gs-muted">Pay cash when you collect your takeaway.</p>
@@ -800,9 +766,9 @@ export function GuestCheckoutPage({
                     {serviceMode === 'dinein' && checkout.payment === 'pay_later'
                       ? 'Pay later at table'
                       : serviceMode === 'dinein' && checkout.payment === 'bill'
-                        ? `Pay bill now · ${(checkout.billPay || 'upi').toUpperCase()}`
+                        ? `Pay bill now · ${(checkout.billPay || 'upi') === 'upi' ? 'Card/QR' : 'Cash'}`
                         : checkout.payment === 'upi'
-                          ? `UPI${restaurantUpi ? ` · ${restaurantUpi}` : ''}`
+                          ? 'Pay now (card / QR)'
                           : 'Cash'}
                   </dd>
                 </div>
@@ -826,19 +792,7 @@ export function GuestCheckoutPage({
               type="button"
               className="gs-btn primary"
               onClick={goNext}
-              disabled={
-                submitting ||
-                (step === 2 &&
-                  serviceMode !== 'dinein' &&
-                  checkout.payment === 'upi' &&
-                  !restaurantUpi) ||
-                (step === 2 &&
-                  serviceMode === 'dinein' &&
-                  checkout.payment === 'bill' &&
-                  (checkout.billPay || 'upi') === 'upi' &&
-                  !restaurantUpi) ||
-                (step === 2 && serviceMode === 'dinein' && !checkout.payment)
-              }
+              disabled={submitting || (step === 2 && serviceMode === 'dinein' && !checkout.payment)}
             >
               {submitting
                 ? 'Placing…'
@@ -887,6 +841,10 @@ const ACCOUNT_TABS = [
 
 export function GuestPlacedPage({ slug, lastOrder }) {
   const steps = trackStepsForStatus(lastOrder?.status || 'new')
+  const awaitingPayNow =
+    lastOrder?.paymentMethod === 'upi' &&
+    lastOrder?.paymentTiming !== 'pay_later' &&
+    lastOrder?.paymentStatus === 'payment_pending'
   return (
     <section className="gs-placed-page">
       <div className="gs-placed-card">
@@ -903,6 +861,21 @@ export function GuestPlacedPage({ slug, lastOrder }) {
               ? ' · payment pending confirmation'
               : ''}
         </p>
+        {awaitingPayNow ? (
+          lastOrder?.payUrl ? (
+            <div className="gs-placed-pay">
+              <QrCodePreview value={lastOrder.payUrl} size={180} alt="Scan to pay" />
+              <p className="gs-muted">Scan the QR code or use the link below to pay now.</p>
+              <a className="gs-btn primary" href={lastOrder.payUrl} target="_blank" rel="noreferrer">
+                Pay now
+              </a>
+            </div>
+          ) : (
+            <p className="gs-muted">
+              We couldn't open the payment link right now — no problem, you can pay at the table instead.
+            </p>
+          )
+        ) : null}
         <TrackStrip steps={steps} />
         <div className="gs-placed-actions">
           <Link className="gs-btn primary" to={guestSitePath(slug, 'tracking')}>

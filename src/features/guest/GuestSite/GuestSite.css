@@ -1052,6 +1052,22 @@
   font-weight: 700;
 }
 
+.gs-placed-pay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--gs-line);
+  border-radius: 20px;
+  background: #fafafa;
+}
+
+.gs-placed-pay .gs-btn {
+  margin-top: 4px;
+}
+
 .gs-track-panel {
   padding: 12px;
   border: 1px solid var(--gs-line);
