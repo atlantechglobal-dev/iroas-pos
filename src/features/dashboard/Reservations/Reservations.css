@@ -1,14 +1,14 @@
 /* Page content only — do not restyle DashboardLayout .app / .sidebar / .main / .content */
 .dashboard-shell.reservations-page {
-  --bg: #f8f9fb;
+  --bg: #f7f6f2;
   --panel: #ffffff;
-  --border: #eaecf0;
-  --ink: #101828;
-  --muted: #667085;
-  --green: #8ee000;
-  --green-hover: #80cd00;
-  --green-soft: #eef9d8;
-  --green-text: #2d5500;
+  --border: #ece8df;
+  --ink: #17171a;
+  --muted: #8b8b8f;
+  --green: #8bc53f;
+  --green-hover: #6fa62a;
+  --green-soft: #eaf5db;
+  --green-text: #4c8a1a;
 }
 
 .dashboard-shell.reservations-page > .app > .main > .content {

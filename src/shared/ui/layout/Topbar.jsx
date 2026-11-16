@@ -347,8 +347,8 @@ export function Topbar({
   }
 
   return (
-    <header className="topbar">
-      <div className="topbar-left">
+    <header className="app-navbar">
+      <div className="app-navbar-start">
         <button
           type="button"
           className="menu-toggle"
@@ -361,7 +361,7 @@ export function Topbar({
           </svg>
         </button>
 
-        <div className={`search-bar${searchOpen ? ' is-open' : ''}`} ref={searchWrapRef}>
+        <div className={`app-navbar-search${searchOpen ? ' is-open' : ''}`} ref={searchWrapRef}>
           <span className="search-icon" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <circle cx="11" cy="11" r="6.25" stroke="currentColor" strokeWidth="2" />
@@ -423,10 +423,10 @@ export function Topbar({
         </div>
       </div>
 
-      <div className="topbar-actions">
+      <div className="app-navbar-actions">
         <div className="quick-action-wrap" ref={wrapRef}>
           <button
-            className="btn btn-primary btn-sm"
+            className="app-navbar-quick"
             type="button"
             aria-expanded={quickOpen}
             aria-haspopup="menu"
@@ -478,7 +478,7 @@ export function Topbar({
 
         <div className="notif-wrap" ref={notifWrapRef}>
           <button
-            className={`icon-btn${notifOpen ? ' is-open' : ''}`}
+            className={`app-navbar-icon${notifOpen ? ' is-open' : ''}`}
             type="button"
             aria-label="Notifications"
             aria-expanded={notifOpen}
@@ -590,9 +590,9 @@ export function Topbar({
           ) : null}
         </div>
 
-        <div className="user-chip-wrapper">
+        <div className="app-navbar-user-wrap">
           <button
-            className="user-chip"
+            className="app-navbar-user"
             type="button"
             aria-expanded={profileOpen}
             aria-haspopup="menu"
@@ -614,8 +614,8 @@ export function Topbar({
 
           {profileOpen && (
             <>
-              <div className="menu-overlay" onClick={onProfileClose} aria-hidden="true" />
-              <div className="profile-menu" role="menu">
+              <div className="app-navbar-backdrop" onClick={onProfileClose} aria-hidden="true" />
+              <div className="app-navbar-menu" role="menu">
                 <button type="button" role="menuitem" onClick={onSettings}>
                   Settings
                 </button>

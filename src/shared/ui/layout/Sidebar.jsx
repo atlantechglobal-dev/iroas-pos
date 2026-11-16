@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import { getActiveNavKey, getNavGroupsForUser } from '@/shared/lib/navGroups'
+import { prefetchNavKey } from '@/shared/lib/routePrefetch'
 
 export function Sidebar({
   activeNav,
@@ -11,8 +13,23 @@ export function Sidebar({
   onWorkspaceClick,
   onClose,
 }) {
-  const resolvedActive = activeNav || getActiveNavKey(pathname, { isAdmin })
+  const resolvedActive = getActiveNavKey(pathname, { isAdmin }) || activeNav
   const groups = getNavGroupsForUser({ isAdmin, businessCategory })
+  const navRef = useRef(null)
+  const name = String(workspaceName || '').trim() || 'Your restaurant'
+  const initial = name.charAt(0).toUpperCase() || 'R'
+
+  useEffect(() => {
+    const nav = navRef.current
+    const active = nav?.querySelector('.nav-item.active')
+    if (!nav || !active) return
+    const top = active.offsetTop
+    const bottom = top + active.offsetHeight
+    if (top < nav.scrollTop) nav.scrollTop = top
+    else if (bottom > nav.scrollTop + nav.clientHeight) {
+      nav.scrollTop = bottom - nav.clientHeight
+    }
+  }, [resolvedActive])
 
   return (
     <aside className="sidebar" aria-label={isAdmin ? 'Platform sidebar' : 'Sidebar'}>
@@ -25,10 +42,10 @@ export function Sidebar({
         </button>
       </div>
 
-      <button className="restaurant-switch" type="button" onClick={onWorkspaceClick}>
-        <span className="avatar-badge">{workspaceName.charAt(0).toUpperCase()}</span>
+      <button className="restaurant-switch" type="button" onClick={onWorkspaceClick} title={name}>
+        <span className="avatar-badge" aria-hidden="true">{initial}</span>
         <span className="restaurant-info">
-          <strong>{workspaceName}</strong>
+          <strong>{name}</strong>
           <small>{workspaceStatus}</small>
         </span>
         {!isAdmin ? (
@@ -38,7 +55,7 @@ export function Sidebar({
         ) : null}
       </button>
 
-      <nav className="nav" aria-label={isAdmin ? 'Platform navigation' : 'Main navigation'}>
+      <nav className="nav" ref={navRef} aria-label={isAdmin ? 'Platform navigation' : 'Main navigation'}>
         {groups.map((group) => (
           <div className="nav-group" key={group.label}>
             <p className="nav-label">{group.label}</p>
@@ -47,6 +64,8 @@ export function Sidebar({
                 type="button"
                 key={item.key}
                 className={`nav-item ${item.key === resolvedActive ? 'active' : ''}`}
+                onPointerEnter={() => prefetchNavKey(item.key)}
+                onFocus={() => prefetchNavKey(item.key)}
                 onClick={() => onNavClick(item)}
                 aria-current={item.key === resolvedActive ? 'page' : undefined}
               >

@@ -1,0 +1,151 @@
+/* Platform admin: laptop, tablet, and phone.
+   Scoped so restaurant pages keep their own layout. */
+
+.dashboard-shell.platform-admin-page .content,
+.dashboard-shell.email-settings-page .content {
+  min-width: 0;
+}
+
+.dashboard-shell.platform-admin-page .stat-card,
+.dashboard-shell.platform-admin-page .pa-kpi,
+.dashboard-shell.platform-admin-page .pa-notif-stat {
+  min-width: 0;
+  flex: none;
+  width: auto;
+  box-sizing: border-box;
+}
+
+.dashboard-shell.platform-admin-page .table-wrapper,
+.dashboard-shell.platform-admin-page .table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-shell.platform-admin-page .pa-shortcut-list,
+  .dashboard-shell.platform-admin-page .pa-quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell.platform-admin-page .table-wrapper table,
+  .dashboard-shell.platform-admin-page .table-wrap table {
+    min-width: 720px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-shell.platform-admin-page .page-header,
+  .dashboard-shell.platform-admin-page .pa-dash-head,
+  .dashboard-shell.email-settings-page .es-page-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-shell.platform-admin-page .head-actions,
+  .dashboard-shell.platform-admin-page .page-actions,
+  .dashboard-shell.email-settings-page .es-page-head-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .dashboard-shell.platform-admin-page .head-actions > *,
+  .dashboard-shell.platform-admin-page .page-actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .dashboard-shell.email-settings-page .es-layout,
+  .dashboard-shell.email-settings-page .es-layout.is-single,
+  .dashboard-shell.email-settings-page .es-field-row,
+  .dashboard-shell.platform-admin-page .pa-invite-form {
+    grid-template-columns: 1fr !important;
+    max-width: 100%;
+  }
+
+  .dashboard-shell.platform-admin-page .pa-plan-form-actions,
+  .dashboard-shell.email-settings-page .es-drawer-actions {
+    flex-wrap: wrap;
+  }
+
+  .dashboard-shell.platform-admin-page .pa-plan-form-actions > *,
+  .dashboard-shell.email-settings-page .es-drawer-actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-shell.platform-admin-page .stat-cards,
+  .dashboard-shell.platform-admin-page .stats-grid,
+  .dashboard-shell.platform-admin-page .pa-kpi-grid,
+  .dashboard-shell.platform-admin-page .pa-notif-stats,
+  .dashboard-shell.platform-admin-page .pa-steps,
+  .dashboard-shell.platform-admin-page .pa-plans-grid,
+  .dashboard-shell.platform-admin-page .pa-pipeline-tabs {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-shell.platform-admin-page .page-header h1,
+  .dashboard-shell.platform-admin-page .pa-dash-head h1,
+  .dashboard-shell.email-settings-page .es-page-head h1 {
+    font-size: 26px;
+    line-height: 1.15;
+  }
+
+  .dashboard-shell.platform-admin-page input,
+  .dashboard-shell.platform-admin-page select,
+  .dashboard-shell.platform-admin-page textarea,
+  .dashboard-shell.email-settings-page input,
+  .dashboard-shell.email-settings-page select,
+  .dashboard-shell.email-settings-page textarea {
+    font-size: 16px;
+  }
+
+  .dashboard-shell.email-settings-page .es-drawer-overlay,
+  .dashboard-shell.platform-admin-page .pa-plan-overlay {
+    align-items: flex-end;
+  }
+
+  .dashboard-shell.email-settings-page .es-drawer,
+  .dashboard-shell.platform-admin-page .pa-plan-drawer {
+    width: 100% !important;
+    max-width: 100%;
+    height: min(92dvh, 100%);
+    border-left: none;
+    border-radius: 20px 20px 0 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-shell.platform-admin-page .head-actions,
+  .dashboard-shell.platform-admin-page .page-actions,
+  .dashboard-shell.email-settings-page .es-page-head-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-shell.platform-admin-page .head-actions > *,
+  .dashboard-shell.platform-admin-page .page-actions > *,
+  .dashboard-shell.email-settings-page .es-page-head-actions > * {
+    width: 100%;
+  }
+
+  .dashboard-shell.platform-admin-page .page-header h1,
+  .dashboard-shell.email-settings-page .es-page-head h1 {
+    font-size: 22px;
+  }
+
+  .dashboard-shell.platform-admin-page .table-wrapper table,
+  .dashboard-shell.platform-admin-page .table-wrap table {
+    min-width: 640px;
+  }
+
+  .dashboard-shell.platform-admin-page th,
+  .dashboard-shell.platform-admin-page td {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}

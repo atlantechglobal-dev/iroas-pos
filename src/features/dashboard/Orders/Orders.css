@@ -84,8 +84,10 @@
   .btn-outline:hover { background: var(--bg); }
 
   /* KANBAN */
-  .board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 20px; flex: 1; align-items: flex-start; }
-  .board-col { flex: 0 0 280px; width: 280px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; max-height: 100%; }
+  .board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; flex: 1 1 auto; align-items: flex-start; align-self: stretch; width: 100%; max-width: 100%; min-width: 0; scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: #c9c4b8 transparent; }
+  .board::-webkit-scrollbar { display: block; height: 8px; }
+  .board::-webkit-scrollbar-thumb { background: #c9c4b8; border-radius: 999px; }
+  .board-col { flex: 0 0 280px; width: 280px; min-width: 280px; scroll-snap-align: start; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; max-height: 100%; }
   .col-head { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .col-count { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
   .col-count.tint-blue { background: #e3edf9; color: #2e6fb5; }
@@ -96,7 +98,8 @@
   .col-more { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 4px; }
 
   .col-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
-  .order-card { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 14px; cursor: pointer; text-align: left; }
+  .order-card { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 14px; cursor: pointer; text-align: left; transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease; }
+  .order-card:hover { background: #f7fbf1; border-color: color-mix(in srgb, var(--green) 55%, var(--border)); box-shadow: 0 8px 18px rgba(30, 25, 15, 0.06); }
   .order-card:focus-visible { outline: 2px solid #2457c5; outline-offset: 2px; }
   .order-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
   .order-card-top strong { font-size: 14px; }

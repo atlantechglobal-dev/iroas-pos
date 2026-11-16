@@ -12,14 +12,14 @@
   display: grid;
   gap: 16px;
   width: 100%;
-  max-width: min(1080px, 100%);
+  max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
 
 .dashboard-shell.payment-settings-page .ps-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr);
+  display: flex;
+  flex-direction: column;
   gap: 20px;
   align-items: stretch;
   padding: 20px 22px;
@@ -96,12 +96,18 @@
 }
 
 .dashboard-shell.payment-settings-page .ps-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   align-items: start;
   min-width: 0;
   width: 100%;
+}
+
+.dashboard-shell.payment-settings-page .es-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .dashboard-shell.payment-settings-page .ps-grid > .es-panel {
@@ -160,9 +166,9 @@
 }
 
 .dashboard-shell.payment-settings-page .ps-footnote {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr);
-  gap: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   align-items: start;
   padding: 16px 18px;
   border-radius: 18px;

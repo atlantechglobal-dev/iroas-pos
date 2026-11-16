@@ -90,7 +90,11 @@ function PosItemRow({ item, currency, courses, onSaved }) {
     try {
       const res = await api.deletePosMenuItem(item.id)
       onSaved(res?.data || null)
-      toast.success(`${item.name} removed from your POS menu.`)
+      toast.success(
+        res?.outcome === 'disabled'
+          ? `${item.name} was removed from the menu. It is already on an invoice, so the POS disabled it instead of deleting it.`
+          : `${item.name} removed from your POS menu.`,
+      )
     } catch (err) {
       toast.error(err?.message || 'Could not remove the item. Nothing was changed.')
     } finally {

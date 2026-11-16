@@ -1,24 +1,23 @@
 .restaurant-profile-page {
-  --bg: #f8f9fb;
+  --bg: #f7f6f2;
   --panel: #ffffff;
-  --border: #eaecf0;
-  --border-subtle: #f0f2f5;
-  --ink: #101828;
-  --ink-secondary: #475467;
-  --muted: #667085;
-  --muted-2: #98a2b3;
-  --green: #8ee000;
-  --green-hover: #80cd00;
-  --green-soft: #eef9d8;
-  --green-soft-border: #d4f09d;
-  --green-text: #2d5500;
+  --border: #ece8df;
+  --border-subtle: #f3f0e8;
+  --ink: #17171a;
+  --ink-secondary: #43434a;
+  --muted: #8b8b8f;
+  --muted-2: #b3b1a8;
+  --green: #8bc53f;
+  --green-hover: #6fa62a;
+  --green-soft: #eaf5db;
+  --green-soft-border: #d4e8b0;
+  --green-text: #4c8a1a;
   --closed-bg: #f4f3ef;
   --closed-text: #78716c;
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
 
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--ink);
   min-height: 100vh;
@@ -33,6 +32,10 @@
     flex-direction: column;
     gap: 16px;
     padding-bottom: 40px;
+  }
+
+  &.dashboard-shell .content > .page-head {
+    margin-bottom: 0;
   }
 
   .page-head {
@@ -163,16 +166,20 @@
   }
 
   .progress-pills {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 10px;
   }
   .progress-pill {
     display: inline-flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 8px;
-    height: 36px;
-    padding: 0 14px;
+    width: 100%;
+    min-height: 36px;
+    height: auto;
+    padding: 8px 12px;
+    white-space: nowrap;
     border-radius: 999px;
     border: 1px solid var(--border);
     background: #f9fafb;
@@ -183,7 +190,9 @@
     transition: all 0.15s ease;
   }
   .progress-pill:hover {
-    border-color: var(--green);
+    border-color: color-mix(in srgb, var(--green) 55%, var(--border));
+    background: #f7fbf1;
+    box-shadow: 0 8px 18px rgba(30, 25, 15, 0.06);
   }
   .progress-pill.done {
     background: var(--green-soft);
@@ -264,7 +273,7 @@
     display: grid;
     grid-template-columns: 1.7fr 1fr;
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
   }
   .delivery-grid {
     grid-template-columns: 1.4fr 1fr;
@@ -276,6 +285,12 @@
     border-radius: 20px;
     padding: 24px;
     box-shadow: 0 1px 3px rgba(16, 24, 40, 0.03);
+    min-width: 0;
+  }
+  .panel-grid > .panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
   }
   .panel-full {
     width: 100%;
@@ -425,6 +440,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    flex: 1;
   }
 
   .contact-item {
@@ -470,9 +486,9 @@
     font-size: 13px;
     font-weight: 700;
     color: var(--ink);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
   }
 
   .btn-edit-contact {
@@ -485,7 +501,7 @@
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    margin-top: 8px;
+    margin-top: auto;
     transition: background 0.12s ease;
   }
   .btn-edit-contact:hover {
@@ -980,6 +996,6 @@
     .btn-save { width: 100%; text-align: center; }
     .field-grid, .field-grid.two, .field-grid.three { grid-template-columns: 1fr; }
     .upload-grid { grid-template-columns: 1fr; }
-    .progress-pills { flex-direction: column; align-items: stretch; }
+    .progress-pills { grid-template-columns: 1fr 1fr; }
   }
 }

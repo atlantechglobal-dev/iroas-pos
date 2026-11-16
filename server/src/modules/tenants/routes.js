@@ -55,7 +55,7 @@ import {
 import { UryError } from '../../integrations/ury/uryClient.js'
 import { IntegrationError, invalidateUryTenant, resolveUryTenant } from '../../integrations/ury/uryTenant.js'
 import { TableEditError, createUryTable, getUryTableOptions, listUryTables } from '../../integrations/ury/uryTables.js'
-import { MenuEditError, addUryItemStock, createUryCourse, createUryMenuDoc, createUryMenuItem, getUryMenu, getUryMenuOptions, removeUryMenuItem, setActiveUryMenu, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
+import { MenuEditError, addUryItemStock, createUryCourse, createUryMenuDoc, createUryMenuItem, deleteUryMenuItem, getUryMenu, getUryMenuOptions, setActiveUryMenu, updateUryMenuItem } from '../../integrations/ury/uryMenu.js'
 import { listUryTableQrCodes } from '../../integrations/ury/uryTableQr.js'
 import { getUryFeatures } from '../../integrations/ury/uryPublic.js'
 import { buildDashboardSummary } from '../../services/dashboardSummary.js'
@@ -1158,6 +1158,26 @@ router.post('/pos-menu/items/:code/stock', async (req, res) => {
   }
 })
 
+router.delete('/pos-menu/items/:id', async (req, res) => {
+  const restaurant = getPosRestaurant(req, res)
+  if (!restaurant) return
+  try {
+    const tenant = await resolveUryTenant(restaurant.id)
+    const { menu, outcome } = await deleteUryMenuItem(tenant, req.params.id)
+    console.info(`[pos-menu:delete] restaurant=${restaurant.id} row=${req.params.id} outcome=${outcome}`)
+    res.json({ success: true, data: menu, outcome })
+  } catch (err) {
+    if (err instanceof MenuEditError) {
+      return res.status(err.status).json({ success: false, code: err.code, error: err.message })
+    }
+    sendPosError(res, err, {
+      label: 'pos-menu:delete',
+      restaurantId: restaurant.id,
+      unavailableMessage: 'Could not delete the menu item. Nothing was changed.',
+    })
+  }
+})
+
 router.patch('/pos-menu/items/:id', async (req, res) => {
   const restaurant = getPosRestaurant(req, res)
   if (!restaurant) return
@@ -1175,26 +1195,6 @@ router.patch('/pos-menu/items/:id', async (req, res) => {
       label: 'pos-menu:update',
       restaurantId: restaurant.id,
       unavailableMessage: 'Could not reach the POS. The menu was not changed. Please try again.',
-    })
-  }
-})
-
-router.delete('/pos-menu/items/:id', async (req, res) => {
-  const restaurant = getPosRestaurant(req, res)
-  if (!restaurant) return
-  try {
-    const tenant = await resolveUryTenant(restaurant.id)
-    const data = await removeUryMenuItem(tenant, req.params.id)
-    console.info(`[pos-menu:delete] restaurant=${restaurant.id} row=${req.params.id}`)
-    res.json({ success: true, data })
-  } catch (err) {
-    if (err instanceof MenuEditError) {
-      return res.status(err.status).json({ success: false, code: err.code, error: err.message })
-    }
-    sendPosError(res, err, {
-      label: 'pos-menu:delete',
-      restaurantId: restaurant.id,
-      unavailableMessage: 'Could not reach the POS. The item was not removed. Please try again.',
     })
   }
 })

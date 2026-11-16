@@ -67,6 +67,7 @@ function PosIntegration() {
             </div>
 
             <div className="two-col">
+              <div className="main-col">
               <section className="card">
                 <h2>Providers</h2>
                 <span className="muted-note">One primary POS, unlimited aggregators</span>
@@ -85,6 +86,24 @@ function PosIntegration() {
                   ))}
                 </div>
               </section>
+
+              <section className="card rules-card">
+                <h2>Sync rules</h2>
+                <span className="muted-note">Applies to the primary POS connection</span>
+                {rules.map((r) => (
+                  <div className="rule-row" key={r.key}>
+                    <div>
+                      <strong>{r.label}</strong>
+                      <p>{r.desc}</p>
+                    </div>
+                    <label className="switch">
+                      <input type="checkbox" checked={r.on} onChange={() => toggleRule(r.key)} />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                ))}
+              </section>
+              </div>
 
               <div className="side-col">
                 <section className="card">
@@ -123,23 +142,6 @@ function PosIntegration() {
                 </section>
               </div>
             </div>
-
-            <section className="card rules-card">
-              <h2>Sync rules</h2>
-              <span className="muted-note">Applies to the primary POS connection</span>
-              {rules.map((r) => (
-                <div className="rule-row" key={r.key}>
-                  <div>
-                    <strong>{r.label}</strong>
-                    <p>{r.desc}</p>
-                  </div>
-                  <label className="switch">
-                    <input type="checkbox" checked={r.on} onChange={() => toggleRule(r.key)} />
-                    <span className="slider"></span>
-                  </label>
-                </div>
-              ))}
-            </section>
     </DashboardLayout>
   )
 }

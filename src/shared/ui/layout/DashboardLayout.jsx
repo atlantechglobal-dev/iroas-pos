@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { useRestaurant } from '@/shared/hooks/useRestaurant'
@@ -7,7 +7,10 @@ import { ROUTES } from '@/shared/constants/routes'
 import { isPendingApproval } from '@/shared/constants/restaurantStatus'
 import { Sidebar } from '@/shared/ui/layout/Sidebar'
 import { Topbar } from '@/shared/ui/layout/Topbar'
+import { ADMIN_NAV_PREFETCH, OWNER_NAV_PREFETCH, prefetchWhenIdle } from '@/shared/lib/routePrefetch'
 import '@/shared/ui/layout/DashboardShell.css'
+import '@/features/platform-admin/PlatformAdmin/AdminResponsive.css'
+import '@/features/dashboard/OwnerResponsive.css'
 
 /**
  * Shared dashboard shell — sidebar, topbar, responsive mobile drawer.
@@ -65,11 +68,19 @@ export function DashboardLayout({
     }
   }, [sidebarOpen])
 
+  const go = (to) => {
+    startTransition(() => navigate(to))
+  }
+
+  useEffect(() => {
+    prefetchWhenIdle(isAdmin ? ADMIN_NAV_PREFETCH : OWNER_NAV_PREFETCH)
+  }, [isAdmin])
+
   const handleNavClick = (item) => {
     setProfileOpen(false)
     setSidebarOpen(false)
     if (item.route) {
-      navigate(item.route)
+      go(item.route)
       return
     }
     toast.info(`${item.label} — demo preview with sample data.`)
@@ -100,11 +111,12 @@ export function DashboardLayout({
           workspaceStatus={workspaceStatus}
           onNavClick={handleNavClick}
           onWorkspaceClick={() => {
+            setSidebarOpen(false)
             if (isAdmin) {
-              navigate(ROUTES.PLATFORM_ADMIN)
+              go(ROUTES.PLATFORM_ADMIN)
               return
             }
-            toast.info('Switch restaurant — demo preview with sample data.')
+            go(ROUTES.RESTAURANT_PROFILE)
           }}
           onClose={() => setSidebarOpen(false)}
         />
@@ -124,18 +136,18 @@ export function DashboardLayout({
             onProfileToggle={() => setProfileOpen((prev) => !prev)}
             onProfileClose={() => setProfileOpen(false)}
             onMenuToggle={() => setSidebarOpen(true)}
-            onNavigate={(to) => navigate(to)}
+            onNavigate={(to) => go(to)}
             onSettings={() => {
               setProfileOpen(false)
-              navigate(isAdmin ? ROUTES.PLATFORM_SETTINGS : ROUTES.SETTINGS)
+              go(isAdmin ? ROUTES.PLATFORM_SETTINGS : ROUTES.SETTINGS)
             }}
             onLogout={logout}
             onNotifications={() => {
               if (isAdmin) {
-                navigate(ROUTES.PLATFORM_NOTIFICATIONS)
+                go(ROUTES.PLATFORM_NOTIFICATIONS)
                 return
               }
-              navigate(ROUTES.NOTIFICATIONS)
+              go(ROUTES.NOTIFICATIONS)
             }}
           />
 

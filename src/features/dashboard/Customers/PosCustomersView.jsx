@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { HorizontalDragScroll } from '@/shared/ui/HorizontalDragScroll'
 
 function formatMoney(value, currency) {
   if (!currency) return Number(value || 0).toFixed(2)
@@ -46,10 +47,16 @@ function tagFor(c) {
 
 function PosCustomersView({ posCustomers, guests, reload }) {
   const [query, setQuery] = useState('')
+  const [focus, setFocus] = useState('all')
   const posList = posCustomers.data?.customers
   const customers = useMemo(() => mergeCustomers(posList || [], guests || []), [posList, guests])
   const q = query.trim().toLowerCase()
-  const filtered = customers.filter((c) => c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q))
+  const filtered = customers.filter((c) => {
+    if (focus === 'repeat' && c.orders + c.bookings <= 1) return false
+    if (focus === 'noshow' && !c.noShows) return false
+    if (focus === 'spend' && !c.spend) return false
+    return c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q)
+  })
   const currency = customers.find((c) => c.currency)?.currency || null
   const totalSpend = customers.reduce((sum, c) => sum + c.spend, 0)
   const repeat = customers.filter((c) => c.orders + c.bookings > 1).length
@@ -69,24 +76,24 @@ function PosCustomersView({ posCustomers, guests, reload }) {
   return (
     <>
       {posProblem ? <p className="muted-note">{posProblem}</p> : null}
-      <div className="stat-cards">
-        <div className="stat-card">
+      <HorizontalDragScroll className="stat-cards">
+        <button type="button" className={`stat-card${focus === 'all' ? ' is-on' : ''}`} onClick={() => setFocus('all')}>
           <span>Guests</span>
           <strong>{customers.length}</strong>
-        </div>
-        <div className="stat-card">
+        </button>
+        <button type="button" className={`stat-card${focus === 'repeat' ? ' is-on' : ''}`} onClick={() => setFocus('repeat')}>
           <span>Repeat guests</span>
           <strong>{repeat}</strong>
-        </div>
-        <div className="stat-card">
+        </button>
+        <button type="button" className={`stat-card${focus === 'noshow' ? ' is-on' : ''}`} onClick={() => setFocus('noshow')}>
           <span>No-shows</span>
           <strong>{noShows}</strong>
-        </div>
-        <div className="stat-card">
+        </button>
+        <button type="button" className={`stat-card${focus === 'spend' ? ' is-on' : ''}`} onClick={() => setFocus('spend')}>
           <span>Paid spend</span>
           <strong>{formatMoney(totalSpend, currency)}</strong>
-        </div>
-      </div>
+        </button>
+      </HorizontalDragScroll>
 
       <div className="card">
         <div className="toolbar">

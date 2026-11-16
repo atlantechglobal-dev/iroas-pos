@@ -165,7 +165,7 @@ export function AppRoutes() {
 
         <Route path={ROUTES.RESTAURANT_SETUP} element={withProtection(RestaurantSetup, WIZARD_ONLY)} />
         <Route path={ROUTES.DOMAIN} element={withProtection(Domain, WIZARD_ONLY)} />
-        <Route path={ROUTES.BRAND} element={withProtection(Brand, WIZARD_ONLY)} />
+        <Route path={ROUTES.BRAND} element={withProtection(Brand)} />
         <Route path={ROUTES.LAUNCH} element={withProtection(Launch, WIZARD_ONLY)} />
         <Route
           path={ROUTES.ONBOARDING_PAYMENT}

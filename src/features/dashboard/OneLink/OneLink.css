@@ -624,8 +624,12 @@
 .one-link-page .one-link-preview-panel {
   padding: 22px;
   position: sticky;
-  top: 16px;
+  top: calc(var(--topbar-height, 96px) + 12px);
+  align-self: start;
+  z-index: 2;
   min-width: 0;
+  max-height: calc(100vh - var(--topbar-height, 96px) - 28px);
+  overflow: auto;
 }
 
 .one-link-page .preview-panel-head {

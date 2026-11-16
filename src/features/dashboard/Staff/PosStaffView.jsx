@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { HorizontalDragScroll } from '@/shared/ui/HorizontalDragScroll'
 
 function initials(name) {
   return (
@@ -13,11 +14,14 @@ function initials(name) {
 
 function PosStaffView({ posStaff }) {
   const [query, setQuery] = useState('')
+  const [focus, setFocus] = useState('all')
   const staff = posStaff.data?.staff || []
   const q = query.trim().toLowerCase()
-  const filtered = staff.filter(
-    (p) => p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q),
-  )
+  const filtered = staff.filter((p) => {
+    if (focus === 'active' && !p.active) return false
+    if (focus === 'pos' && !p.posAccess) return false
+    return p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
+  })
   const activeCount = staff.filter((p) => p.active).length
   const posCount = staff.filter((p) => p.posAccess).length
 
@@ -42,12 +46,20 @@ function PosStaffView({ posStaff }) {
 
   return (
     <>
-      <div className="stat-cards">
-        <div className="stat-card"><span>Team members</span><strong>{staff.length}</strong></div>
-        <div className="stat-card"><span>Active</span><strong>{activeCount}</strong></div>
-        <div className="stat-card"><span>POS access</span><strong>{posCount}</strong></div>
-        <div className="stat-card"><span>Branch</span><strong className="pos-branch">{posStaff.data?.branch || '—'}</strong></div>
-      </div>
+      <HorizontalDragScroll className="stat-cards">
+        <button type="button" className={`stat-card${focus === 'all' ? ' is-on' : ''}`} onClick={() => setFocus('all')}>
+          <span>Team members</span><strong>{staff.length}</strong>
+        </button>
+        <button type="button" className={`stat-card${focus === 'active' ? ' is-on' : ''}`} onClick={() => setFocus('active')}>
+          <span>Active</span><strong>{activeCount}</strong>
+        </button>
+        <button type="button" className={`stat-card${focus === 'pos' ? ' is-on' : ''}`} onClick={() => setFocus('pos')}>
+          <span>POS access</span><strong>{posCount}</strong>
+        </button>
+        <div className="stat-card">
+          <span>Branch</span><strong className="pos-branch">{posStaff.data?.branch || '—'}</strong>
+        </div>
+      </HorizontalDragScroll>
 
       <div className="card directory-card">
         <div className="directory-head">

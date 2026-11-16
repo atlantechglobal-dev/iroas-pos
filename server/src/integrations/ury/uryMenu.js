@@ -241,8 +241,8 @@ export class MenuEditError extends Error {
 
 /**
  * Finds the menu row (and its parent URY Menu doc) for a given row id, searching
- * the active menu first, then every other menu on the branch. Shared by
- * updateUryMenuItem and removeUryMenuItem so both look a row up the same way.
+ * the active menu first, then every other menu on the branch. Used by
+ * updateUryMenuItem to look a row up.
  */
 async function findMenuRow(tenant, rowIdText) {
   const { menu } = await loadActiveMenuDoc(tenant)
@@ -337,20 +337,6 @@ export async function updateUryMenuItem(tenant, rowId, changes = {}) {
  * removed — the underlying Item (and any order history referencing it)
  * is untouched, same as how the URY desk menu screen deletes a row.
  */
-export async function removeUryMenuItem(tenant, rowId) {
-  const rowIdText = String(rowId || '')
-  const { doc } = await findMenuRow(tenant, rowIdText)
-  const nextDoc = { ...doc, items: (doc.items || []).filter((entry) => entry.name !== rowIdText), doctype: 'URY Menu' }
-  try {
-    await tenant.client.post('frappe.client.save', { doc: nextDoc })
-  } catch (err) {
-    if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
-    throw err
-  }
-  clearUryMenuCache()
-  return getUryMenu(tenant)
-}
-
 /** Switches the restaurant's active menu to an existing URY Menu on this branch. */
 export async function setActiveUryMenu(tenant, menuName) {
   const name = cleanName(menuName, 140)
@@ -370,6 +356,127 @@ export async function setActiveUryMenu(tenant, menuName) {
   }
   clearUryMenuCache()
   return getUryMenu(tenant)
+}
+
+/** Frappe delete_items can answer HTTP 200 while still refusing the delete. */
+function raisedFrappeMessages(body) {
+  try {
+    const raw = JSON.parse(body?._server_messages || '[]')
+    return raw
+      .map((entry) => (typeof entry === 'string' ? JSON.parse(entry) : entry))
+      .filter((msg) => msg && Number(msg.raise_exception) === 1)
+      .map((msg) => String(msg.message || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+async function findMenuItemRow(tenant, rowId) {
+  const rowIdText = String(rowId || '')
+  if (!rowIdText) return null
+  const { menu } = await loadActiveMenuDoc(tenant)
+  let row = menu?.items?.find((entry) => entry.name === rowIdText && entry.parent === menu.name)
+  let menuName = row ? menu.name : ''
+  if (!row) {
+    const menus = await branchMenus(tenant.client, tenant.branch)
+    for (const listed of menus) {
+      if (listed.name === menu?.name) continue
+      let doc
+      try {
+        doc = (await tenant.client.getDoc('URY Menu', listed.name)).docs[0]
+      } catch (err) {
+        if (err instanceof UryError && (err.code === 'not_found' || err.code === 'forbidden')) continue
+        throw err
+      }
+      row = (doc.items || []).find((entry) => entry.name === rowIdText && entry.parent === listed.name)
+      if (row) {
+        menuName = listed.name
+        break
+      }
+    }
+  }
+  if (!row?.item || !menuName) return null
+  return { row, menuName, code: row.item }
+}
+
+async function itemStillOnMenus(tenant, code) {
+  const menus = await branchMenus(tenant.client, tenant.branch)
+  for (const listed of menus) {
+    let doc
+    try {
+      doc = (await tenant.client.getDoc('URY Menu', listed.name)).docs[0]
+    } catch (err) {
+      if (err instanceof UryError && (err.code === 'not_found' || err.code === 'forbidden')) continue
+      throw err
+    }
+    if ((doc.items || []).some((entry) => entry.item === code)) return true
+  }
+  return false
+}
+
+async function disablePosItem(tenant, code) {
+  await tenant.client.post('frappe.client.set_value', {
+    doctype: 'Item',
+    name: code,
+    fieldname: 'disabled',
+    value: 1,
+  })
+}
+
+/**
+ * Removes one row from the menu list, then deletes the POS Item.
+ * When the Item is already on an invoice, Frappe refuses the delete and asks
+ * to disable it instead — the row still leaves the menu, and the Item is disabled.
+ */
+export async function deleteUryMenuItem(tenant, rowId) {
+  const found = await findMenuItemRow(tenant, rowId)
+  if (!found) throw new MenuEditError('item_not_found', 'Menu item not found.', { status: 404 })
+
+  const doc = (await tenant.client.getDoc('URY Menu', found.menuName)).docs[0]
+  const before = (doc.items || []).length
+  doc.items = (doc.items || []).filter((entry) => entry.name !== found.row.name)
+  if (doc.items.length === before) throw new MenuEditError('item_not_found', 'Menu item not found.', { status: 404 })
+  doc.doctype = 'URY Menu'
+  try {
+    await tenant.client.post('frappe.client.save', { doc })
+  } catch (err) {
+    if (err instanceof UryError && err.code === 'validation') throw new MenuEditError('rejected', err.message, { status: 422 })
+    throw err
+  }
+
+  let outcome = 'removed'
+  if (!(await itemStillOnMenus(tenant, found.code))) {
+    try {
+      const body = await tenant.client.post('frappe.desk.reportview.delete_items', {
+        doctype: 'Item',
+        items: JSON.stringify([found.code]),
+      })
+      if (raisedFrappeMessages(body).length) {
+        try {
+          await disablePosItem(tenant, found.code)
+          outcome = 'disabled'
+        } catch (disableErr) {
+          if (!(disableErr instanceof UryError)) throw disableErr
+          outcome = 'removed'
+        }
+      } else {
+        outcome = 'deleted'
+      }
+    } catch (err) {
+      if (!(err instanceof UryError) || !['validation', 'forbidden'].includes(err.code)) throw err
+      try {
+        await disablePosItem(tenant, found.code)
+        outcome = 'disabled'
+      } catch (disableErr) {
+        if (!(disableErr instanceof UryError)) throw disableErr
+        outcome = 'removed'
+      }
+    }
+  }
+
+  clearUryMenuCache()
+  return { menu: await getUryMenu(tenant), outcome }
 }
 
 async function readMenuCatalog(client, branch, knownDocs = new Map()) {

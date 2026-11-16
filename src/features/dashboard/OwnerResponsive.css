@@ -1,0 +1,174 @@
+/* Restaurant panel: laptop, tablet, and phone.
+   Platform admin keeps its own rules. */
+
+.dashboard-shell:not(.platform-admin-page) .content {
+  min-width: 0;
+}
+
+.dashboard-shell:not(.platform-admin-page) .stat-card {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-shell:not(.platform-admin-page) .one-link-page .dashboard-grid,
+  .dashboard-shell:not(.platform-admin-page) .branding-studio,
+  .dashboard-shell:not(.platform-admin-page) .dbc-workspace,
+  .dashboard-shell:not(.platform-admin-page) .table-qr-layout,
+  .dashboard-shell:not(.platform-admin-page) .two-col,
+  .dashboard-shell:not(.platform-admin-page) .panel-grid,
+  .dashboard-shell:not(.platform-admin-page) .delivery-grid,
+  .dashboard-shell:not(.platform-admin-page) .billing-subgrid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .one-link-preview-panel,
+  .dashboard-shell:not(.platform-admin-page) .branding-preview,
+  .dashboard-shell:not(.platform-admin-page) .dbc-preview {
+    position: static;
+    max-width: 420px;
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-shell:not(.platform-admin-page) .page-head,
+  .dashboard-shell:not(.platform-admin-page) .page-header,
+  .dashboard-shell:not(.platform-admin-page) .directory-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .head-actions,
+  .dashboard-shell:not(.platform-admin-page) .page-actions,
+  .dashboard-shell:not(.platform-admin-page) .title-buttons {
+    width: 100%;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .head-actions > *,
+  .dashboard-shell:not(.platform-admin-page) .page-actions > *,
+  .dashboard-shell:not(.platform-admin-page) .title-buttons > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .pos-item-grid,
+  .dashboard-shell:not(.platform-admin-page) .item-grid,
+  .dashboard-shell:not(.platform-admin-page) .category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .customer-list li,
+  .dashboard-shell:not(.platform-admin-page) .txn-list li {
+    grid-template-columns: 1fr auto;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .staff-list li {
+    flex-wrap: wrap;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .field-grid,
+  .dashboard-shell:not(.platform-admin-page) .field-grid.two,
+  .dashboard-shell:not(.platform-admin-page) .field-grid.three,
+  .dashboard-shell:not(.platform-admin-page) .upload-grid,
+  .dashboard-shell:not(.platform-admin-page) .table-add-form,
+  .dashboard-shell:not(.platform-admin-page) .table-qr-add {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .tab-bar,
+  .dashboard-shell:not(.platform-admin-page) .filter-chips,
+  .dashboard-shell:not(.platform-admin-page) .role-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .tab-bar::-webkit-scrollbar,
+  .dashboard-shell:not(.platform-admin-page) .filter-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .tab-bar > *,
+  .dashboard-shell:not(.platform-admin-page) .filter-chips > *,
+  .dashboard-shell:not(.platform-admin-page) .role-chips > * {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-shell:not(.platform-admin-page) .page-head h1,
+  .dashboard-shell:not(.platform-admin-page) .page-header h1 {
+    font-size: 26px;
+    line-height: 1.15;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) input,
+  .dashboard-shell:not(.platform-admin-page) select,
+  .dashboard-shell:not(.platform-admin-page) textarea {
+    font-size: 16px;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .menu-drawer-backdrop,
+  .dashboard-shell:not(.platform-admin-page) .order-sheet-backdrop,
+  .dashboard-shell:not(.platform-admin-page) .review-modal,
+  .dashboard-shell:not(.platform-admin-page) .pay-modal-backdrop {
+    align-items: flex-end;
+    justify-content: stretch;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .menu-drawer,
+  .dashboard-shell:not(.platform-admin-page) .order-sheet,
+  .dashboard-shell:not(.platform-admin-page) .review-modal-card,
+  .dashboard-shell:not(.platform-admin-page) .pay-modal {
+    width: 100% !important;
+    max-width: 100%;
+    height: min(92dvh, 100%);
+    max-height: min(92dvh, 100%);
+    border-radius: 20px 20px 0 0;
+    border-left: none;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-shell:not(.platform-admin-page) .head-actions,
+  .dashboard-shell:not(.platform-admin-page) .page-actions,
+  .dashboard-shell:not(.platform-admin-page) .title-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .head-actions > *,
+  .dashboard-shell:not(.platform-admin-page) .page-actions > *,
+  .dashboard-shell:not(.platform-admin-page) .title-buttons > * {
+    width: 100%;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .page-head h1,
+  .dashboard-shell:not(.platform-admin-page) .page-header h1 {
+    font-size: 22px;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .pos-item-row,
+  .dashboard-shell:not(.platform-admin-page) .pos-item-head,
+  .dashboard-shell:not(.platform-admin-page) .pos-item-row:has(.pos-price-form) {
+    grid-template-columns: 1fr auto;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .pos-item-grid,
+  .dashboard-shell:not(.platform-admin-page) .item-grid,
+  .dashboard-shell:not(.platform-admin-page) .category-grid,
+  .dashboard-shell:not(.platform-admin-page) .customer-list li {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell:not(.platform-admin-page) .pos-course-pill,
+  .dashboard-shell:not(.platform-admin-page) .pos-item-price,
+  .dashboard-shell:not(.platform-admin-page) .pos-price-form,
+  .dashboard-shell:not(.platform-admin-page) .pos-item-actions {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

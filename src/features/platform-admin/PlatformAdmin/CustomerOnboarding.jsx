@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/shared/ui/layout/DashboardLayout'
 import { TenantReviewDrawer } from '@/shared/ui/admin/TenantReviewDrawer'
-import { useDebounce } from '@/shared/hooks/useDebounce'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { api } from '@/shared/lib/api'
 import { OnboardingChip } from '@/shared/ui/setup-progress/SetupProgress'
@@ -49,8 +48,6 @@ function CustomerOnboarding() {
   const toast = useToast()
   const navigate = useNavigate()
   const [filter, setFilter] = useState('onboarding')
-  const [search, setSearch] = useState('')
-  const debounced = useDebounce(search, 250)
   const [tenants, setTenants] = useState([])
   const [pipelineStats, setPipelineStats] = useState({ setup: 0, awaiting: 0 })
   const [loading, setLoading] = useState(true)
@@ -71,7 +68,7 @@ function CustomerOnboarding() {
     setLoading(true)
     const statusParam = filter === 'all' ? '' : filter
     api
-      .adminTenants(debounced, statusParam)
+      .adminTenants('', statusParam)
       .then(({ tenants: rows }) => {
         const list = rows || []
         if (filter === 'all') {
@@ -95,7 +92,7 @@ function CustomerOnboarding() {
 
   useEffect(() => {
     loadList()
-  }, [debounced, filter])
+  }, [filter])
 
   const reload = () => {
     loadPipelineStats()
@@ -164,16 +161,6 @@ function CustomerOnboarding() {
             </button>
           )
         })}
-      </div>
-
-      <div className="pa-pipeline-search">
-        <input
-          type="search"
-          placeholder="Search business or owner…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search onboarding list"
-        />
       </div>
 
       <section className="tenants-card">
