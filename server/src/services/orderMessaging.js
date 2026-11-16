@@ -1,6 +1,7 @@
 import { db } from '../infra/db.js'
 import { queueEmail, createNotification } from './identityService.js'
 import { isSmtpConfigured, sendEmail } from './emailService.js'
+import { sendWhatsAppForMessageType } from './whatsappService.js'
 import { formatMoney } from '../shared/money.js'
 
 function parseSettings(restaurant) {
@@ -85,6 +86,14 @@ export async function onOrderCreated(restaurant, order) {
       subject: `Order #${order.publicCode} received — ${restaurantName}`,
       body: guestBody,
     })
+  }
+
+  if (order.phone) {
+    await sendWhatsAppForMessageType('orderConfirmation', order.phone, [
+      order.guestName || 'there',
+      order.publicCode,
+      formatMoney(order.total),
+    ])
   }
 
   if (settings.newOrderAlert !== false) {

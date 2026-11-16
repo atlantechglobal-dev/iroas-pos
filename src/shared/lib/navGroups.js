@@ -201,6 +201,12 @@ export const ADMIN_NAV_GROUPS = [
         route: ROUTES.PLATFORM_SETTINGS_PAYMENT,
       },
       {
+        key: 'platform-settings-whatsapp',
+        label: 'WhatsApp settings',
+        icon: '/images/msg.svg',
+        route: ROUTES.PLATFORM_SETTINGS_WHATSAPP,
+      },
+      {
         key: 'platform-settings-google',
         label: 'Google sign-in',
         icon: '/images/security.svg',
@@ -235,6 +241,7 @@ const ADMIN_PATH_KEYS = [
   [ROUTES.PLATFORM_PROFESSIONAL, 'platform-professional'],
   [ROUTES.PLATFORM_SETTINGS_EMAIL, 'platform-settings-email'],
   [ROUTES.PLATFORM_SETTINGS_PAYMENT, 'platform-settings-payment'],
+  [ROUTES.PLATFORM_SETTINGS_WHATSAPP, 'platform-settings-whatsapp'],
   [ROUTES.PLATFORM_SETTINGS_GOOGLE, 'platform-settings-google'],
   [ROUTES.PLATFORM_SETTINGS_CATEGORIES, 'platform-settings-categories'],
   [ROUTES.PLATFORM_SETTINGS_FLAGS, 'platform-settings-flags'],

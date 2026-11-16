@@ -16,6 +16,11 @@ const CARDS = [
     desc: 'AddPay credentials for onboarding launch payment',
   },
   {
+    to: ROUTES.PLATFORM_SETTINGS_WHATSAPP,
+    title: 'WhatsApp settings',
+    desc: 'Meta Cloud API · booking & order confirmation templates',
+  },
+  {
     to: ROUTES.PLATFORM_SETTINGS_GOOGLE,
     title: 'Google sign-in',
     desc: 'OAuth Client ID for Login with Google',

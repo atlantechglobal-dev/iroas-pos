@@ -1,6 +1,7 @@
 import { db } from '../infra/db.js'
 import { queueEmail, createNotification } from './identityService.js'
 import { isSmtpConfigured, sendEmail } from './emailService.js'
+import { sendWhatsAppForMessageType } from './whatsappService.js'
 import { parseTimeToMinutes } from './reservationAvailability.js'
 
 function parseSettings(restaurant) {
@@ -74,6 +75,18 @@ function cancelPendingReminders(reservationId) {
      SET status = 'cancelled'
      WHERE reservation_id = ? AND kind = 'booking_reminder' AND status = 'queued'`,
   ).run(reservationId)
+}
+
+function sendBookingConfirmedWhatsApp(restaurant, reservation) {
+  if (!reservation.phone) return
+  const when = `${reservation.date} at ${reservation.time}`
+  // sendWhatsAppForMessageType never rejects (it swallows send failures internally),
+  // so this fires without blocking the caller or needing a .catch().
+  sendWhatsAppForMessageType('bookingConfirmation', reservation.phone, [
+    reservation.guest_name || 'there',
+    when,
+    String(reservation.guests),
+  ])
 }
 
 function scheduleReminder(restaurant, reservation) {
@@ -206,6 +219,7 @@ export function onReservationCreated(restaurant, reservation, { source = 'public
 
   if (isConfirmed) {
     scheduleReminder(restaurant, reservation)
+    sendBookingConfirmedWhatsApp(restaurant, reservation)
   }
 }
 
@@ -260,6 +274,7 @@ export function onReservationStatusChange(restaurant, previous, next, { byGuest 
       })
     }
     scheduleReminder(restaurant, next)
+    sendBookingConfirmedWhatsApp(restaurant, next)
   }
 
   if (next.status === 'cancelled' && previous.status !== 'cancelled') {

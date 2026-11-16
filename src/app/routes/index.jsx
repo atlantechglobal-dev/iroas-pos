@@ -72,6 +72,7 @@ const Notifications = lazy(() => import('@/features/dashboard/Notifications/Noti
 const Settings = lazy(() => import('@/features/dashboard/Settings/Settings'))
 const EmailSettings = lazy(() => import('@/features/dashboard/Settings/EmailSettings'))
 const PaymentSettings = lazy(() => import('@/features/dashboard/Settings/PaymentSettings'))
+const WhatsAppSettings = lazy(() => import('@/features/dashboard/Settings/WhatsAppSettings'))
 const GoogleAuthSettings = lazy(() => import('@/features/dashboard/Settings/GoogleAuthSettings'))
 const BusinessCategoriesSettings = lazy(
   () => import('@/features/platform-admin/PlatformAdmin/BusinessCategoriesSettings'),
@@ -281,6 +282,10 @@ export function AppRoutes() {
         <Route
           path={ROUTES.PLATFORM_SETTINGS_PAYMENT}
           element={withProtection(PaymentSettings, { adminOnly: true, superAdminOnly: true })}
+        />
+        <Route
+          path={ROUTES.PLATFORM_SETTINGS_WHATSAPP}
+          element={withProtection(WhatsAppSettings, { adminOnly: true, superAdminOnly: true })}
         />
         <Route
           path={ROUTES.PLATFORM_SETTINGS_GOOGLE}

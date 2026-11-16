@@ -66,6 +66,7 @@ export const ROUTES = {
   PLATFORM_SETTINGS: '/platform-admin/settings',
   PLATFORM_SETTINGS_EMAIL: '/platform-admin/settings/email',
   PLATFORM_SETTINGS_PAYMENT: '/platform-admin/settings/payment',
+  PLATFORM_SETTINGS_WHATSAPP: '/platform-admin/settings/whatsapp',
   PLATFORM_SETTINGS_GOOGLE: '/platform-admin/settings/google',
   PLATFORM_SETTINGS_CATEGORIES: '/platform-admin/settings/categories',
   PLATFORM_SETTINGS_FLAGS: '/platform-admin/settings/flags',

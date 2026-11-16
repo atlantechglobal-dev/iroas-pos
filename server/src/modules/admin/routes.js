@@ -39,6 +39,12 @@ import {
 } from '../../services/emailService.js'
 import { getPublicPaymentSettings, savePaymentSettings } from '../../services/paymentSettings.js'
 import {
+  getPublicWhatsAppSettings,
+  saveWhatsAppSettings,
+  sendWhatsAppMessage,
+  isWhatsAppConfigured,
+} from '../../services/whatsappService.js'
+import {
   getPublicGoogleAuthSettings,
   saveGoogleAuthSettings,
 } from '../../services/googleAuthSettings.js'
@@ -871,6 +877,41 @@ router.post('/email-settings/test', async (req, res) => {
     })
   } catch (err) {
     res.status(502).json({ error: err.message || 'Test email failed.' })
+  }
+})
+
+router.get('/whatsapp-settings', (_req, res) => {
+  res.json({ settings: getPublicWhatsAppSettings() })
+})
+
+router.put('/whatsapp-settings', (req, res) => {
+  try {
+    const settings = saveWhatsAppSettings(req.body || {})
+    auditFromReq(req, 'settings.whatsapp', 'settings', 'whatsapp', 'Updated WhatsApp settings')
+    res.json({ ok: true, settings })
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message || 'Unable to save WhatsApp settings.' })
+  }
+})
+
+router.post('/whatsapp-settings/test', async (req, res) => {
+  if (!isWhatsAppConfigured()) {
+    return res.status(400).json({
+      error: 'WhatsApp is not configured. Save a phone number ID + access token first.',
+    })
+  }
+  const to = String(req.body?.to || '').trim()
+  const templateName = String(req.body?.templateName || '').trim()
+  if (!to || !templateName) {
+    return res.status(400).json({ error: 'Provide a recipient phone number and an approved template name.' })
+  }
+  try {
+    const data = await sendWhatsAppMessage(to, templateName, {
+      languageCode: String(req.body?.languageCode || 'en').trim() || 'en',
+    })
+    res.json({ ok: true, to, data })
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Test WhatsApp message failed.' })
   }
 })
 

@@ -56,6 +56,11 @@ export const adminApi = {
   paymentSettings: () => apiRequest('/admin/payment-settings'),
   savePaymentSettings: (payload) =>
     apiRequest('/admin/payment-settings', { method: 'PUT', body: payload }),
+  whatsappSettings: () => apiRequest('/admin/whatsapp-settings'),
+  saveWhatsappSettings: (payload) =>
+    apiRequest('/admin/whatsapp-settings', { method: 'PUT', body: payload }),
+  testWhatsapp: (payload) =>
+    apiRequest('/admin/whatsapp-settings/test', { method: 'POST', body: payload }),
   plans: () => apiRequest('/admin/plans'),
   createPlan: (payload) => apiRequest('/admin/plans', { method: 'POST', body: payload }),
   savePlan: (id, payload) => apiRequest(`/admin/plans/${id}`, { method: 'PUT', body: payload }),
